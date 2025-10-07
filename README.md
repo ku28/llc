@@ -1,6 +1,6 @@
-Clinic ERP (MVP)
+LLC ERP (MVP)
 
-This repository is a minimal clinic ERP inspired by accountsdeck.
+This repository is a minimal LLC ERP inspired by accountsdeck.
 
 Tech stack
 - Next.js (TypeScript)

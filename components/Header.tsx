@@ -45,8 +45,20 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
 
   return (
     <header className="panel shadow py-3 mb-6">
-      <div className="max-w-4xl mx-auto px-4 flex justify-between items-center">
-        <h1 className="text-lg font-bold">{title}</h1>
+  <div className="max-w-6xl mx-auto px-2 sm:px-4 flex justify-between items-center">
+        <div className="flex items-center gap-6">
+          <h1 className="text-lg font-bold">{title}</h1>
+
+          {/* main nav - hidden on small screens */}
+          <nav className="hidden md:flex items-center gap-2">
+            <Link href="/" className="px-3 py-2 rounded hover:bg-gray-100">Dashboard</Link>
+            <Link href="/patients" className="px-3 py-2 rounded hover:bg-gray-100">Patients</Link>
+            <Link href="/treatments" className="px-3 py-2 rounded hover:bg-gray-100">Treatments</Link>
+            <Link href="/products" className="px-3 py-2 rounded hover:bg-gray-100">Inventory</Link>
+            <Link href="/visits" className="px-3 py-2 rounded hover:bg-gray-100">Visits</Link>
+          </nav>
+
+        </div>
         <div className="flex items-center gap-4">
           {/* quick access to prescriptions page */}
           <Link href="/prescriptions" className="px-3 py-1 bg-brand text-white rounded">Prescriptions</Link>

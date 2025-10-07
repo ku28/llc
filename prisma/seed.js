@@ -8,15 +8,15 @@ async function main() {
   const recHash = await bcrypt.hash('receptionpass', 10)
 
   await prisma.user.upsert({
-    where: { email: 'admin@clinic.local' },
+    where: { email: 'admin@lastleafcare.in' },
     update: { passwordHash: adminHash },
-    create: { email: 'admin@clinic.local', name: 'Admin', role: 'admin', passwordHash: adminHash }
+    create: { email: 'admin@lastleafcare.in', name: 'Admin', role: 'admin', passwordHash: adminHash }
   })
 
   await prisma.user.upsert({
-    where: { email: 'reception@clinic.local' },
+    where: { email: 'reception@lastleafcare.in' },
     update: { passwordHash: recHash },
-    create: { email: 'reception@clinic.local', name: 'Reception', role: 'staff', passwordHash: recHash }
+    create: { email: 'reception@lastleafcare.in', name: 'Reception', role: 'staff', passwordHash: recHash }
   })
 
   const p = await prisma.patient.upsert({
