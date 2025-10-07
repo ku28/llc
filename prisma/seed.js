@@ -2,7 +2,22 @@ const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
 
 async function main() {
-  // (default admin/reception users removed) If you need stable admin users, create them manually.
+  // create or update users
+  const bcrypt = require('bcryptjs')
+  const adminHash = await bcrypt.hash('adminpass', 10)
+  const recHash = await bcrypt.hash('receptionpass', 10)
+
+  await prisma.user.upsert({
+    where: { email: 'admin@lastleafcare.com' },
+    update: { passwordHash: adminHash },
+    create: { email: 'admin@lastleafcare.com', name: 'Admin', role: 'admin', passwordHash: adminHash }
+  })
+
+  await prisma.user.upsert({
+    where: { email: 'reception@lastleafcare.com' },
+    update: { passwordHash: recHash },
+    create: { email: 'reception@lastleafcare.com', name: 'Reception', role: 'staff', passwordHash: recHash }
+  })
 
   const p = await prisma.patient.upsert({
     where: { email: 'john@example.com' },

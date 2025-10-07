@@ -10,11 +10,9 @@ export default function LoginPage() {
     async function submit(e: any) {
         e.preventDefault(); setLoading(true)
         const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
-        const body = await res.json().catch(() => ({}))
         setLoading(false)
-        if (res.ok) return router.push('/')
-        console.error('Login failed response:', res.status, body)
-        alert(body && body.error ? `Login failed: ${body.error}` : 'Login failed')
+        if (res.ok) router.push('/')
+        else alert('Login failed')
     }
 
     return (
