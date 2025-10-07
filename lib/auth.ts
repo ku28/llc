@@ -30,7 +30,13 @@ export function verifySessionToken(token: string) {
             let diff = 0
             for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i)
             if (diff !== 0) return null
-        const data = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'))
+        // payload is base64url (no padding, - and _). Convert to standard base64 before decoding.
+        let b64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+        const pad = b64.length % 4
+        if (pad === 2) b64 += '=='
+        else if (pad === 3) b64 += '='
+        else if (pad !== 0) { /* pad === 1 is invalid */ return null }
+        const data = JSON.parse(Buffer.from(b64, 'base64').toString('utf8'))
         return data
     } catch (e) { return null }
 }
