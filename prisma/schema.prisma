@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  passwordHash String?
+  role      String   @default("staff")
+  createdAt DateTime @default(now())
+}
+
+model Patient {
+  id         Int      @id @default(autoincrement())
+  firstName  String
+  lastName   String
+  phone      String?
+  email      String?  @unique
+  opdNo      String?
+  date       DateTime? @default(now())
+  dob        DateTime?
+  age        Int?
+  address    String?
+  gender     String?
+  nextVisit  DateTime?
+  occupation String?
+  pendingPaymentCents Int @default(0)
+  height     Float?
+  weight     Float?
+  createdAt  DateTime @default(now())
+  appointments Appointment[]
+  invoices     Invoice[]
+  visits       Visit[]
+}
+
+model Appointment {
+  id         Int      @id @default(autoincrement())
+  patient    Patient  @relation(fields: [patientId], references: [id])
+  patientId  Int
+  scheduled  DateTime
+  notes      String?
+  status     String   @default("scheduled")
+  createdAt  DateTime @default(now())
+}
+
+model Invoice {
+  id         Int      @id @default(autoincrement())
+  patient    Patient  @relation(fields: [patientId], references: [id])
+  patientId  Int
+  totalCents Int
+  paid       Boolean  @default(false)
+  dueDate    DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model Product {
+  id          Int     @id @default(autoincrement())
+  name        String
+  sku         String? @unique
+  priceCents  Int
+  quantity    Int     @default(0)
+  reorderLevel Int    @default(0)
+  batches     ProductBatch[]
+  productOrders ProductOrder[]
+}
+
+model Treatment {
+  id         Int      @id @default(autoincrement())
+  name       String
+  code       String?  @unique
+  dosage     String?
+  administration String?
+  procedure  String?
+  dilutors   String? // Free-form: "No of drops in Water/Alcohol in oil, etc"
+  notes      String?
+  createdAt  DateTime @default(now())
+  prescriptions Prescription[]
+}
+
+model Visit {
+  id                Int       @id @default(autoincrement())
+  patient           Patient   @relation(fields: [patientId], references: [id])
+  patientId         Int
+  opdNo             String
+  date              DateTime  @default(now())
+  diagnoses         String?
+  temperament       String?
+  pulseDiagnosis    String?
+  majorComplaints   String?
+  historyReports    String?
+  investigations    String?
+  provisionalDiagnosis String?
+  improvements      String?
+  specialNote       String?
+  initials          String?
+  dob               DateTime?
+  age               Int?
+  address           String?
+  visitNumber       Int?
+  gender            String?
+  phone             String?
+  nextVisit         DateTime?
+  occupation        String?
+  pendingPaymentCents Int    @default(0)
+  height            Float?
+  weight            Float?
+  procedureAdopted  String?
+  precautions       String?
+  createdAt         DateTime @default(now())
+  prescriptions     Prescription[]
+}
+
+model Prescription {
+  id          Int       @id @default(autoincrement())
+  visit       Visit     @relation(fields: [visitId], references: [id])
+  visitId     Int
+  treatment   Treatment @relation(fields: [treatmentId], references: [id])
+  treatmentId Int
+  dosage      String?
+  administration String?
+  quantity    Int       @default(1)
+  taken       Boolean   @default(false)
+  dispensed   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+}
+
+model ProductBatch {
+  id             Int      @id @default(autoincrement())
+  product        Product  @relation(fields: [productId], references: [id])
+  productId      Int
+  sku            String?
+  quantity       Int
+  purchasePriceCents Int
+  salePriceCents Int
+  expiry         DateTime?
+  createdAt      DateTime @default(now())
+  purchases      Purchase[]
+  sales          Sale[]
+}
+
+model Purchase {
+  id             Int      @id @default(autoincrement())
+  productBatch   ProductBatch @relation(fields: [productBatchId], references: [id])
+  productBatchId Int
+  quantity       Int
+  totalCents     Int
+  supplier       String?
+  date           DateTime @default(now())
+}
+
+model Sale {
+  id             Int      @id @default(autoincrement())
+  productBatch   ProductBatch @relation(fields: [productBatchId], references: [id])
+  productBatchId Int
+  quantity       Int
+  totalCents     Int
+  customer       String?
+  date           DateTime @default(now())
+}
+
+model ProductOrder {
+  id        Int      @id @default(autoincrement())
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int
+  quantity  Int
+  status    String   @default("pending")
+  orderVia  String?
+  createdAt DateTime @default(now())
+}
