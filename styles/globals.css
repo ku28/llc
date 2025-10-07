@@ -5,3 +5,100 @@
 html, body, #__next {
   height: 100%;
 }
+
+/* Theme defaults: white background, black text, brand green accents */
+:root {
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --text: #000000;
+  --muted: #6b7280; /* gray-500 */
+  --brand: #10B981;
+}
+
+/* Dark mode variables */
+.dark {
+  --bg: #0f172a; /* slate-900 */
+  --panel: #0b1220;
+  --text: #e6eef8;
+  --muted: #9ca3af;
+  --brand: #34d399; /* lighter green for dark */
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+/* panel utility */
+.panel {
+  background-color: var(--panel);
+  color: var(--text);
+}
+
+.brand {
+  color: var(--brand);
+}
+
+/* Dark-mode overrides for commonly used Tailwind utility classes so the whole
+   app responds to the `.dark` class (not just components that use CSS vars). */
+.dark .bg-white { background-color: var(--panel) !important; }
+.dark .bg-gray-50 { background-color: var(--bg) !important; }
+
+/* Buttons and colored elements should use the brand color in dark */
+.dark .bg-indigo-600,
+.dark .bg-blue-600,
+.dark .bg-green-600,
+.dark .bg-red-500,
+.dark .bg-brand,
+.dark .bg-brand-600 { background-color: var(--brand) !important; }
+
+/* Text colors */
+.dark .text-white { color: var(--text) !important; }
+.dark .text-gray-500 { color: var(--muted) !important; }
+.dark .text-gray-700 { color: var(--text) !important; }
+
+/* Hover states for navigation and controls */
+.dark .hover\:bg-gray-100:hover { background-color: rgba(255,255,255,0.03) !important; }
+.dark .hover\:bg-gray-200:hover { background-color: rgba(255,255,255,0.04) !important; }
+
+/* Panels and cards default */
+.dark .panel { background-color: var(--panel) !important; color: var(--text) !important; }
+
+/* Smooth theme transition when toggling */
+.theme-transition,
+.theme-transition * {
+  transition: background-color 250ms ease, color 250ms ease, border-color 250ms ease, fill 250ms ease !important;
+}
+
+/* Theme toggle switch styles */
+.theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 48px;
+  height: 28px;
+  padding: 4px;
+  background: rgba(0,0,0,0.04);
+  border-radius: 9999px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.theme-toggle .toggle-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; }
+.theme-toggle .toggle-sun { color: #fbbf24; }
+.theme-toggle .toggle-moon { color: #374151; }
+.theme-toggle .toggle-knob {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: white;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1), background 220ms;
+}
+.theme-toggle.is-dark { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.06); }
+.theme-toggle.is-dark .toggle-knob { transform: translateX(20px); background: #111827; }
+
+
