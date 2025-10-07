@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
+import DateInput from '../components/DateInput'
 
 export default function PatientsPage() {
     const [patients, setPatients] = useState<any[]>([])
     const [user, setUser] = useState<any>(null)
-    const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisit: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' })
+    const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' })
 
     useEffect(() => { fetch('/api/patients').then(r => r.json()).then(setPatients) }, [])
 
@@ -11,9 +12,19 @@ export default function PatientsPage() {
 
     return (
         <div>
-            <h2 className="text-xl font-bold mb-4">Patients</h2>
-            <div className="bg-white rounded shadow p-4">
-                {!user && <div className="mb-2 text-sm text-gray-600">You must <a className="text-blue-600 underline" href="/login">login</a> to add patients.</div>}
+            <div className="section-header">
+                <h2 className="section-title">Patient Management</h2>
+                <span className="badge">{patients.length} patients</span>
+            </div>
+
+            <div className="card mb-6">
+                <h3 className="text-lg font-semibold mb-4">Register New Patient</h3>
+                
+                {!user && (
+                    <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm">
+                        You must <a className="text-brand underline font-medium" href="/login">login</a> to add patients.
+                    </div>
+                )}
 
                 {user && (
                     <form onSubmit={async (e) => {
@@ -25,37 +36,98 @@ export default function PatientsPage() {
                             if (payload.pendingPaymentCents) payload.pendingPaymentCents = Number(payload.pendingPaymentCents)
                             if (payload.height) payload.height = Number(payload.height)
                             if (payload.weight) payload.weight = Number(payload.weight)
+                            
+                            // Combine date and time for nextVisit
+                            if (form.nextVisitDate && form.nextVisitTime) {
+                                payload.nextVisit = `${form.nextVisitDate}T${form.nextVisitTime}`
+                            }
+                            
                             await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
                             const list = await (await fetch('/api/patients')).json()
                             setPatients(list)
-                            setForm({ firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisit: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' })
+                            setForm({ firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' })
                         } catch (err) { console.error(err); alert('Failed to create patient') }
-                    }} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-                        <input required placeholder="First name" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} className="p-2 border rounded" />
-                        <input required placeholder="Last name" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} className="p-2 border rounded" />
-                        <input placeholder="Phone" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="p-2 border rounded" />
-                        <input placeholder="Email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="p-2 border rounded" />
-                        <input type="date" placeholder="DOB" value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} className="p-2 border rounded" />
-                        <input placeholder="OPD No" value={(form as any).opdNo || ''} onChange={e => setForm({ ...form, opdNo: e.target.value })} className="p-2 border rounded" />
-                        <input placeholder="Age" type="number" value={(form as any).age || ''} onChange={e => setForm({ ...form, age: e.target.value })} className="p-2 border rounded" />
-                        <input placeholder="Address" value={(form as any).address || ''} onChange={e => setForm({ ...form, address: e.target.value })} className="p-2 border rounded" />
-                        <input placeholder="Gender" value={(form as any).gender || ''} onChange={e => setForm({ ...form, gender: e.target.value })} className="p-2 border rounded" />
-                        <input type="datetime-local" placeholder="Next visit" value={(form as any).nextVisit || ''} onChange={e => setForm({ ...form, nextVisit: e.target.value })} className="p-2 border rounded" />
-                        <input placeholder="Occupation" value={(form as any).occupation || ''} onChange={e => setForm({ ...form, occupation: e.target.value })} className="p-2 border rounded" />
-                        <input placeholder="Pending payment (cents)" type="number" value={(form as any).pendingPaymentCents || ''} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} className="p-2 border rounded" />
-                        <input placeholder="Height" type="number" value={(form as any).height || ''} onChange={e => setForm({ ...form, height: e.target.value })} className="p-2 border rounded" />
-                        <input placeholder="Weight" type="number" value={(form as any).weight || ''} onChange={e => setForm({ ...form, weight: e.target.value })} className="p-2 border rounded" />
-                        <div className="sm:col-span-3 text-right"><button className="bg-blue-600 text-white px-4 py-2 rounded">Add Patient</button></div>
+                    }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">First Name *</label>
+                            <input required placeholder="John" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Last Name *</label>
+                            <input required placeholder="Doe" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Phone</label>
+                            <input placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Email</label>
+                            <input type="email" placeholder="john.doe@example.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Date of Birth</label>
+                            <DateInput type="date" placeholder="Select date of birth" value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">OPD Number</label>
+                            <input placeholder="OPD-001" value={(form as any).opdNo || ''} onChange={e => setForm({ ...form, opdNo: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Age</label>
+                            <input placeholder="35" type="number" value={(form as any).age || ''} onChange={e => setForm({ ...form, age: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Address</label>
+                            <input placeholder="123 Main St, City" value={(form as any).address || ''} onChange={e => setForm({ ...form, address: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Gender</label>
+                            <input placeholder="Male / Female / Other" value={(form as any).gender || ''} onChange={e => setForm({ ...form, gender: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Next Visit Date</label>
+                            <DateInput type="date" placeholder="Select visit date" value={form.nextVisitDate} onChange={e => setForm({ ...form, nextVisitDate: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Next Visit Time</label>
+                            <input type="time" placeholder="Select time" value={form.nextVisitTime} onChange={e => setForm({ ...form, nextVisitTime: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Occupation</label>
+                            <input placeholder="Engineer" value={(form as any).occupation || ''} onChange={e => setForm({ ...form, occupation: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Pending Payment (₹)</label>
+                            <input placeholder="500.00" type="number" step="0.01" value={(form as any).pendingPaymentCents || ''} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Height (cm)</label>
+                            <input placeholder="175" type="number" value={(form as any).height || ''} onChange={e => setForm({ ...form, height: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Weight (kg)</label>
+                            <input placeholder="70" type="number" value={(form as any).weight || ''} onChange={e => setForm({ ...form, weight: e.target.value })} className="p-2 border rounded w-full" />
+                        </div>
+                        <div className="sm:col-span-2 lg:col-span-3 text-right pt-2">
+                            <button className="btn btn-primary">Add Patient</button>
+                        </div>
                     </form>
                 )}
+            </div>
 
-                <ul>
-                    {patients.map(p => (
-                        <li key={p.id} className="p-2 border-b">
-                            <PatientRow p={p} onUpdated={async () => { setPatients(await (await fetch('/api/patients')).json()) }} onDeleted={async () => { setPatients(await (await fetch('/api/patients')).json()) }} />
-                        </li>
-                    ))}
-                </ul>
+            <div className="card">
+                <h3 className="text-lg font-semibold mb-4">Patient Records</h3>
+                {patients.length === 0 ? (
+                    <div className="text-center py-8 text-muted">No patients registered yet</div>
+                ) : (
+                    <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {patients.map(p => (
+                            <li key={p.id} className="py-3">
+                                <PatientRow p={p} onUpdated={async () => { setPatients(await (await fetch('/api/patients')).json()) }} onDeleted={async () => { setPatients(await (await fetch('/api/patients')).json()) }} />
+                            </li>
+                        ))}
+                    </ul>
+                )}
             </div>
         </div>
     )
@@ -63,7 +135,40 @@ export default function PatientsPage() {
 
 function PatientRow({ p, onUpdated, onDeleted }: any) {
     const [editing, setEditing] = useState(false)
-    const [form, setForm] = useState({ firstName: p.firstName || '', lastName: p.lastName || '', phone: p.phone || '', email: p.email || '', dob: p.dob ? new Date(p.dob).toISOString().slice(0, 10) : '', opdNo: p.opdNo || '', date: p.date ? new Date(p.date).toISOString().slice(0, 10) : '', age: p.age ? String(p.age) : '', address: p.address || '', gender: p.gender || '', nextVisit: p.nextVisit ? new Date(p.nextVisit).toISOString().slice(0, 16) : '', occupation: p.occupation || '', pendingPaymentCents: p.pendingPaymentCents ? String(p.pendingPaymentCents) : '', height: p.height ? String(p.height) : '', weight: p.weight ? String(p.weight) : '' })
+    
+    // Split nextVisit into date and time
+    const splitNextVisit = () => {
+        if (p.nextVisit) {
+            const dt = new Date(p.nextVisit).toISOString()
+            return {
+                date: dt.slice(0, 10),
+                time: dt.slice(11, 16)
+            }
+        }
+        return { date: '', time: '' }
+    }
+    
+    const nextVisitSplit = splitNextVisit()
+    
+    const [form, setForm] = useState({ 
+        firstName: p.firstName || '', 
+        lastName: p.lastName || '', 
+        phone: p.phone || '', 
+        email: p.email || '', 
+        dob: p.dob ? new Date(p.dob).toISOString().slice(0, 10) : '', 
+        opdNo: p.opdNo || '', 
+        date: p.date ? new Date(p.date).toISOString().slice(0, 10) : '', 
+        age: p.age ? String(p.age) : '', 
+        address: p.address || '', 
+        gender: p.gender || '', 
+        nextVisit: p.nextVisit ? new Date(p.nextVisit).toISOString().slice(0, 16) : '',
+        nextVisitDate: nextVisitSplit.date,
+        nextVisitTime: nextVisitSplit.time,
+        occupation: p.occupation || '', 
+        pendingPaymentCents: p.pendingPaymentCents ? String(p.pendingPaymentCents) : '', 
+        height: p.height ? String(p.height) : '', 
+        weight: p.weight ? String(p.weight) : '' 
+    })
 
     async function save() {
         try {
@@ -72,6 +177,14 @@ function PatientRow({ p, onUpdated, onDeleted }: any) {
             if (payload.pendingPaymentCents) payload.pendingPaymentCents = Number(payload.pendingPaymentCents)
             if (payload.height) payload.height = Number(payload.height)
             if (payload.weight) payload.weight = Number(payload.weight)
+            
+            // Combine date and time for nextVisit
+            if (form.nextVisitDate && form.nextVisitTime) {
+                payload.nextVisit = `${form.nextVisitDate}T${form.nextVisitTime}`
+            } else if (form.nextVisit) {
+                payload.nextVisit = form.nextVisit
+            }
+            
             await fetch('/api/patients', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
             setEditing(false)
             onUpdated()
@@ -92,44 +205,121 @@ function PatientRow({ p, onUpdated, onDeleted }: any) {
     }
 
     if (editing) return (
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
-            <input placeholder="First name" className="p-2 border rounded" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
-            <input placeholder="Last name" className="p-2 border rounded" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
-            <input placeholder="Phone" className="p-2 border rounded" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
-            <input placeholder="Email" className="p-2 border rounded" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-            <input placeholder="OPD No" className="p-2 border rounded" value={(form as any).opdNo || ''} onChange={e => setForm({ ...form, opdNo: e.target.value })} />
-            <input placeholder="DOB" className="p-2 border rounded" type="date" value={(form as any).dob || ''} onChange={e => setForm({ ...form, dob: e.target.value })} />
-            <input placeholder="Age" className="p-2 border rounded" type="number" value={(form as any).age || ''} onChange={e => setForm({ ...form, age: e.target.value })} />
-            <input placeholder="Address" className="p-2 border rounded" value={(form as any).address || ''} onChange={e => setForm({ ...form, address: e.target.value })} />
-            <input placeholder="Gender" className="p-2 border rounded" value={(form as any).gender || ''} onChange={e => setForm({ ...form, gender: e.target.value })} />
-            <input placeholder="Next visit" className="p-2 border rounded" type="datetime-local" value={(form as any).nextVisit || ''} onChange={e => setForm({ ...form, nextVisit: e.target.value })} />
-            <input placeholder="Occupation" className="p-2 border rounded" value={(form as any).occupation || ''} onChange={e => setForm({ ...form, occupation: e.target.value })} />
-            <input placeholder="Pending payment (cents)" className="p-2 border rounded" type="number" value={(form as any).pendingPaymentCents || ''} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} />
-            <input placeholder="Height" className="p-2 border rounded" type="number" value={(form as any).height || ''} onChange={e => setForm({ ...form, height: e.target.value })} />
-            <input placeholder="Weight" className="p-2 border rounded" type="number" value={(form as any).weight || ''} onChange={e => setForm({ ...form, weight: e.target.value })} />
-            <div className="flex gap-2">
-                <button onClick={save} className="px-3 py-1 bg-green-600 text-white rounded">Save</button>
-                <button onClick={() => setEditing(false)} className="px-3 py-1 bg-gray-300 rounded">Cancel</button>
+        <div className="bg-gray-50 dark:bg-gray-900/30 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">First Name</label>
+                    <input placeholder="John" className="p-2 border rounded w-full" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Last Name</label>
+                    <input placeholder="Doe" className="p-2 border rounded w-full" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Phone</label>
+                    <input placeholder="+91 98765 43210" className="p-2 border rounded w-full" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Email</label>
+                    <input placeholder="john.doe@example.com" type="email" className="p-2 border rounded w-full" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">OPD Number</label>
+                    <input placeholder="OPD-001" className="p-2 border rounded w-full" value={(form as any).opdNo || ''} onChange={e => setForm({ ...form, opdNo: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Date of Birth</label>
+                    <DateInput className="p-2 border rounded w-full" type="date" placeholder="Select date of birth" value={(form as any).dob || ''} onChange={e => setForm({ ...form, dob: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Age</label>
+                    <input placeholder="35" className="p-2 border rounded w-full" type="number" value={(form as any).age || ''} onChange={e => setForm({ ...form, age: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Address</label>
+                    <input placeholder="123 Main St, City" className="p-2 border rounded w-full" value={(form as any).address || ''} onChange={e => setForm({ ...form, address: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Gender</label>
+                    <input placeholder="Male / Female / Other" className="p-2 border rounded w-full" value={(form as any).gender || ''} onChange={e => setForm({ ...form, gender: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Next Visit Date</label>
+                    <DateInput className="p-2 border rounded w-full" type="date" placeholder="Select visit date" value={(form as any).nextVisitDate || ''} onChange={e => setForm({ ...form, nextVisitDate: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Next Visit Time</label>
+                    <input type="time" placeholder="Select time" className="p-2 border rounded w-full" value={(form as any).nextVisitTime || ''} onChange={e => setForm({ ...form, nextVisitTime: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Occupation</label>
+                    <input placeholder="Engineer" className="p-2 border rounded w-full" value={(form as any).occupation || ''} onChange={e => setForm({ ...form, occupation: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Pending Payment (₹)</label>
+                    <input placeholder="500.00" className="p-2 border rounded w-full" type="number" step="0.01" value={(form as any).pendingPaymentCents || ''} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Height (cm)</label>
+                    <input placeholder="175" className="p-2 border rounded w-full" type="number" value={(form as any).height || ''} onChange={e => setForm({ ...form, height: e.target.value })} />
+                </div>
+                <div>
+                    <label className="block text-xs font-medium mb-1 text-muted">Weight (kg)</label>
+                    <input placeholder="70" className="p-2 border rounded w-full" type="number" value={(form as any).weight || ''} onChange={e => setForm({ ...form, weight: e.target.value })} />
+                </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+                <button onClick={save} className="btn btn-primary">Save Changes</button>
+                <button onClick={() => setEditing(false)} className="btn btn-secondary">Cancel</button>
             </div>
         </div>
     )
 
     return (
-        <div className="flex justify-between items-center">
-            <div>
-                <div className="font-medium">{p.firstName} {p.lastName} {p.opdNo ? <span className="text-sm text-gray-500">· OPD: {p.opdNo}</span> : null}</div>
-                <div className="text-sm text-gray-500">DOB: {p.dob ? new Date(p.dob).toLocaleDateString() : '-'} · Age: {p.age ?? '-'} · Gender: {p.gender ?? '-'}</div>
-                <div className="text-sm text-gray-500">Address: {p.address ?? '-'} · Occupation: {p.occupation ?? '-'}</div>
-                <div className="text-sm text-gray-500">Phone: {p.phone ?? '-'} · Pending: {p.pendingPaymentCents ? (p.pendingPaymentCents / 100).toFixed(2) : '0.00'}</div>
-                <div className="text-sm text-gray-500">Height: {p.height ?? '-'} · Weight: {p.weight ?? '-'}</div>
+        <div className="flex flex-col sm:flex-row justify-between gap-4">
+            <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                    <h4 className="font-semibold text-lg">{p.firstName} {p.lastName}</h4>
+                    {p.opdNo && <span className="badge">OPD: {p.opdNo}</span>}
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm text-muted">
+                    <div><span className="font-medium">DOB:</span> {p.dob ? new Date(p.dob).toLocaleDateString() : '-'}</div>
+                    <div><span className="font-medium">Age:</span> {p.age ?? '-'}</div>
+                    <div><span className="font-medium">Gender:</span> {p.gender ?? '-'}</div>
+                    <div><span className="font-medium">Phone:</span> {p.phone ?? '-'}</div>
+                    <div><span className="font-medium">Email:</span> {p.email ?? '-'}</div>
+                    <div><span className="font-medium">Occupation:</span> {p.occupation ?? '-'}</div>
+                    <div className="sm:col-span-2"><span className="font-medium">Address:</span> {p.address ?? '-'}</div>
+                    <div><span className="font-medium">Height:</span> {p.height ? `${p.height} cm` : '-'}</div>
+                    <div><span className="font-medium">Weight:</span> {p.weight ? `${p.weight} kg` : '-'}</div>
+                    <div>
+                        <span className="font-medium">Pending:</span> 
+                        <span className={p.pendingPaymentCents && p.pendingPaymentCents > 0 ? 'text-red-600 dark:text-red-400 font-medium ml-1' : 'ml-1'}>
+                            ₹{p.pendingPaymentCents ? (p.pendingPaymentCents / 100).toFixed(2) : '0.00'}
+                        </span>
+                    </div>
+                    {p.nextVisit && (
+                        <div>
+                            <span className="font-medium">Next visit:</span> 
+                            <a href={`/patients/${p.id}`} className="text-brand hover:underline ml-1 font-medium">
+                                {new Date(p.nextVisit).toLocaleDateString()}
+                            </a>
+                        </div>
+                    )}
+                </div>
+
                 {p.visits && p.visits[0] ? (
-                    <div className="mt-1 text-sm text-gray-700">Last visit: {new Date(p.visits[0].date).toLocaleString()} · Diagnoses: {p.visits[0].diagnoses}</div>
+                    <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-sm">
+                        <span className="font-medium">Last visit:</span> {new Date(p.visits[0].date).toLocaleDateString()} · 
+                        <span className="font-medium ml-2">Diagnoses:</span> {p.visits[0].diagnoses || 'None'}
+                    </div>
                 ) : null}
-                <div className="text-sm text-gray-500">Next visit: {p.nextVisit ? <a href={`/patients/${p.id}`} className="text-blue-600 underline">{new Date(p.nextVisit).toLocaleDateString()}</a> : '-'}</div>
             </div>
-            <div className="space-x-2">
-                <button onClick={() => setEditing(true)} className="px-2 py-1 bg-yellow-400 rounded">Edit</button>
-                <button onClick={remove} className="px-2 py-1 bg-red-500 text-white rounded">Delete</button>
+
+            <div className="flex sm:flex-col gap-2 self-start">
+                <button onClick={() => setEditing(true)} className="btn btn-secondary flex-1 sm:flex-none">Edit</button>
+                <button onClick={remove} className="btn btn-danger flex-1 sm:flex-none">Delete</button>
             </div>
         </div>
     )

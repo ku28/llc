@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import CustomSelect from '../components/CustomSelect'
+import DateInput from '../components/DateInput'
 
 export default function PrescriptionsPage() {
     const [patients, setPatients] = useState<any[]>([])
     const [treatments, setTreatments] = useState<any[]>([])
     const [products, setProducts] = useState<any[]>([])
     const [selectedProductId, setSelectedProductId] = useState<string>('')
-    const [form, setForm] = useState<any>({ patientId: '', opdNo: '', diagnoses: '', temperament: '', pulseDiagnosis: '', majorComplaints: '', historyReports: '', investigations: '', provisionalDiagnosis: '', improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '', nextVisit: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' })
+    const [form, setForm] = useState<any>({ patientId: '', opdNo: '', diagnoses: '', temperament: '', pulseDiagnosis: '', majorComplaints: '', historyReports: '', investigations: '', provisionalDiagnosis: '', improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' })
     const [prescriptions, setPrescriptions] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [lastCreatedVisitId, setLastCreatedVisitId] = useState<number | null>(null)
@@ -52,6 +54,16 @@ export default function PrescriptionsPage() {
         setForm((prev: any) => ({ ...prev, patientId: id }))
         const found = patients.find(p => String(p.id) === String(id))
         if (!found) return
+        
+        // Split nextVisit into date and time
+        let nextVisitDate = ''
+        let nextVisitTime = ''
+        if (found.nextVisit) {
+            const dt = new Date(found.nextVisit).toISOString()
+            nextVisitDate = dt.slice(0, 10)
+            nextVisitTime = dt.slice(11, 16)
+        }
+        
         setForm((prev: any) => ({
             ...prev,
             patientId: String(found.id),
@@ -61,7 +73,8 @@ export default function PrescriptionsPage() {
             address: found.address || '',
             gender: found.gender || '',
             phone: found.phone || '',
-            nextVisit: formatDateTimeLocal(found.nextVisit),
+            nextVisitDate,
+            nextVisitTime,
             occupation: found.occupation || '',
             pendingPaymentCents: found.pendingPaymentCents ?? '',
             height: found.height ?? '',
@@ -84,6 +97,12 @@ export default function PrescriptionsPage() {
         setLoading(true)
         try {
             const payload = { ...form, prescriptions }
+            
+            // Combine date and time for nextVisit
+            if (form.nextVisitDate && form.nextVisitTime) {
+                payload.nextVisit = `${form.nextVisitDate}T${form.nextVisitTime}`
+            }
+            
             const res = await fetch('/api/visits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
             if (!res.ok) { const b = await res.json().catch(() => ({ error: res.statusText })); alert('Save failed: ' + (b?.error || res.statusText)); setLoading(false); return }
             const data = await res.json()
@@ -92,7 +111,7 @@ export default function PrescriptionsPage() {
             // show a quick confirmation
             alert('Saved visit #' + data.id)
             // reset
-            setForm({ patientId: '', opdNo: '', diagnoses: '', temperament: '', pulseDiagnosis: '', majorComplaints: '', historyReports: '', investigations: '', provisionalDiagnosis: '', improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '', nextVisit: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' })
+            setForm({ patientId: '', opdNo: '', diagnoses: '', temperament: '', pulseDiagnosis: '', majorComplaints: '', historyReports: '', investigations: '', provisionalDiagnosis: '', improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' })
             setPrescriptions([])
         } catch (err) { console.error(err); alert('Save failed') }
         setLoading(false)
@@ -100,125 +119,324 @@ export default function PrescriptionsPage() {
 
     return (
         <div>
-            <h2 className="text-xl font-bold mb-4">Create Visit & Prescriptions</h2>
-            <form onSubmit={submit} className="grid grid-cols-1 gap-3">
-                <div>
-                    <label className="block text-sm font-medium">Patient</label>
-                    <select required value={form.patientId} onChange={handlePatientChange} className="p-2 border rounded w-full">
-                        <option value="">-- select patient --</option>
-                        {patients.map(p => <option key={p.id} value={p.id}>{p.firstName} {p.lastName} {p.opdNo ? '· OPD: ' + p.opdNo : ''}</option>)}
-                    </select>
+            <div className="section-header">
+                <h2 className="section-title">Create Visit & Prescriptions</h2>
+                <p className="text-sm text-muted">Comprehensive visit recording with prescriptions and patient updates</p>
+            </div>
+
+            <form onSubmit={submit} className="space-y-6">
+                {/* Patient Selection Card */}
+                <div className="card">
+                    <h3 className="text-lg font-semibold mb-4">Patient Information</h3>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Select Patient *</label>
+                            <CustomSelect
+                                required
+                                value={form.patientId}
+                                onChange={(id) => {
+                                    setForm((prev: any) => ({ ...prev, patientId: id }))
+                                    const found = patients.find(p => String(p.id) === String(id))
+                                    if (!found) return
+                                    
+                                    // Split nextVisit into date and time
+                                    let nextVisitDate = ''
+                                    let nextVisitTime = ''
+                                    if (found.nextVisit) {
+                                        const dt = new Date(found.nextVisit).toISOString()
+                                        nextVisitDate = dt.slice(0, 10)
+                                        nextVisitTime = dt.slice(11, 16)
+                                    }
+                                    
+                                    setForm((prev: any) => ({
+                                        ...prev,
+                                        patientId: String(found.id),
+                                        opdNo: found.opdNo || '',
+                                        dob: formatDateForInput(found.dob),
+                                        age: found.age ?? '',
+                                        address: found.address || '',
+                                        gender: found.gender || '',
+                                        phone: found.phone || '',
+                                        nextVisitDate,
+                                        nextVisitTime,
+                                        occupation: found.occupation || '',
+                                        pendingPaymentCents: found.pendingPaymentCents ?? '',
+                                        height: found.height ?? '',
+                                        weight: found.weight ?? ''
+                                    }))
+                                }}
+                                options={[
+                                    { value: '', label: '-- select patient --' },
+                                    ...patients.map(p => ({
+                                        value: String(p.id),
+                                        label: `${p.firstName} ${p.lastName}${p.opdNo ? ' · OPD: ' + p.opdNo : ''}`
+                                    }))
+                                ]}
+                                placeholder="-- select patient --"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">OPD Number</label>
+                                <input placeholder="OPD-001" value={form.opdNo} onChange={e => setForm({ ...form, opdNo: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Date of Birth</label>
+                                <DateInput type="date" placeholder="Select date of birth" value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Age</label>
+                                <input type="number" placeholder="35" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Gender</label>
+                                <input placeholder="Male / Female / Other" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Phone</label>
+                                <input placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Occupation</label>
+                                <input placeholder="Engineer" value={form.occupation} onChange={e => setForm({ ...form, occupation: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div className="sm:col-span-2">
+                                <label className="block text-sm font-medium mb-1.5">Address</label>
+                                <input placeholder="123 Main St, City" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Height (cm)</label>
+                                <input type="number" placeholder="175" value={form.height} onChange={e => setForm({ ...form, height: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Weight (kg)</label>
+                                <input type="number" placeholder="70" value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Pending Payment (₹)</label>
+                                <input type="number" step="0.01" placeholder="500.00" value={form.pendingPaymentCents} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Next Visit Date</label>
+                                <DateInput type="date" placeholder="Select visit date" value={form.nextVisitDate} onChange={e => setForm({ ...form, nextVisitDate: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Next Visit Time</label>
+                                <input type="time" placeholder="Select time" value={form.nextVisitTime} onChange={e => setForm({ ...form, nextVisitTime: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div>
-                    <label className="block text-sm font-medium">Medicines (inventory)</label>
+                {/* Clinical Information Card */}
+                <div className="card">
+                    <h3 className="text-lg font-semibold mb-4">Clinical Information</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Diagnosis</label>
+                            <input placeholder="Fever, Common Cold" value={form.diagnoses} onChange={e => setForm({ ...form, diagnoses: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Temperament</label>
+                            <input placeholder="Phlegmatic" value={form.temperament} onChange={e => setForm({ ...form, temperament: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Pulse Diagnosis</label>
+                            <input placeholder="72 bpm, regular" value={form.pulseDiagnosis} onChange={e => setForm({ ...form, pulseDiagnosis: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Major Complaints</label>
+                            <input placeholder="Headache, Fatigue" value={form.majorComplaints} onChange={e => setForm({ ...form, majorComplaints: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">History / Reports</label>
+                            <input placeholder="Previous medical history" value={form.historyReports} onChange={e => setForm({ ...form, historyReports: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Investigation Ordered</label>
+                            <input placeholder="Blood test, X-ray" value={form.investigations} onChange={e => setForm({ ...form, investigations: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Provisional Diagnosis</label>
+                            <input placeholder="Viral infection" value={form.provisionalDiagnosis} onChange={e => setForm({ ...form, provisionalDiagnosis: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Improvements</label>
+                            <input placeholder="Patient showing recovery" value={form.improvements} onChange={e => setForm({ ...form, improvements: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium mb-1.5">Special Note</label>
+                            <input placeholder="Follow-up in 7 days" value={form.specialNote} onChange={e => setForm({ ...form, specialNote: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Medicines Selection Card */}
+                <div className="card">
+                    <h3 className="text-lg font-semibold mb-4">Medicine Selection</h3>
                     {products.length === 0 ? (
-                        <div className="text-sm text-gray-500">No medicines in inventory. Add products on the Inventory page.</div>
+                        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm">
+                            No medicines in inventory. Add products on the <a href="/products" className="text-brand underline font-medium">Inventory page</a>.
+                        </div>
                     ) : (
                         <div className="flex gap-2">
-                            <select value={selectedProductId} onChange={e => setSelectedProductId(e.target.value)} className="p-2 border rounded w-full">
-                                <option value="">-- select medicine --</option>
-                                {products.map(p => {
-                                    const rl = (p as any).reorderLevel ?? 0
-                                    const low = p.quantity <= rl
-                                    return <option key={p.id} value={p.id}>{p.name} · Qty: {p.quantity}{rl ? ' · Reorder: ' + rl : ''}{low ? ' · LOW' : ''}</option>
-                                })}
-                            </select>
-                            <button type="button" onClick={addSelectedProductToPrescription} className="px-3 py-1 bg-blue-600 text-white rounded">Add</button>
+                            <CustomSelect
+                                value={selectedProductId}
+                                onChange={setSelectedProductId}
+                                options={[
+                                    { value: '', label: '-- select medicine from inventory --' },
+                                    ...products.map(p => {
+                                        const rl = (p as any).reorderLevel ?? 0
+                                        const low = p.quantity <= rl
+                                        return {
+                                            value: String(p.id),
+                                            label: `${p.name} · Stock: ${p.quantity}${rl ? ' · Reorder: ' + rl : ''}${low ? ' · ⚠️ LOW' : ''}`
+                                        }
+                                    })
+                                ]}
+                                placeholder="-- select medicine from inventory --"
+                                className="flex-1"
+                            />
+                            <button type="button" onClick={addSelectedProductToPrescription} className="btn btn-primary">Add to Prescription</button>
                         </div>
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <input placeholder="OPD No" value={form.opdNo} onChange={e => setForm({ ...form, opdNo: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Diagnoses" value={form.diagnoses} onChange={e => setForm({ ...form, diagnoses: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Temperament" value={form.temperament} onChange={e => setForm({ ...form, temperament: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Pulse diagnosis" value={form.pulseDiagnosis} onChange={e => setForm({ ...form, pulseDiagnosis: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Major complaints" value={form.majorComplaints} onChange={e => setForm({ ...form, majorComplaints: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="History / reports" value={form.historyReports} onChange={e => setForm({ ...form, historyReports: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Investigation ordered" value={form.investigations} onChange={e => setForm({ ...form, investigations: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Provisional diagnosis" value={form.provisionalDiagnosis} onChange={e => setForm({ ...form, provisionalDiagnosis: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Improvements" value={form.improvements} onChange={e => setForm({ ...form, improvements: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Special note" value={form.specialNote} onChange={e => setForm({ ...form, specialNote: e.target.value })} className="p-2 border rounded" />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <input type="date" placeholder="DOB" value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Age" type="number" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Address" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Gender" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Phone" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="p-2 border rounded" />
-                    <input type="datetime-local" placeholder="Next visit" value={form.nextVisit} onChange={e => setForm({ ...form, nextVisit: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Occupation" value={form.occupation} onChange={e => setForm({ ...form, occupation: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Pending payment (cents)" type="number" value={form.pendingPaymentCents} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Height" type="number" value={form.height} onChange={e => setForm({ ...form, height: e.target.value })} className="p-2 border rounded" />
-                    <input placeholder="Weight" type="number" value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} className="p-2 border rounded" />
-                </div>
-
-                <div>
-                    <h3 className="font-semibold">Prescriptions</h3>
-                    <div className="space-y-2">
-                        {prescriptions.map((pr, i) => (
-                            <div key={i} className="p-2 border rounded grid grid-cols-1 sm:grid-cols-7 gap-2 items-center">
-                                <select value={pr.treatmentId} onChange={e => updatePrescription(i, { treatmentId: e.target.value })} className="p-2 border rounded">
-                                    <option value="">-- treatment --</option>
-                                    {treatments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                </select>
-                                {/* product selection shows inventory and qty */}
-                                <select value={pr.productId} onChange={e => updatePrescription(i, { productId: e.target.value })} className="p-2 border rounded">
-                                    <option value="">-- medicine (inventory) --</option>
-                                    {products.map(p => <option key={p.id} value={p.id}>{p.name} · Qty: {p.quantity}{p.reorderLevel ? ' · Reorder: ' + p.reorderLevel : ''}</option>)}
-                                </select>
-                                <input placeholder="Dosage" value={pr.dosage} onChange={e => updatePrescription(i, { dosage: e.target.value })} className="p-2 border rounded" />
-                                <input placeholder="Administration" value={pr.administration} onChange={e => updatePrescription(i, { administration: e.target.value })} className="p-2 border rounded" />
-                                <input placeholder="Quantity" type="number" value={pr.quantity} onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} className="p-2 border rounded" />
-                                <label className="sm:col-span-4 text-sm"><input type="checkbox" checked={!!pr.taken} onChange={e => updatePrescription(i, { taken: e.target.checked })} /> Taken</label>
-                                <div className="text-right">
-                                    <button type="button" onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }} className="px-3 py-1 bg-red-600 text-white rounded">Delete</button>
+                {/* Prescriptions Card */}
+                <div className="card">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold">Prescriptions</h3>
+                        <button type="button" onClick={addEmptyPrescription} className="btn btn-secondary text-sm">+ Add Empty Row</button>
+                    </div>
+                    {prescriptions.length === 0 ? (
+                        <div className="text-center py-8 text-muted">
+                            No prescriptions added yet. Use the medicine selector above or click "Add Empty Row".
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {prescriptions.map((pr, i) => (
+                                <div key={i} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/30">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Treatment</label>
+                                            <CustomSelect
+                                                value={pr.treatmentId}
+                                                onChange={(val) => updatePrescription(i, { treatmentId: val })}
+                                                options={[
+                                                    { value: '', label: '-- select treatment --' },
+                                                    ...treatments.map(t => ({ value: String(t.id), label: t.name }))
+                                                ]}
+                                                placeholder="-- select treatment --"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Medicine (from inventory)</label>
+                                            <CustomSelect
+                                                value={pr.productId}
+                                                onChange={(val) => updatePrescription(i, { productId: val })}
+                                                options={[
+                                                    { value: '', label: '-- select medicine --' },
+                                                    ...products.map(p => ({
+                                                        value: String(p.id),
+                                                        label: `${p.name} · Stock: ${p.quantity}${p.reorderLevel ? ' · Reorder: ' + p.reorderLevel : ''}`
+                                                    }))
+                                                ]}
+                                                placeholder="-- select medicine --"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Dosage</label>
+                                            <input placeholder="5 drops, 3x daily" value={pr.dosage} onChange={e => updatePrescription(i, { dosage: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Administration</label>
+                                            <input placeholder="Oral / Topical" value={pr.administration} onChange={e => updatePrescription(i, { administration: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Quantity</label>
+                                            <input type="number" placeholder="1" value={pr.quantity} onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div className="flex items-end gap-2">
+                                            <label className="flex items-center gap-2 flex-1 text-sm">
+                                                <input type="checkbox" checked={!!pr.taken} onChange={e => updatePrescription(i, { taken: e.target.checked })} className="w-4 h-4" />
+                                                <span>Taken</span>
+                                            </label>
+                                            <button type="button" onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }} className="btn btn-danger text-sm">
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="mt-2">
-                        <button type="button" onClick={addEmptyPrescription} className="px-3 py-1 bg-blue-600 text-white rounded">Add Prescription</button>
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
-                <div className="pt-2">
-                    <button disabled={loading} className="px-4 py-2 bg-green-600 text-white rounded">Save Visit & Prescriptions</button>
-                </div>
-                {lastCreatedVisitId && (
-                    <div className="pt-2">
-                        <a href={`/visits/${lastCreatedVisitId}`} target="_blank" rel="noreferrer" className="inline-block px-3 py-2 bg-indigo-600 text-white rounded">Open Visit</a>
-                    </div>
-                )}
-            </form>
-
-            {lastCreatedVisit && (
-                <div className="mt-6 bg-white rounded shadow p-4" ref={el => previewRef.current = el}>
+                {/* Submit Button */}
+                <div className="card">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-bold">Prescription Preview — Visit #{lastCreatedVisit.id}</h3>
-                        <div>
-                            <button onClick={() => openPrintableWindow(previewRef.current)} className="px-3 py-1 bg-gray-800 text-white rounded">Print / Save PDF</button>
+                        <div className="text-sm text-muted">
+                            {prescriptions.length > 0 && (
+                                <span>{prescriptions.length} prescription(s) added</span>
+                            )}
+                        </div>
+                        <div className="flex gap-3">
+                            <button disabled={loading} className="btn btn-primary">
+                                {loading ? 'Saving...' : 'Save Visit & Prescriptions'}
+                            </button>
+                            {lastCreatedVisitId && (
+                                <a href={`/visits/${lastCreatedVisitId}`} target="_blank" rel="noreferrer" className="btn btn-secondary">
+                                    Open Last Visit
+                                </a>
+                            )}
                         </div>
                     </div>
+                </div>
+            </form>
 
-                    <div className="mt-3">
-                        <div className="font-semibold">Patient</div>
-                        <div>{(patients.find(p => String(p.id) === String(lastCreatedVisit.patientId))?.firstName) || lastCreatedVisit.patient?.firstName || ''} {(patients.find(p => String(p.id) === String(lastCreatedVisit.patientId))?.lastName) || lastCreatedVisit.patient?.lastName || ''}</div>
-                        <div className="text-sm text-gray-600">OPD: {lastCreatedVisit.opdNo} · Date: {new Date(lastCreatedVisit.date).toLocaleString()}</div>
+            {/* Prescription Preview Card */}
+            {lastCreatedVisit && (
+                <div className="card mt-6" ref={el => previewRef.current = el}>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold">Prescription Preview — Visit #{lastCreatedVisit.id}</h3>
+                        <button onClick={() => openPrintableWindow(previewRef.current)} className="btn btn-primary text-sm">
+                            🖨️ Print / Save PDF
+                        </button>
                     </div>
 
-                    <div className="mt-4">
-                        <div className="font-semibold">Prescriptions</div>
-                        <ul className="mt-2">
-                            {lastCreatedVisit.prescriptions?.map((pr: any) => (
-                                <li key={pr.id} className="p-2 border-b">
-                                    <div className="font-medium">{(treatments.find(t => String(t.id) === String(pr.treatmentId))?.name) || ''} {(products.find(p => String(p.id) === String(pr.productId))?.name) ? ` — ${products.find(p => String(p.id) === String(pr.productId))?.name}` : ''}</div>
-                                    <div className="text-sm text-gray-700">Dosage: {pr.dosage || '-'} · Qty: {pr.quantity} · Administration: {pr.administration || '-'}</div>
-                                </li>
-                            ))}
-                        </ul>
+                    <div className="space-y-4">
+                        <div className="p-4 bg-gray-50 dark:bg-gray-900/30 rounded-lg">
+                            <div className="font-semibold mb-2">Patient Information</div>
+                            <div className="text-sm space-y-1">
+                                <div><span className="font-medium">Name:</span> {(patients.find(p => String(p.id) === String(lastCreatedVisit.patientId))?.firstName) || lastCreatedVisit.patient?.firstName || ''} {(patients.find(p => String(p.id) === String(lastCreatedVisit.patientId))?.lastName) || lastCreatedVisit.patient?.lastName || ''}</div>
+                                <div><span className="font-medium">OPD Number:</span> {lastCreatedVisit.opdNo}</div>
+                                <div><span className="font-medium">Date:</span> {new Date(lastCreatedVisit.date).toLocaleString()}</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="font-semibold mb-3">Prescribed Medicines</div>
+                            {lastCreatedVisit.prescriptions?.length === 0 ? (
+                                <div className="text-center py-4 text-muted text-sm">No prescriptions</div>
+                            ) : (
+                                <ul className="space-y-2">
+                                    {lastCreatedVisit.prescriptions?.map((pr: any) => (
+                                        <li key={pr.id} className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                            <div className="font-medium text-brand">
+                                                {(treatments.find(t => String(t.id) === String(pr.treatmentId))?.name) || 'Treatment'} 
+                                                {(products.find(p => String(p.id) === String(pr.productId))?.name) ? ` — ${products.find(p => String(p.id) === String(pr.productId))?.name}` : ''}
+                                            </div>
+                                            <div className="text-sm text-muted mt-1">
+                                                <span className="font-medium">Dosage:</span> {pr.dosage || '-'} · 
+                                                <span className="font-medium ml-2">Quantity:</span> {pr.quantity} · 
+                                                <span className="font-medium ml-2">Administration:</span> {pr.administration || '-'}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

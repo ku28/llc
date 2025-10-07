@@ -12,7 +12,11 @@ export default function SignupPage() {
         e.preventDefault(); setLoading(true)
         const res = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, name, password }) })
         setLoading(false)
-        if (res.ok) router.push('/')
+        if (res.ok) {
+            // Dispatch custom event to notify components of login
+            window.dispatchEvent(new Event('user-login'))
+            router.push('/')
+        }
         else alert('Signup failed')
     }
 

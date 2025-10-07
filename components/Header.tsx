@@ -1,12 +1,47 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
 
 export default function Header({ title = 'LLC ERP' }: { title?: string }) {
   const [user, setUser] = useState<any>(null)
   const [dark, setDark] = useState<boolean>(false)
+  const router = useRouter()
+
+  // Function to fetch user data
+  const fetchUser = async () => {
+    try {
+      const res = await fetch('/api/auth/me')
+      const data = await res.json()
+      setUser(data.user)
+    } catch (err) {
+      console.error('Failed to fetch user:', err)
+    }
+  }
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user))
+    // Fetch user on mount
+    fetchUser()
+
+    // Re-fetch user when page becomes visible (handles navigation/refresh)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchUser()
+      }
+    }
+
+    // Re-fetch user when window gains focus (handles returning to tab)
+    const handleFocus = () => {
+      fetchUser()
+    }
+
+    // Re-fetch user when custom login event is dispatched
+    const handleUserLogin = () => {
+      fetchUser()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('user-login', handleUserLogin)
 
     // initialize theme from localStorage or prefers-color-scheme
     try {
@@ -20,6 +55,13 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
       }
     } catch (e) {
       // ignore (SSR)
+    }
+
+    // Cleanup listeners
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('user-login', handleUserLogin)
     }
   }, [])
 
@@ -38,30 +80,37 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
   }
 
   async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    setUser(null)
-    window.location.href = '/'
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      setUser(null)
+      // Use Next.js router instead of window.location to preserve theme
+      router.push('/')
+    } catch (err) {
+      console.error('Logout failed:', err)
+      // Fallback to window.location if router fails
+      window.location.href = '/'
+    }
   }
 
   return (
-    <header className="panel shadow py-3 mb-6">
+    <header className="panel shadow-sm py-4 mb-8 sticky top-0 z-50 backdrop-blur-sm bg-opacity-95">
   <div className="max-w-6xl mx-auto px-2 sm:px-4 flex justify-between items-center">
         <div className="flex items-center gap-6">
-          <h1 className="text-lg font-bold">{title}</h1>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-brand to-green-600 bg-clip-text text-transparent">{title}</h1>
 
           {/* main nav - hidden on small screens */}
-          <nav className="hidden md:flex items-center gap-2">
-            <Link href="/" className="px-3 py-2 rounded hover:bg-gray-100">Dashboard</Link>
-            <Link href="/patients" className="px-3 py-2 rounded hover:bg-gray-100">Patients</Link>
-            <Link href="/treatments" className="px-3 py-2 rounded hover:bg-gray-100">Treatments</Link>
-            <Link href="/products" className="px-3 py-2 rounded hover:bg-gray-100">Inventory</Link>
-            <Link href="/visits" className="px-3 py-2 rounded hover:bg-gray-100">Visits</Link>
+          <nav className="hidden md:flex items-center gap-1">
+            <Link href="/" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Dashboard</Link>
+            <Link href="/patients" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Patients</Link>
+            <Link href="/treatments" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Treatments</Link>
+            <Link href="/products" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Inventory</Link>
+            <Link href="/visits" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Visits</Link>
           </nav>
 
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {/* quick access to prescriptions page */}
-          <Link href="/prescriptions" className="px-3 py-1 bg-brand text-white rounded">Prescriptions</Link>
+          <Link href="/prescriptions" className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-green-600 transition-all hover:shadow-lg font-medium text-sm">Prescriptions</Link>
 
           {/* theme toggle (sun/moon) - shows both icons with a sliding knob */}
           <button
@@ -86,13 +135,16 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
 
           {user ? (
             <div className="flex items-center gap-3">
-              <div className="text-sm">{user.name || user.email} <span className="text-xs text-muted">({user.role})</span></div>
-              <button onClick={logout} className="px-3 py-1 bg-red-500 text-white rounded">Logout</button>
+              <div className="text-sm hidden sm:block">
+                <div className="font-medium">{user.name || user.email}</div>
+                <div className="text-xs text-muted">{user.role}</div>
+              </div>
+              <button onClick={logout} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all hover:shadow-lg font-medium text-sm">Logout</button>
             </div>
           ) : (
             <div className="flex gap-2">
-              <Link href="/login" className="px-3 py-1 bg-brand text-white rounded">Login</Link>
-              <Link href="/signup" className="px-3 py-1 bg-brand text-white rounded">Signup</Link>
+              <Link href="/login" className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-green-600 transition-all hover:shadow-lg font-medium text-sm">Login</Link>
+              <Link href="/signup" className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-green-600 transition-all hover:shadow-lg font-medium text-sm hidden sm:inline-block">Signup</Link>
             </div>
           )}
         </div>

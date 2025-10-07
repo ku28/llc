@@ -1,5 +1,6 @@
 import { useRouter } from 'next/router'
 import { useEffect, useState, useRef } from 'react'
+import DateInput from '../../components/DateInput'
 
 export default function PatientDetail() {
     const router = useRouter()
@@ -8,6 +9,7 @@ export default function PatientDetail() {
     const [visits, setVisits] = useState<any[]>([])
     const [showSchedule, setShowSchedule] = useState(false)
     const [apptDate, setApptDate] = useState('')
+    const [apptTime, setApptTime] = useState('')
     const printRef = useRef<HTMLDivElement | null>(null)
 
     useEffect(() => { if (id) load() }, [id])
@@ -24,9 +26,11 @@ export default function PatientDetail() {
 
     async function schedule(e: any) {
         e.preventDefault()
-        await fetch('/api/appointments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientId: id, scheduled: apptDate }) })
+        const scheduled = apptDate && apptTime ? `${apptDate}T${apptTime}` : apptDate
+        await fetch('/api/appointments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patientId: id, scheduled }) })
         setShowSchedule(false)
         setApptDate('')
+        setApptTime('')
         load()
     }
 
@@ -68,8 +72,13 @@ export default function PatientDetail() {
             </div>
 
             {showSchedule && (
-                <form onSubmit={schedule} className="mb-4 bg-white p-4 rounded shadow">
-                    <input required type="datetime-local" value={apptDate} onChange={e => setApptDate(e.target.value)} className="p-2 border rounded mr-2" />
+                <form onSubmit={schedule} className="mb-4 bg-white p-4 rounded shadow flex gap-2">
+                    <div className="flex-1">
+                        <DateInput required type="date" placeholder="Select appointment date" value={apptDate} onChange={e => setApptDate(e.target.value)} className="p-2 border rounded w-full" />
+                    </div>
+                    <div className="flex-1">
+                        <input required type="time" placeholder="Select time" value={apptTime} onChange={e => setApptTime(e.target.value)} className="p-2 border rounded w-full" />
+                    </div>
                     <button className="px-3 py-1 bg-blue-600 text-white rounded">Schedule</button>
                     <button type="button" onClick={() => setShowSchedule(false)} className="ml-2 px-3 py-1 bg-gray-300 rounded">Cancel</button>
                 </form>

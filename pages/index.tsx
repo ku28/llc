@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 
 export default function Dashboard(){
   const [counts, setCounts] = useState<any>({})
@@ -18,22 +19,53 @@ export default function Dashboard(){
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-4 rounded shadow">Patients<br/><div className="text-2xl font-bold">{counts.patients ?? '—'}</div></div>
-        <div className="bg-white p-4 rounded shadow">Treatments<br/><div className="text-2xl font-bold">{counts.treatments ?? '—'}</div></div>
-        <div className="bg-white p-4 rounded shadow">Products<br/><div className="text-2xl font-bold">{counts.products ?? '—'}</div></div>
-        <div className="bg-white p-4 rounded shadow">Visits<br/><div className="text-2xl font-bold">{counts.visits ?? '—'}</div></div>
+      <div className="section-header">
+        <h1 className="section-title">Dashboard</h1>
+        <div className="text-sm text-muted">Welcome to LLC ERP</div>
       </div>
 
-      <div className="bg-white p-4 rounded shadow">
-        <h2 className="font-semibold mb-2">Recent visits</h2>
-        <ul>
-          {recentVisits.map(v=> (
-            <li key={v.id} className="p-2 border-b">OPD {v.opdNo} — {v.patient?.firstName} {v.patient?.lastName} · {v.diagnoses}</li>
-          ))}
-        </ul>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="stat-card">
+          <div className="stat-label">Total Patients</div>
+          <div className="stat-value">{counts.patients ?? '—'}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Treatments</div>
+          <div className="stat-value">{counts.treatments ?? '—'}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Products</div>
+          <div className="stat-value">{counts.products ?? '—'}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Total Visits</div>
+          <div className="stat-value">{counts.visits ?? '—'}</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Recent Visits</h2>
+          <Link href="/visits" className="text-sm text-brand hover:underline font-medium">View all →</Link>
+        </div>
+        {recentVisits.length === 0 ? (
+          <div className="text-center py-8 text-muted">No visits recorded yet</div>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {recentVisits.map(v=> (
+              <li key={v.id} className="list-item flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="font-medium">
+                    {v.patient?.firstName} {v.patient?.lastName}
+                    <span className="ml-2 badge">OPD {v.opdNo}</span>
+                  </div>
+                  <div className="text-sm text-muted mt-1">{v.diagnoses || 'No diagnosis'}</div>
+                </div>
+                <div className="text-sm text-muted">{new Date(v.date).toLocaleDateString()}</div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   )
