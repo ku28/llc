@@ -7,6 +7,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <>
       <Head>
+        <title>LLC ERP</title>
         {/* Prefer a PNG file (browsers reliably show PNG); keep .ico for legacy */}
         <link rel="icon" href="/favicon.png" type="image/png" />
         <link rel="icon" href="/favicon.ico" type="image/x-icon" />

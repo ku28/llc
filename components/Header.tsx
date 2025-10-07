@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
-export default function Header({ title = 'Clinic ERP' }: { title?: string }) {
+export default function Header({ title = 'LLC ERP' }: { title?: string }) {
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
