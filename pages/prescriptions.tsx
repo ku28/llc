@@ -7,7 +7,19 @@ export default function PrescriptionsPage() {
     const [treatments, setTreatments] = useState<any[]>([])
     const [products, setProducts] = useState<any[]>([])
     const [selectedProductId, setSelectedProductId] = useState<string>('')
-    const [form, setForm] = useState<any>({ patientId: '', opdNo: '', diagnoses: '', temperament: '', pulseDiagnosis: '', majorComplaints: '', historyReports: '', investigations: '', provisionalDiagnosis: '', improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' })
+    const [form, setForm] = useState<any>({ 
+        patientId: '', opdNo: '', diagnoses: '', temperament: '', pulseDiagnosis: '', pulseDiagnosis2: '',
+        majorComplaints: '', historyReports: '', investigations: '', provisionalDiagnosis: '', 
+        improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '', 
+        nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', 
+        height: '', weight: '', fatherHusbandGuardianName: '',
+        // New financial fields
+        amount: '', discount: '', payment: '', balance: '',
+        // New tracking fields
+        visitNumber: '', followUpCount: '', helper: '',
+        // New note fields
+        procedureAdopted: '', discussion: '', extra: ''
+    })
     const [prescriptions, setPrescriptions] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [lastCreatedVisitId, setLastCreatedVisitId] = useState<number | null>(null)
@@ -22,7 +34,12 @@ export default function PrescriptionsPage() {
         if (!selectedProductId) return alert('Select a medicine first')
         const prod = products.find(p => String(p.id) === String(selectedProductId))
         if (!prod) return alert('Selected product not found')
-        setPrescriptions([...prescriptions, { treatmentId: '', productId: String(prod.id), dosage: '', administration: '', quantity: 1, taken: false }])
+        setPrescriptions([...prescriptions, { 
+            treatmentId: '', productId: String(prod.id), dosage: '', administration: '', quantity: 1, taken: false,
+            // Advanced fields
+            drugLabel: '', constitutionRemedy: '', symptomCode: '', effectCode: '',
+            timeOfDay: '', procedureMethod: '', precautions: '', totalDays: ''
+        }])
     }
 
     // Helpers to format dates for inputs
@@ -83,7 +100,12 @@ export default function PrescriptionsPage() {
     }
 
     function addEmptyPrescription() {
-        setPrescriptions([...prescriptions, { treatmentId: '', productId: '', dosage: '', administration: '', quantity: 1, taken: false }])
+        setPrescriptions([...prescriptions, { 
+            treatmentId: '', productId: '', dosage: '', administration: '', quantity: 1, taken: false,
+            // Advanced fields
+            drugLabel: '', constitutionRemedy: '', symptomCode: '', effectCode: '',
+            timeOfDay: '', procedureMethod: '', precautions: '', totalDays: ''
+        }])
     }
 
     function updatePrescription(i: number, patch: any) {
@@ -111,7 +133,16 @@ export default function PrescriptionsPage() {
             // show a quick confirmation
             alert('Saved visit #' + data.id)
             // reset
-            setForm({ patientId: '', opdNo: '', diagnoses: '', temperament: '', pulseDiagnosis: '', majorComplaints: '', historyReports: '', investigations: '', provisionalDiagnosis: '', improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' })
+            setForm({ 
+                patientId: '', opdNo: '', diagnoses: '', temperament: '', pulseDiagnosis: '', pulseDiagnosis2: '',
+                majorComplaints: '', historyReports: '', investigations: '', provisionalDiagnosis: '', 
+                improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '', 
+                nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', 
+                height: '', weight: '', fatherHusbandGuardianName: '',
+                amount: '', discount: '', payment: '', balance: '',
+                visitNumber: '', followUpCount: '', helper: '',
+                procedureAdopted: '', discussion: '', extra: ''
+            })
             setPrescriptions([])
         } catch (err) { console.error(err); alert('Save failed') }
         setLoading(false)
@@ -205,6 +236,10 @@ export default function PrescriptionsPage() {
                                 <label className="block text-sm font-medium mb-1.5">Address</label>
                                 <input placeholder="123 Main St, City" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="w-full p-2 border rounded" />
                             </div>
+                            <div className="sm:col-span-2">
+                                <label className="block text-sm font-medium mb-1.5">Father/Husband/Guardian Name</label>
+                                <input placeholder="Guardian name" value={form.fatherHusbandGuardianName} onChange={e => setForm({ ...form, fatherHusbandGuardianName: e.target.value })} className="w-full p-2 border rounded" />
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium mb-1.5">Height (cm)</label>
                                 <input type="number" placeholder="175" value={form.height} onChange={e => setForm({ ...form, height: e.target.value })} className="w-full p-2 border rounded" />
@@ -243,7 +278,11 @@ export default function PrescriptionsPage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Pulse Diagnosis</label>
-                            <input placeholder="72 bpm, regular" value={form.pulseDiagnosis} onChange={e => setForm({ ...form, pulseDiagnosis: e.target.value })} className="w-full p-2 border rounded" />
+                            <input placeholder="1/2/3-BRN" value={form.pulseDiagnosis} onChange={e => setForm({ ...form, pulseDiagnosis: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Pulse Diagnosis 2</label>
+                            <input placeholder="1/1/2-BM" value={form.pulseDiagnosis2} onChange={e => setForm({ ...form, pulseDiagnosis2: e.target.value })} className="w-full p-2 border rounded" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Major Complaints</label>
@@ -268,6 +307,67 @@ export default function PrescriptionsPage() {
                         <div className="sm:col-span-2">
                             <label className="block text-sm font-medium mb-1.5">Special Note</label>
                             <input placeholder="Follow-up in 7 days" value={form.specialNote} onChange={e => setForm({ ...form, specialNote: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Visit Tracking Card */}
+                <div className="card">
+                    <h3 className="text-lg font-semibold mb-4">Visit Tracking</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Visit Number (V)</label>
+                            <input type="number" placeholder="1" value={form.visitNumber} onChange={e => setForm({ ...form, visitNumber: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Follow-Up Count (FU)</label>
+                            <input type="number" placeholder="0" value={form.followUpCount} onChange={e => setForm({ ...form, followUpCount: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Helper/Staff ID</label>
+                            <input placeholder="Staff001" value={form.helper} onChange={e => setForm({ ...form, helper: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Financial Information Card */}
+                <div className="card">
+                    <h3 className="text-lg font-semibold mb-4">Financial Information</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Amount (₹)</label>
+                            <input type="number" step="0.01" placeholder="1000.00" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Discount (₹)</label>
+                            <input type="number" step="0.01" placeholder="100.00" value={form.discount} onChange={e => setForm({ ...form, discount: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Payment Received (₹)</label>
+                            <input type="number" step="0.01" placeholder="900.00" value={form.payment} onChange={e => setForm({ ...form, payment: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Balance Due (₹)</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={form.balance} onChange={e => setForm({ ...form, balance: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Additional Notes Card */}
+                <div className="card">
+                    <h3 className="text-lg font-semibold mb-4">Additional Notes</h3>
+                    <div className="grid grid-cols-1 gap-3">
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Procedure Adopted</label>
+                            <textarea rows={2} placeholder="Procedures performed during visit" value={form.procedureAdopted} onChange={e => setForm({ ...form, procedureAdopted: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Discussion</label>
+                            <textarea rows={2} placeholder="Discussion notes and observations" value={form.discussion} onChange={e => setForm({ ...form, discussion: e.target.value })} className="w-full p-2 border rounded" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Extra Notes</label>
+                            <textarea rows={2} placeholder="Additional notes or charges" value={form.extra} onChange={e => setForm({ ...form, extra: e.target.value })} className="w-full p-2 border rounded" />
                         </div>
                     </div>
                 </div>
@@ -346,16 +446,48 @@ export default function PrescriptionsPage() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Dosage</label>
-                                            <input placeholder="5 drops, 3x daily" value={pr.dosage} onChange={e => updatePrescription(i, { dosage: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Dosage (DOSE)</label>
+                                            <input placeholder="10/DRP/TDS/LW WTR" value={pr.dosage} onChange={e => updatePrescription(i, { dosage: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Administration</label>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Drug Label (DL)</label>
+                                            <input placeholder="S1, C3, L1" value={pr.drugLabel} onChange={e => updatePrescription(i, { drugLabel: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Constitution Remedy (CR)</label>
+                                            <input placeholder="S1, VEN1, F1" value={pr.constitutionRemedy} onChange={e => updatePrescription(i, { constitutionRemedy: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Symptom Code (SY)</label>
+                                            <input placeholder="Symptom code" value={pr.symptomCode} onChange={e => updatePrescription(i, { symptomCode: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Effect Code (EF)</label>
+                                            <input placeholder="WE, YE, GE, BE" value={pr.effectCode} onChange={e => updatePrescription(i, { effectCode: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Time of Day (TM)</label>
+                                            <input placeholder="BM, AM, RAP, ALT" value={pr.timeOfDay} onChange={e => updatePrescription(i, { timeOfDay: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Administration (AD)</label>
                                             <input placeholder="Oral / Topical" value={pr.administration} onChange={e => updatePrescription(i, { administration: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Quantity</label>
-                                            <input type="number" placeholder="1" value={pr.quantity} onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Procedure (PR)</label>
+                                            <input placeholder="PPH, MSG, APL/LOCAL" value={pr.procedureMethod} onChange={e => updatePrescription(i, { procedureMethod: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Precautions (PRE)</label>
+                                            <input placeholder="Special precautions" value={pr.precautions} onChange={e => updatePrescription(i, { precautions: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Total Days (TDY)</label>
+                                            <input type="number" placeholder="30" value={pr.totalDays} onChange={e => updatePrescription(i, { totalDays: Number(e.target.value) })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Quantity (Bottles)</label>
+                                            <input type="number" step="0.01" placeholder="1" value={pr.quantity} onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div className="flex items-end gap-2">
                                             <label className="flex items-center gap-2 flex-1 text-sm">

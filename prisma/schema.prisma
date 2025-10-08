@@ -33,6 +33,7 @@ model Patient {
   pendingPaymentCents Int @default(0)
   height     Float?
   weight     Float?
+  fatherHusbandGuardianName String?  // F/H/G Name from CSV
   createdAt  DateTime @default(now())
   appointments Appointment[]
   invoices     Invoice[]
@@ -62,25 +63,77 @@ model Invoice {
 model Product {
   id          Int     @id @default(autoincrement())
   name        String
-  sku         String? @unique
-  priceCents  Int
-  quantity    Int     @default(0)
-  reorderLevel Int    @default(0)
+  category    Category? @relation(fields: [categoryId], references: [id])
+  categoryId  Int?
+  unit        String? // UINT - unit of measurement (30 ml, 100 gm, etc.)
+  priceCents  Int     // RATE/U - selling price per unit in cents
+  purchasePriceCents Int @default(0) // P/PRICE - purchase price in cents
+  quantity    Int     @default(0) // INVENTORY - current stock quantity
+  inventoryValue Float? // INV/VAL - calculated value of inventory
+  totalPurchased Int @default(0) // PURCHASE - total units purchased
+  purchaseValue Float? // PUR/VAL - total purchase value
+  totalSales  Int @default(0) // SALES - total units sold
+  salesValue  Float? // SALE/VAL - total sales value
+  latestUpdate DateTime? // LATEST - last update date
+  actualInventory Int? // ACTUAL INVENTORY - physical count
   batches     ProductBatch[]
   productOrders ProductOrder[]
+  treatmentProducts TreatmentProduct[] // Products used in treatments
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  code      String?
+  reorderLevel Int   @default(0) // THRESH/IN - threshold for this category
+  products  Product[]
+  createdAt DateTime @default(now())
 }
 
 model Treatment {
   id         Int      @id @default(autoincrement())
-  name       String
-  code       String?  @unique
+  srNo       String?  // Serial Number
+  provDiagnosis String?  // Provisional Diagnosis (main condition name)
+  planNumber String?  // Plan variation number (01, 02, 03, etc.)
+  speciality String?  // Speciality field
+  organ      String?  // Organ field
+  diseaseAction String? // Disease Action field
+  treatmentPlan String? // Treatment Plan details
+  timing     String?  // Timing: BM (Before Meal), AM (After Meal), etc.
+  additions  String?  // Additions
   dosage     String?
   administration String?
   procedure  String?
-  dilutors   String? // Free-form: "No of drops in Water/Alcohol in oil, etc"
+  presentation String? // Presentation
+  droppersToday Int?  // Droppers Today
+  quantity   Int?     // Quantity
   notes      String?
   createdAt  DateTime @default(now())
   prescriptions Prescription[]
+  treatmentProducts TreatmentProduct[] // Multiple products in this treatment
+}
+
+// Junction table for Treatment-Product many-to-many relationship
+model TreatmentProduct {
+  id          Int      @id @default(autoincrement())
+  treatment   Treatment @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+  treatmentId Int
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId   Int
+  comp1       String?  // Component 1 - composition
+  comp2       String?  // Component 2 - composition
+  comp3       String?  // Component 3 - composition
+  quantity    Int      @default(1) // Quantity of drops for this medicine
+  timing      String?  // Timing for this medicine (BM, AM, WM, HS, EMPTY)
+  dosage      String?  // Dosage instructions for this medicine
+  additions   String?  // Additional notes for this medicine
+  procedure   String?  // Procedure for this medicine
+  presentation String? // Presentation format (Tablet, Drops, etc.)
+  droppersToday Int?   // Number of droppers today
+  medicineQuantity Int? // Quantity of this medicine
+  createdAt   DateTime @default(now())
+  
+  @@unique([treatmentId, productId])
 }
 
 model Visit {
@@ -91,18 +144,20 @@ model Visit {
   date              DateTime  @default(now())
   diagnoses         String?
   temperament       String?
-  pulseDiagnosis    String?
-  majorComplaints   String?
-  historyReports    String?
-  investigations    String?
+  pulseDiagnosis    String?    // Pulse Diagnosis 1
+  pulseDiagnosis2   String?    // Pulse Diagnosis 2
+  majorComplaints   String?    // Chief Complaints
+  historyReports    String?    // Hist/Reports
+  investigations    String?    // Lab tests/investigations
   provisionalDiagnosis String?
-  improvements      String?
+  improvements      String?    // Imp
   specialNote       String?
   initials          String?
   dob               DateTime?
   age               Int?
   address           String?
-  visitNumber       Int?
+  visitNumber       Int?       // V - visit number
+  followUpCount     Int?       // FU - follow-up count
   gender            String?
   phone             String?
   nextVisit         DateTime?
@@ -110,8 +165,20 @@ model Visit {
   pendingPaymentCents Int    @default(0)
   height            Float?
   weight            Float?
-  procedureAdopted  String?
+  procedureAdopted  String?    // PROCEDURE field
   precautions       String?
+  discussion        String?    // DISCUSSION field
+  extra             String?    // EXTRA field
+  
+  // Financial fields
+  amount            Float?     // AMT - total amount
+  discount          Float?     // DISCOUNT
+  payment           Float?     // PAYMENT received
+  balance           Float?     // BAL - balance due
+  
+  // Additional tracking
+  helper            String?    // HELPER - staff/helper ID
+  
   createdAt         DateTime @default(now())
   prescriptions     Prescription[]
 }
@@ -122,11 +189,22 @@ model Prescription {
   visitId     Int
   treatment   Treatment @relation(fields: [treatmentId], references: [id])
   treatmentId Int
-  dosage      String?
-  administration String?
-  quantity    Int       @default(1)
+  dosage      String?   // DOSE - full dosage instruction (e.g., "10/DRP/TDS/LW WTR")
+  administration String? // AD - administration method
+  quantity    Int       @default(1) // QTY - quantity of bottles/units
   taken       Boolean   @default(false)
   dispensed   Boolean   @default(false)
+  
+  // Advanced prescription fields from CSV
+  drugLabel          String?  // DL - Drug Label (S1, C3, L1, etc.)
+  constitutionRemedy String?  // CR - Constitution Remedy codes
+  symptomCode        String?  // SY - Symptom targeting code
+  effectCode         String?  // EF - Effect type (WE/YE/GE/BE)
+  timeOfDay          String?  // TM - When to take (BM/AM/RAP/ALT)
+  procedureMethod    String?  // PR - Application procedure
+  precautions        String?  // PRE - Special precautions
+  totalDays          Int?     // TDY - Treatment duration in days
+  
   createdAt   DateTime  @default(now())
 }
 
