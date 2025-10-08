@@ -79,6 +79,7 @@ model Product {
   batches     ProductBatch[]
   productOrders ProductOrder[]
   treatmentProducts TreatmentProduct[] // Products used in treatments
+  prescriptions Prescription[] // Prescriptions using this product
 }
 
 model Category {
@@ -189,21 +190,25 @@ model Prescription {
   visitId     Int
   treatment   Treatment @relation(fields: [treatmentId], references: [id])
   treatmentId Int
-  dosage      String?   // DOSE - full dosage instruction (e.g., "10/DRP/TDS/LW WTR")
+  product     Product?  @relation(fields: [productId], references: [id])
+  productId   Int?      // Optional - specific medicine from inventory
+  
+  // Treatment-specific fields (matching TreatmentProduct)
+  comp1       String?  // Component 1 - composition
+  comp2       String?  // Component 2 - composition
+  comp3       String?  // Component 3 - composition
+  quantity    Int      @default(1) // Quantity of drops/units
+  timing      String?  // Timing for this medicine (BM, AM, WM, HS, EMPTY)
+  dosage      String?  // Dosage instructions
+  additions   String?  // Additional notes
+  procedure   String?  // Procedure for this medicine
+  presentation String? // Presentation format (Tablet, Drops, etc.)
+  droppersToday Int?   // Number of droppers today
+  medicineQuantity Int? // Quantity of this medicine
   administration String? // AD - administration method
-  quantity    Int       @default(1) // QTY - quantity of bottles/units
+  
   taken       Boolean   @default(false)
   dispensed   Boolean   @default(false)
-  
-  // Advanced prescription fields from CSV
-  drugLabel          String?  // DL - Drug Label (S1, C3, L1, etc.)
-  constitutionRemedy String?  // CR - Constitution Remedy codes
-  symptomCode        String?  // SY - Symptom targeting code
-  effectCode         String?  // EF - Effect type (WE/YE/GE/BE)
-  timeOfDay          String?  // TM - When to take (BM/AM/RAP/ALT)
-  procedureMethod    String?  // PR - Application procedure
-  precautions        String?  // PRE - Special precautions
-  totalDays          Int?     // TDY - Treatment duration in days
   
   createdAt   DateTime  @default(now())
 }

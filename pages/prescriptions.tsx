@@ -35,10 +35,12 @@ export default function PrescriptionsPage() {
         const prod = products.find(p => String(p.id) === String(selectedProductId))
         if (!prod) return alert('Selected product not found')
         setPrescriptions([...prescriptions, { 
-            treatmentId: '', productId: String(prod.id), dosage: '', administration: '', quantity: 1, taken: false,
-            // Advanced fields
-            drugLabel: '', constitutionRemedy: '', symptomCode: '', effectCode: '',
-            timeOfDay: '', procedureMethod: '', precautions: '', totalDays: ''
+            treatmentId: '', productId: String(prod.id), 
+            comp1: '', comp2: '', comp3: '',
+            quantity: 1, timing: '', dosage: '', 
+            additions: '', procedure: '', presentation: '',
+            droppersToday: '', medicineQuantity: '',
+            administration: '', taken: false
         }])
     }
 
@@ -101,15 +103,48 @@ export default function PrescriptionsPage() {
 
     function addEmptyPrescription() {
         setPrescriptions([...prescriptions, { 
-            treatmentId: '', productId: '', dosage: '', administration: '', quantity: 1, taken: false,
-            // Advanced fields
-            drugLabel: '', constitutionRemedy: '', symptomCode: '', effectCode: '',
-            timeOfDay: '', procedureMethod: '', precautions: '', totalDays: ''
+            treatmentId: '', productId: '', 
+            comp1: '', comp2: '', comp3: '',
+            quantity: 1, timing: '', dosage: '', 
+            additions: '', procedure: '', presentation: '',
+            droppersToday: '', medicineQuantity: '',
+            administration: '', taken: false
         }])
     }
 
     function updatePrescription(i: number, patch: any) {
         const copy = [...prescriptions]
+        
+        // If treatmentId is being updated, auto-fill all related fields
+        if (patch.treatmentId !== undefined) {
+            const treatment = treatments.find(t => String(t.id) === String(patch.treatmentId))
+            if (treatment && treatment.treatmentProducts && treatment.treatmentProducts.length > 0) {
+                // Get the first product from the treatment (or you could create multiple prescriptions)
+                const firstProduct = treatment.treatmentProducts[0]
+                
+                // Auto-fill all fields from treatment and its first product
+                copy[i] = { 
+                    ...copy[i], 
+                    treatmentId: patch.treatmentId,
+                    productId: String(firstProduct.productId),
+                    comp1: firstProduct.comp1 || '',
+                    comp2: firstProduct.comp2 || '',
+                    comp3: firstProduct.comp3 || '',
+                    quantity: firstProduct.quantity || treatment.quantity || 1,
+                    timing: firstProduct.timing || '',
+                    dosage: firstProduct.dosage || treatment.dosage || '',
+                    additions: firstProduct.additions || '',
+                    procedure: firstProduct.procedure || treatment.procedure || '',
+                    presentation: firstProduct.presentation || '',
+                    droppersToday: firstProduct.droppersToday?.toString() || '',
+                    medicineQuantity: firstProduct.medicineQuantity?.toString() || '',
+                    administration: treatment.administration || ''
+                }
+                setPrescriptions(copy)
+                return
+            }
+        }
+        
         copy[i] = { ...copy[i], ...patch }
         setPrescriptions(copy)
     }
@@ -375,12 +410,60 @@ export default function PrescriptionsPage() {
                 {/* Medicines Selection Card */}
                 <div className="card">
                     <h3 className="text-lg font-semibold mb-4">Medicine Selection</h3>
+                    
+                    {/* Add from Treatment Plan */}
+                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <label className="block text-sm font-medium mb-2">Quick Add from Treatment Plan</label>
+                        <div className="flex gap-2">
+                            <CustomSelect
+                                value=""
+                                onChange={(treatmentId) => {
+                                    const treatment = treatments.find(t => String(t.id) === String(treatmentId))
+                                    if (treatment && treatment.treatmentProducts && treatment.treatmentProducts.length > 0) {
+                                        // Add all medicines from the treatment plan
+                                        const newPrescriptions = treatment.treatmentProducts.map((tp: any) => ({
+                                            treatmentId: String(treatment.id),
+                                            productId: String(tp.productId),
+                                            comp1: tp.comp1 || '',
+                                            comp2: tp.comp2 || '',
+                                            comp3: tp.comp3 || '',
+                                            quantity: tp.quantity || treatment.quantity || 1,
+                                            timing: tp.timing || '',
+                                            dosage: tp.dosage || treatment.dosage || '',
+                                            additions: tp.additions || '',
+                                            procedure: tp.procedure || treatment.procedure || '',
+                                            presentation: tp.presentation || '',
+                                            droppersToday: tp.droppersToday?.toString() || '',
+                                            medicineQuantity: tp.medicineQuantity?.toString() || '',
+                                            administration: treatment.administration || '',
+                                            taken: false
+                                        }))
+                                        setPrescriptions([...prescriptions, ...newPrescriptions])
+                                    }
+                                }}
+                                options={[
+                                    { value: '', label: '-- select treatment plan to add all medicines --' },
+                                    ...treatments.map(t => ({ 
+                                        value: String(t.id), 
+                                        label: `${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`} (${t.treatmentProducts?.length || 0} medicines)` 
+                                    }))
+                                ]}
+                                placeholder="-- select treatment plan --"
+                                className="flex-1"
+                            />
+                        </div>
+                        <p className="text-xs text-muted mt-1">This will add all medicines from the selected treatment plan with pre-filled dosages and instructions.</p>
+                    </div>
+
+                    {/* Add Individual Medicine */}
                     {products.length === 0 ? (
                         <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm">
                             No medicines in inventory. Add products on the <a href="/products" className="text-brand underline font-medium">Inventory page</a>.
                         </div>
                     ) : (
-                        <div className="flex gap-2">
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Or Add Individual Medicine</label>
+                            <div className="flex gap-2">
                             <CustomSelect
                                 value={selectedProductId}
                                 onChange={setSelectedProductId}
@@ -399,6 +482,7 @@ export default function PrescriptionsPage() {
                                 className="flex-1"
                             />
                             <button type="button" onClick={addSelectedProductToPrescription} className="btn btn-primary">Add to Prescription</button>
+                        </div>
                         </div>
                     )}
                 </div>
@@ -419,15 +503,18 @@ export default function PrescriptionsPage() {
                                 <div key={i} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/30">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Treatment</label>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Treatment Plan</label>
                                             <CustomSelect
                                                 value={pr.treatmentId}
                                                 onChange={(val) => updatePrescription(i, { treatmentId: val })}
                                                 options={[
-                                                    { value: '', label: '-- select treatment --' },
-                                                    ...treatments.map(t => ({ value: String(t.id), label: t.name }))
+                                                    { value: '', label: '-- select treatment plan --' },
+                                                    ...treatments.map(t => ({ 
+                                                        value: String(t.id), 
+                                                        label: t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}` 
+                                                    }))
                                                 ]}
-                                                placeholder="-- select treatment --"
+                                                placeholder="-- select treatment plan --"
                                             />
                                         </div>
                                         <div>
@@ -446,48 +533,63 @@ export default function PrescriptionsPage() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Dosage (DOSE)</label>
-                                            <input placeholder="10/DRP/TDS/LW WTR" value={pr.dosage} onChange={e => updatePrescription(i, { dosage: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Comp 1</label>
+                                            <input placeholder="Component 1" value={pr.comp1 || ''} onChange={e => updatePrescription(i, { comp1: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Drug Label (DL)</label>
-                                            <input placeholder="S1, C3, L1" value={pr.drugLabel} onChange={e => updatePrescription(i, { drugLabel: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Comp 2</label>
+                                            <input placeholder="Component 2" value={pr.comp2 || ''} onChange={e => updatePrescription(i, { comp2: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Constitution Remedy (CR)</label>
-                                            <input placeholder="S1, VEN1, F1" value={pr.constitutionRemedy} onChange={e => updatePrescription(i, { constitutionRemedy: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Comp 3</label>
+                                            <input placeholder="Component 3" value={pr.comp3 || ''} onChange={e => updatePrescription(i, { comp3: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Symptom Code (SY)</label>
-                                            <input placeholder="Symptom code" value={pr.symptomCode} onChange={e => updatePrescription(i, { symptomCode: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Qty (Drops)</label>
+                                            <input type="number" min="1" placeholder="0" value={pr.quantity} onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Effect Code (EF)</label>
-                                            <input placeholder="WE, YE, GE, BE" value={pr.effectCode} onChange={e => updatePrescription(i, { effectCode: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Timing</label>
+                                            <select 
+                                                value={pr.timing || ''} 
+                                                onChange={e => updatePrescription(i, { timing: e.target.value })}
+                                                className="w-full p-2 border rounded text-sm"
+                                            >
+                                                <option value="">Select timing</option>
+                                                <option value="BM">Before Meal</option>
+                                                <option value="AM">After Meal</option>
+                                                <option value="WM">With Meal</option>
+                                                <option value="HS">At Bedtime</option>
+                                                <option value="EMPTY">Empty Stomach</option>
+                                            </select>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Time of Day (TM)</label>
-                                            <input placeholder="BM, AM, RAP, ALT" value={pr.timeOfDay} onChange={e => updatePrescription(i, { timeOfDay: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Dosage</label>
+                                            <input placeholder="5 drops, 3x daily" value={pr.dosage || ''} onChange={e => updatePrescription(i, { dosage: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Administration (AD)</label>
-                                            <input placeholder="Oral / Topical" value={pr.administration} onChange={e => updatePrescription(i, { administration: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Additions</label>
+                                            <input placeholder="Additional notes" value={pr.additions || ''} onChange={e => updatePrescription(i, { additions: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Procedure (PR)</label>
-                                            <input placeholder="PPH, MSG, APL/LOCAL" value={pr.procedureMethod} onChange={e => updatePrescription(i, { procedureMethod: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Procedure</label>
+                                            <input placeholder="Procedure" value={pr.procedure || ''} onChange={e => updatePrescription(i, { procedure: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Precautions (PRE)</label>
-                                            <input placeholder="Special precautions" value={pr.precautions} onChange={e => updatePrescription(i, { precautions: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Presentation</label>
+                                            <input placeholder="Tablet, Drops, etc." value={pr.presentation || ''} onChange={e => updatePrescription(i, { presentation: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Total Days (TDY)</label>
-                                            <input type="number" placeholder="30" value={pr.totalDays} onChange={e => updatePrescription(i, { totalDays: Number(e.target.value) })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Droppers Today</label>
+                                            <input type="number" placeholder="0" value={pr.droppersToday || ''} onChange={e => updatePrescription(i, { droppersToday: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-medium mb-1 text-muted">Quantity (Bottles)</label>
-                                            <input type="number" step="0.01" placeholder="1" value={pr.quantity} onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} className="w-full p-2 border rounded text-sm" />
+                                            <label className="block text-xs font-medium mb-1 text-muted">Medicine Quantity</label>
+                                            <input type="number" placeholder="0" value={pr.medicineQuantity || ''} onChange={e => updatePrescription(i, { medicineQuantity: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1 text-muted">Administration</label>
+                                            <input placeholder="Oral / Topical" value={pr.administration || ''} onChange={e => updatePrescription(i, { administration: e.target.value })} className="w-full p-2 border rounded text-sm" />
                                         </div>
                                         <div className="flex items-end gap-2">
                                             <label className="flex items-center gap-2 flex-1 text-sm">
@@ -495,7 +597,7 @@ export default function PrescriptionsPage() {
                                                 <span>Taken</span>
                                             </label>
                                             <button type="button" onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }} className="btn btn-danger text-sm">
-                                                Delete
+                                                × Remove
                                             </button>
                                         </div>
                                     </div>
@@ -537,37 +639,126 @@ export default function PrescriptionsPage() {
                         </button>
                     </div>
 
-                    <div className="space-y-4">
-                        <div className="p-4 bg-gray-50 dark:bg-gray-900/30 rounded-lg">
-                            <div className="font-semibold mb-2">Patient Information</div>
-                            <div className="text-sm space-y-1">
-                                <div><span className="font-medium">Name:</span> {(patients.find(p => String(p.id) === String(lastCreatedVisit.patientId))?.firstName) || lastCreatedVisit.patient?.firstName || ''} {(patients.find(p => String(p.id) === String(lastCreatedVisit.patientId))?.lastName) || lastCreatedVisit.patient?.lastName || ''}</div>
-                                <div><span className="font-medium">OPD Number:</span> {lastCreatedVisit.opdNo}</div>
-                                <div><span className="font-medium">Date:</span> {new Date(lastCreatedVisit.date).toLocaleString()}</div>
-                            </div>
+                    {/* TOP PART - FOR PATIENT (WITHOUT COMPOSITION) */}
+                    <div className="prescription-section border-2 border-dashed border-gray-300 dark:border-gray-600 p-6 mb-8 rounded-lg">
+                        <div className="text-center mb-4">
+                            <h2 className="text-xl font-bold">PRESCRIPTION - PATIENT COPY</h2>
+                            <p className="text-sm text-muted">For Patient's Reference</p>
                         </div>
 
-                        <div>
-                            <div className="font-semibold mb-3">Prescribed Medicines</div>
-                            {lastCreatedVisit.prescriptions?.length === 0 ? (
-                                <div className="text-center py-4 text-muted text-sm">No prescriptions</div>
-                            ) : (
-                                <ul className="space-y-2">
-                                    {lastCreatedVisit.prescriptions?.map((pr: any) => (
-                                        <li key={pr.id} className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                            <div className="font-medium text-brand">
-                                                {(treatments.find(t => String(t.id) === String(pr.treatmentId))?.name) || 'Treatment'} 
-                                                {(products.find(p => String(p.id) === String(pr.productId))?.name) ? ` — ${products.find(p => String(p.id) === String(pr.productId))?.name}` : ''}
-                                            </div>
-                                            <div className="text-sm text-muted mt-1">
-                                                <span className="font-medium">Dosage:</span> {pr.dosage || '-'} · 
-                                                <span className="font-medium ml-2">Quantity:</span> {pr.quantity} · 
-                                                <span className="font-medium ml-2">Administration:</span> {pr.administration || '-'}
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                        <div className="space-y-4">
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/30 rounded-lg">
+                                <div className="font-semibold mb-2">Patient Information</div>
+                                <div className="text-sm space-y-1">
+                                    <div><span className="font-medium">Name:</span> {(patients.find(p => String(p.id) === String(lastCreatedVisit.patientId))?.firstName) || lastCreatedVisit.patient?.firstName || ''} {(patients.find(p => String(p.id) === String(lastCreatedVisit.patientId))?.lastName) || lastCreatedVisit.patient?.lastName || ''}</div>
+                                    <div><span className="font-medium">OPD Number:</span> {lastCreatedVisit.opdNo}</div>
+                                    <div><span className="font-medium">Date:</span> {new Date(lastCreatedVisit.date).toLocaleString()}</div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="font-semibold mb-3">Prescribed Medicines</div>
+                                {lastCreatedVisit.prescriptions?.length === 0 ? (
+                                    <div className="text-center py-4 text-muted text-sm">No prescriptions</div>
+                                ) : (
+                                    <ul className="space-y-2">
+                                        {lastCreatedVisit.prescriptions?.map((pr: any, index: number) => {
+                                            const product = products.find(p => String(p.id) === String(pr.productId))
+                                            const treatment = treatments.find(t => String(t.id) === String(pr.treatmentId))
+                                            return (
+                                                <li key={pr.id} className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                                    <div className="font-medium text-brand text-lg">
+                                                        {index + 1}. {product?.name || 'Medicine'}
+                                                    </div>
+                                                    <div className="text-sm mt-2 space-y-1">
+                                                        {pr.dosage && <div><span className="font-medium">Dosage:</span> {pr.dosage}</div>}
+                                                        {pr.timing && <div><span className="font-medium">Timing:</span> {pr.timing}</div>}
+                                                        {pr.quantity && <div><span className="font-medium">Quantity:</span> {pr.quantity}</div>}
+                                                        {pr.administration && <div><span className="font-medium">Administration:</span> {pr.administration}</div>}
+                                                        {pr.procedure && <div><span className="font-medium">Procedure:</span> {pr.procedure}</div>}
+                                                        {pr.additions && <div><span className="font-medium">Additional Instructions:</span> {pr.additions}</div>}
+                                                    </div>
+                                                </li>
+                                            )
+                                        })}
+                                    </ul>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* PAGE BREAK FOR PRINTING */}
+                    <div className="page-break" style={{ pageBreakAfter: 'always', borderTop: '2px dashed #ccc', margin: '20px 0' }}></div>
+
+                    {/* BOTTOM PART - WITH COMPOSITION (FOR RECORD/PHARMACIST) */}
+                    <div className="prescription-section border-2 border-dashed border-blue-300 dark:border-blue-600 p-6 rounded-lg">
+                        <div className="text-center mb-4">
+                            <h2 className="text-xl font-bold">PRESCRIPTION - COMPLETE RECORD</h2>
+                            <p className="text-sm text-muted">With Full Composition Details</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/30 rounded-lg">
+                                <div className="font-semibold mb-2">Patient Information</div>
+                                <div className="text-sm space-y-1">
+                                    <div><span className="font-medium">Name:</span> {(patients.find(p => String(p.id) === String(lastCreatedVisit.patientId))?.firstName) || lastCreatedVisit.patient?.firstName || ''} {(patients.find(p => String(p.id) === String(lastCreatedVisit.patientId))?.lastName) || lastCreatedVisit.patient?.lastName || ''}</div>
+                                    <div><span className="font-medium">OPD Number:</span> {lastCreatedVisit.opdNo}</div>
+                                    <div><span className="font-medium">Date:</span> {new Date(lastCreatedVisit.date).toLocaleString()}</div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="font-semibold mb-3">Prescribed Medicines (With Composition)</div>
+                                {lastCreatedVisit.prescriptions?.length === 0 ? (
+                                    <div className="text-center py-4 text-muted text-sm">No prescriptions</div>
+                                ) : (
+                                    <ul className="space-y-3">
+                                        {lastCreatedVisit.prescriptions?.map((pr: any, index: number) => {
+                                            const product = products.find(p => String(p.id) === String(pr.productId))
+                                            const treatment = treatments.find(t => String(t.id) === String(pr.treatmentId))
+                                            return (
+                                                <li key={pr.id} className="p-4 border-2 border-blue-200 dark:border-blue-700 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                                                    <div className="font-medium text-brand text-lg mb-2">
+                                                        {index + 1}. {product?.name || 'Medicine'}
+                                                    </div>
+                                                    
+                                                    {/* COMPOSITION SECTION */}
+                                                    {(pr.comp1 || pr.comp2 || pr.comp3) && (
+                                                        <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded">
+                                                            <div className="font-semibold text-sm mb-1">🔬 Composition:</div>
+                                                            <div className="text-sm space-y-0.5">
+                                                                {pr.comp1 && <div>• Component 1: {pr.comp1}</div>}
+                                                                {pr.comp2 && <div>• Component 2: {pr.comp2}</div>}
+                                                                {pr.comp3 && <div>• Component 3: {pr.comp3}</div>}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* TREATMENT PLAN INFO */}
+                                                    {treatment && (
+                                                        <div className="mb-2 text-sm">
+                                                            <span className="font-medium">Treatment Plan:</span> {treatment.treatmentPlan || treatment.provDiagnosis || 'N/A'}
+                                                        </div>
+                                                    )}
+
+                                                    {/* ALL OTHER DETAILS */}
+                                                    <div className="text-sm space-y-1">
+                                                        {pr.dosage && <div><span className="font-medium">Dosage:</span> {pr.dosage}</div>}
+                                                        {pr.timing && <div><span className="font-medium">Timing:</span> {pr.timing}</div>}
+                                                        {pr.quantity && <div><span className="font-medium">Quantity:</span> {pr.quantity}</div>}
+                                                        {pr.administration && <div><span className="font-medium">Administration:</span> {pr.administration}</div>}
+                                                        {pr.procedure && <div><span className="font-medium">Procedure:</span> {pr.procedure}</div>}
+                                                        {pr.presentation && <div><span className="font-medium">Presentation:</span> {pr.presentation}</div>}
+                                                        {pr.droppersToday && <div><span className="font-medium">Droppers Today:</span> {pr.droppersToday}</div>}
+                                                        {pr.medicineQuantity && <div><span className="font-medium">Medicine Quantity:</span> {pr.medicineQuantity}</div>}
+                                                        {pr.additions && <div><span className="font-medium">Additional Instructions:</span> {pr.additions}</div>}
+                                                    </div>
+                                                </li>
+                                            )
+                                        })}
+                                    </ul>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -583,9 +774,61 @@ function openPrintableWindow(node: HTMLDivElement | null){
         <head>
           <title>Prescription</title>
           <style>
-            body{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; padding: 20px }
+            body{ 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; 
+              padding: 20px;
+              max-width: 1000px;
+              margin: 0 auto;
+            }
+            h2{ margin: 0 0 10px; color: #333; }
             h3{ margin:0 0 10px }
             .p-item{ margin-bottom: 8px }
+            .prescription-section { 
+              margin-bottom: 30px;
+              padding: 20px;
+              border: 2px dashed #ccc;
+              border-radius: 8px;
+            }
+            .page-break { 
+              page-break-after: always;
+              border-top: 2px dashed #ccc;
+              margin: 30px 0;
+              padding-top: 10px;
+            }
+            .text-center { text-align: center; }
+            .mb-4 { margin-bottom: 1rem; }
+            .mb-2 { margin-bottom: 0.5rem; }
+            .mb-3 { margin-bottom: 0.75rem; }
+            .space-y-1 > * + * { margin-top: 0.25rem; }
+            .space-y-2 > * + * { margin-top: 0.5rem; }
+            .space-y-3 > * + * { margin-top: 0.75rem; }
+            .space-y-4 > * + * { margin-top: 1rem; }
+            .p-4 { padding: 1rem; }
+            .p-3 { padding: 0.75rem; }
+            .p-2 { padding: 0.5rem; }
+            .bg-gray-50 { background-color: #f9fafb; }
+            .bg-blue-50 { background-color: #eff6ff; }
+            .bg-yellow-50 { background-color: #fefce8; }
+            .rounded-lg { border-radius: 0.5rem; }
+            .border { border: 1px solid #e5e7eb; }
+            .border-2 { border: 2px solid; }
+            .border-gray-200 { border-color: #e5e7eb; }
+            .border-blue-200 { border-color: #bfdbfe; }
+            .border-yellow-300 { border-color: #fde047; }
+            .font-semibold { font-weight: 600; }
+            .font-medium { font-weight: 500; }
+            .font-bold { font-weight: 700; }
+            .text-sm { font-size: 0.875rem; }
+            .text-lg { font-size: 1.125rem; }
+            .text-xl { font-size: 1.25rem; }
+            .text-brand { color: #3b82f6; }
+            .text-muted { color: #6b7280; }
+            ul { list-style: none; padding: 0; }
+            @media print {
+              body { padding: 10px; }
+              .page-break { page-break-after: always; }
+              button { display: none; }
+            }
           </style>
         </head>
         <body>

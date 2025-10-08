@@ -6,7 +6,12 @@ import { requireAuth } from '../../lib/auth'
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'GET') {
         try {
-            const items = await prisma.visit.findMany({ orderBy: { date: 'desc' } })
+            const items = await prisma.visit.findMany({ 
+                orderBy: { date: 'desc' },
+                include: {
+                    prescriptions: true
+                }
+            })
             return res.status(200).json(items)
         } catch (err: any) {
             if (err?.code === 'P2021' || err?.code === 'P2022') return res.status(200).json([])
@@ -75,9 +80,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const ops = prescriptions.map((pr: any) => ({
                     visitId: visit.id,
                     treatmentId: pr.treatmentId ? Number(pr.treatmentId) : undefined,
-                    dosage: pr.dosage,
-                    administration: pr.administration,
+                    productId: pr.productId ? Number(pr.productId) : undefined,
+                    comp1: pr.comp1 || null,
+                    comp2: pr.comp2 || null,
+                    comp3: pr.comp3 || null,
                     quantity: Number(pr.quantity || 1),
+                    timing: pr.timing || null,
+                    dosage: pr.dosage || null,
+                    additions: pr.additions || null,
+                    procedure: pr.procedure || null,
+                    presentation: pr.presentation || null,
+                    droppersToday: pr.droppersToday ? Number(pr.droppersToday) : null,
+                    medicineQuantity: pr.medicineQuantity ? Number(pr.medicineQuantity) : null,
+                    administration: pr.administration || null,
                     taken: !!pr.taken
                 }))
 
