@@ -2,3 +2,14 @@ node_modules
 .next
 .env
 prisma/dev.db
+
+# Electron build output
+dist
+build
+*.exe
+*.dmg
+*.AppImage
+
+# Electron temp files
+.electron
+out

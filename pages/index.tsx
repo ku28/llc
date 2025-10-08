@@ -53,7 +53,7 @@ export default function Dashboard(){
         ) : (
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
             {recentVisits.map(v=> (
-              <li key={v.id} className="list-item flex items-center justify-between">
+              <li key={v.id} className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="font-medium">
                     {v.patient?.firstName} {v.patient?.lastName}
