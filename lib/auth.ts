@@ -36,7 +36,9 @@ export function verifySessionToken(token: string) {
 }
 
 export function setSessionCookie(res: NextApiResponse, token: string) {
-    const cookie = `session=${token}; Path=/; HttpOnly; SameSite=Lax` + (process.env.NODE_ENV === 'production' ? '; Secure' : '')
+    // Set cookie to expire in 30 days (2592000 seconds)
+    const maxAge = 30 * 24 * 60 * 60
+    const cookie = `session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}` + (process.env.NODE_ENV === 'production' ? '; Secure' : '')
     res.setHeader('Set-Cookie', cookie)
 }
 
