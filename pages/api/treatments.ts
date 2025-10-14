@@ -1,8 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
-import { requireAuth } from '../../lib/auth'
+import { requireDoctorOrAdmin, requireAuth } from '../../lib/auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    // Treatments restricted to doctors and admins only
+    const user = await requireDoctorOrAdmin(req, res)
+    if (!user) return
+    
     if (req.method === 'GET') {
         try {
             const items = await prisma.treatment.findMany({ 

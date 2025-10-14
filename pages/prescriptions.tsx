@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/router'
 import CustomSelect from '../components/CustomSelect'
 import DateInput from '../components/DateInput'
 
 export default function PrescriptionsPage() {
+    const router = useRouter()
     const [patients, setPatients] = useState<any[]>([])
     const [treatments, setTreatments] = useState<any[]>([])
     const [products, setProducts] = useState<any[]>([])
@@ -165,20 +167,8 @@ export default function PrescriptionsPage() {
             const data = await res.json()
             setLastCreatedVisitId(data.id)
             setLastCreatedVisit(data)
-            // show a quick confirmation
-            alert('Saved visit #' + data.id)
-            // reset
-            setForm({ 
-                patientId: '', opdNo: '', diagnoses: '', temperament: '', pulseDiagnosis: '', pulseDiagnosis2: '',
-                majorComplaints: '', historyReports: '', investigations: '', provisionalDiagnosis: '', 
-                improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '', 
-                nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', 
-                height: '', weight: '', fatherHusbandGuardianName: '',
-                amount: '', discount: '', payment: '', balance: '',
-                visitNumber: '', followUpCount: '', helper: '',
-                procedureAdopted: '', discussion: '', extra: ''
-            })
-            setPrescriptions([])
+            // Redirect to visit details page
+            router.push(`/visits/${data.id}`)
         } catch (err) { console.error(err); alert('Save failed') }
         setLoading(false)
     }

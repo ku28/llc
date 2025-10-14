@@ -1,11 +1,22 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+import { canAccessRoute } from '../lib/permissions'
 
 export default function Header({ title = 'LLC ERP' }: { title?: string }) {
   const [user, setUser] = useState<any>(null)
   const [dark, setDark] = useState<boolean>(false)
+  const [accountingOpen, setAccountingOpen] = useState(false)
   const router = useRouter()
+
+  // Helper to check if user can access a route
+  const canAccess = (route: string) => {
+    if (!user) return false
+    return canAccessRoute(user.role, route)
+  }
+
+  // Helper to check if user is reception
+  const isReception = user?.role === 'reception'
 
   // Function to fetch user data
   const fetchUser = async () => {
@@ -100,11 +111,81 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
 
           {/* main nav - hidden on small screens */}
           <nav className="hidden md:flex items-center gap-1">
-            <Link href="/" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Dashboard</Link>
-            <Link href="/patients" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Patients</Link>
-            <Link href="/treatments" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Treatments</Link>
-            <Link href="/products" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Inventory</Link>
-            <Link href="/visits" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Visits</Link>
+            {canAccess('/dashboard') && <Link href="/" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Dashboard</Link>}
+            {canAccess('/patients') && <Link href="/patients" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Patients</Link>}
+            {canAccess('/treatments') && <Link href="/treatments" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Treatments</Link>}
+            {canAccess('/products') && <Link href="/products" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Stock</Link>}
+            {canAccess('/visits') && <Link href="/visits" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Visits</Link>}
+            
+            {/* Show Invoices link directly for reception, or in dropdown for others */}
+            {isReception && canAccess('/invoices') && (
+              <Link href="/invoices" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Invoices</Link>
+            )}
+            
+            {/* Accounting Dropdown - only show for non-reception users who can access accounting features */}
+            {!isReception && (canAccess('/suppliers') || canAccess('/purchase-orders') || canAccess('/invoices') || canAccess('/stock-transactions') || canAccess('/analytics')) && (
+            <div className="relative" onMouseLeave={() => setAccountingOpen(false)}>
+              <button
+                onClick={() => setAccountingOpen(!accountingOpen)}
+                className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm flex items-center gap-1"
+              >
+                Accounting
+                <svg className={`w-4 h-4 transition-transform ${accountingOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {accountingOpen && (
+                <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                  {canAccess('/suppliers') && (
+                    <Link 
+                      href="/suppliers" 
+                      className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                      onClick={() => setAccountingOpen(false)}
+                    >
+                      Suppliers
+                    </Link>
+                  )}
+                  {canAccess('/purchase-orders') && (
+                    <Link 
+                      href="/purchase-orders" 
+                      className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                      onClick={() => setAccountingOpen(false)}
+                    >
+                      Purchase Orders
+                    </Link>
+                  )}
+                  {canAccess('/invoices') && (
+                    <Link 
+                      href="/invoices" 
+                      className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                      onClick={() => setAccountingOpen(false)}
+                    >
+                      Invoices
+                    </Link>
+                  )}
+                  {canAccess('/stock-transactions') && (
+                    <Link 
+                      href="/stock-transactions" 
+                      className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                      onClick={() => setAccountingOpen(false)}
+                    >
+                      Inventory History
+                    </Link>
+                  )}
+                  {canAccess('/analytics') && (
+                    <Link 
+                      href="/analytics" 
+                      className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                      onClick={() => setAccountingOpen(false)}
+                    >
+                      Analytics
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+            )}
           </nav>
 
         </div>
@@ -144,7 +225,6 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
           ) : (
             <div className="flex gap-2">
               <Link href="/login" className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-green-600 transition-all hover:shadow-lg font-medium text-sm">Login</Link>
-              <Link href="/signup" className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-green-600 transition-all hover:shadow-lg font-medium text-sm hidden sm:inline-block">Signup</Link>
             </div>
           )}
         </div>

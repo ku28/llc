@@ -1,12 +1,20 @@
 import { useState, useEffect } from 'react'
 import CustomSelect from '../components/CustomSelect'
+import { requireStaffOrAbove } from '../lib/withAuth'
 
-export default function ProductsPage() {
+function ProductsPage() {
     const [items, setItems] = useState<any[]>([])
     const [categories, setCategories] = useState<any[]>([])
     const [editingId, setEditingId] = useState<number | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
+    const [searchQuery, setSearchQuery] = useState('')
+    
+    // Filter states
+    const [filterCategory, setFilterCategory] = useState<string>('')
+    const [filterStockStatus, setFilterStockStatus] = useState<string>('')
+    const [filterPriceRange, setFilterPriceRange] = useState<string>('')
+    const [showFilters, setShowFilters] = useState(false)
     
     const emptyForm = {
         name: '',
@@ -212,6 +220,125 @@ export default function ProductsPage() {
                 </button>
             </div>
 
+            {/* Search Bar */}
+            <div className="card mb-4">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="flex-1 relative">
+                        <input
+                            type="text"
+                            placeholder="🔍 Search products by name..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                        />
+                        <svg className="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                        </svg>
+                        Filters
+                    </button>
+                    {(searchQuery || filterCategory || filterStockStatus || filterPriceRange) && (
+                        <button
+                            onClick={() => {
+                                setSearchQuery('')
+                                setFilterCategory('')
+                                setFilterStockStatus('')
+                                setFilterPriceRange('')
+                            }}
+                            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            Clear All
+                        </button>
+                    )}
+                </div>
+
+                {/* Filter Panel */}
+                {showFilters && (
+                    <div className="border-t dark:border-gray-700 pt-4 mt-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Category Filter */}
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Category</label>
+                                <select
+                                    value={filterCategory}
+                                    onChange={(e) => setFilterCategory(e.target.value)}
+                                    className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                >
+                                    <option value="">All Categories</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Stock Status Filter */}
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Stock Status</label>
+                                <select
+                                    value={filterStockStatus}
+                                    onChange={(e) => setFilterStockStatus(e.target.value)}
+                                    className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                >
+                                    <option value="">All Stock Levels</option>
+                                    <option value="in-stock">In Stock</option>
+                                    <option value="low-stock">Low Stock (Below Threshold)</option>
+                                    <option value="out-of-stock">Out of Stock</option>
+                                </select>
+                            </div>
+
+                            {/* Price Range Filter */}
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Price Range</label>
+                                <select
+                                    value={filterPriceRange}
+                                    onChange={(e) => setFilterPriceRange(e.target.value)}
+                                    className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                >
+                                    <option value="">All Prices</option>
+                                    <option value="0-100">₹0 - ₹100</option>
+                                    <option value="100-500">₹100 - ₹500</option>
+                                    <option value="500-1000">₹500 - ₹1,000</option>
+                                    <option value="1000-5000">₹1,000 - ₹5,000</option>
+                                    <option value="5000+">₹5,000+</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Active Filters Display */}
+                        {(filterCategory || filterStockStatus || filterPriceRange) && (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                <span className="text-sm font-medium">Active Filters:</span>
+                                {filterCategory && (
+                                    <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm flex items-center gap-2">
+                                        {categories.find(c => c.id === Number(filterCategory))?.name}
+                                        <button onClick={() => setFilterCategory('')} className="hover:text-blue-600">×</button>
+                                    </span>
+                                )}
+                                {filterStockStatus && (
+                                    <span className="px-3 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-sm flex items-center gap-2">
+                                        {filterStockStatus === 'in-stock' ? 'In Stock' : filterStockStatus === 'low-stock' ? 'Low Stock' : 'Out of Stock'}
+                                        <button onClick={() => setFilterStockStatus('')} className="hover:text-green-600">×</button>
+                                    </span>
+                                )}
+                                {filterPriceRange && (
+                                    <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded-full text-sm flex items-center gap-2">
+                                        {filterPriceRange === '5000+' ? '₹5,000+' : `₹${filterPriceRange.replace('-', ' - ₹')}`}
+                                        <button onClick={() => setFilterPriceRange('')} className="hover:text-purple-600">×</button>
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {/* Modal/Dialog */}
             {isModalOpen && (
                 <div 
@@ -316,11 +443,86 @@ export default function ProductsPage() {
             <div className="card">
                         <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
                             <span>Products Inventory</span>
-                            <span className="badge">{items.length} items</span>
+                            <span className="badge">
+                                {(() => {
+                                    // Apply same filtering logic for count
+                                    return items.filter(p => {
+                                        if (searchQuery) {
+                                            const name = (p.name || '').toLowerCase()
+                                            if (!name.includes(searchQuery.toLowerCase())) return false
+                                        }
+                                        if (filterCategory && p.categoryId !== Number(filterCategory)) return false
+                                        if (filterStockStatus) {
+                                            const quantity = p.quantity || 0
+                                            const threshold = p.category?.reorderLevel || 0
+                                            if (filterStockStatus === 'in-stock' && quantity <= threshold) return false
+                                            if (filterStockStatus === 'low-stock' && (quantity > threshold || quantity === 0)) return false
+                                            if (filterStockStatus === 'out-of-stock' && quantity !== 0) return false
+                                        }
+                                        if (filterPriceRange) {
+                                            const price = p.priceCents || 0
+                                            if (filterPriceRange === '0-100' && (price < 0 || price > 100)) return false
+                                            if (filterPriceRange === '100-500' && (price < 100 || price > 500)) return false
+                                            if (filterPriceRange === '500-1000' && (price < 500 || price > 1000)) return false
+                                            if (filterPriceRange === '1000-5000' && (price < 1000 || price > 5000)) return false
+                                            if (filterPriceRange === '5000+' && price < 5000) return false
+                                        }
+                                        return true
+                                    }).length
+                                })()} of {items.length} items
+                            </span>
                         </h3>
-                    {items.length === 0 ? (
-                        <div className="text-center py-8 text-muted">No products yet</div>
-                    ) : (
+                    {(() => {
+                        const filteredItems = items.filter(p => {
+                            // Search filter
+                            if (searchQuery) {
+                                const name = (p.name || '').toLowerCase()
+                                if (!name.includes(searchQuery.toLowerCase())) return false
+                            }
+                            
+                            // Category filter
+                            if (filterCategory) {
+                                if (p.categoryId !== Number(filterCategory)) return false
+                            }
+                            
+                            // Stock status filter
+                            if (filterStockStatus) {
+                                const quantity = p.quantity || 0
+                                const threshold = p.category?.reorderLevel || 0
+                                
+                                if (filterStockStatus === 'in-stock' && quantity <= threshold) return false
+                                if (filterStockStatus === 'low-stock' && (quantity > threshold || quantity === 0)) return false
+                                if (filterStockStatus === 'out-of-stock' && quantity !== 0) return false
+                            }
+                            
+                            // Price range filter
+                            if (filterPriceRange) {
+                                const price = p.priceCents || 0
+                                
+                                if (filterPriceRange === '0-100' && (price < 0 || price > 100)) return false
+                                if (filterPriceRange === '100-500' && (price < 100 || price > 500)) return false
+                                if (filterPriceRange === '500-1000' && (price < 500 || price > 1000)) return false
+                                if (filterPriceRange === '1000-5000' && (price < 1000 || price > 5000)) return false
+                                if (filterPriceRange === '5000+' && price < 5000) return false
+                            }
+                            
+                            return true
+                        })
+                        
+                        if (filteredItems.length === 0 && (searchQuery || filterCategory || filterStockStatus || filterPriceRange)) {
+                            return (
+                                <div className="text-center py-8 text-muted">
+                                    <p className="text-lg mb-2">No products match your filters</p>
+                                    <p className="text-sm">Try adjusting your search or filter criteria</p>
+                                </div>
+                            )
+                        }
+                        
+                        if (filteredItems.length === 0) {
+                            return <div className="text-center py-8 text-muted">No products yet</div>
+                        }
+                        
+                        return (
                         <div className="overflow-x-auto">
                             <table className="w-full text-xs">
                                 <thead className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
@@ -342,7 +544,7 @@ export default function ProductsPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                    {items.map(p => (
+                                    {filteredItems.map(p => (
                                         <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                             <td className="px-2 py-1.5">
                                                 <div className="font-medium text-xs leading-tight">{p.name}</div>
@@ -391,8 +593,12 @@ export default function ProductsPage() {
                                 </tbody>
                             </table>
                         </div>
-                    )}
+                        )
+                    })()}
                 </div>
         </div>
     )
 }
+
+// Protect this page - only staff, doctors, and admins can access
+export default requireStaffOrAbove(ProductsPage)

@@ -1,10 +1,48 @@
 import '../styles/globals.css'
 import type { AppProps } from 'next/app'
+import { useRouter } from 'next/router'
+import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import Script from 'next/script'
 import Layout from '../components/Layout'
 
 export default function App({ Component, pageProps }: AppProps) {
+  const router = useRouter()
+  const [authChecked, setAuthChecked] = useState(false)
+  
+  // Pages that don't require authentication
+  const publicPages = ['/login', '/signup']
+  const isPublicPage = publicPages.includes(router.pathname)
+
+  useEffect(() => {
+    // Skip auth check for public pages
+    if (isPublicPage) {
+      setAuthChecked(true)
+      return
+    }
+
+    // Check authentication for all other pages
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me')
+        const data = await res.json()
+        
+        if (!data.user) {
+          // Not authenticated - redirect to login
+          router.push('/login')
+          return
+        }
+        
+        setAuthChecked(true)
+      } catch (err) {
+        // Error checking auth - redirect to login
+        router.push('/login')
+      }
+    }
+
+    checkAuth()
+  }, [router.pathname, isPublicPage, router])
+
   return (
     <>
       <Head>
@@ -43,7 +81,17 @@ export default function App({ Component, pageProps }: AppProps) {
       />
 
       <Layout>
-        <Component {...pageProps} />
+        {/* Only render component after auth check (or if public page) */}
+        {(authChecked || isPublicPage) ? (
+          <Component {...pageProps} />
+        ) : (
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto mb-4"></div>
+              <p className="text-muted">Checking authentication...</p>
+            </div>
+          </div>
+        )}
       </Layout>
     </>
   )

@@ -67,3 +67,45 @@ export async function getSessionUser(req: NextApiRequest) {
     const user = await prisma.user.findUnique({ where: { id: Number(data.sub) } }).catch(() => null)
     return user
 }
+
+// Role-based authorization helpers
+export function isAdmin(user: any): boolean {
+    return user?.role === 'admin'
+}
+
+export function isDoctor(user: any): boolean {
+    return user?.role === 'doctor' || user?.role === 'admin'
+}
+
+export function isStaff(user: any): boolean {
+    return user?.role === 'staff' || user?.role === 'admin' || user?.role === 'doctor'
+}
+
+export function isReception(user: any): boolean {
+    return user?.role === 'reception'
+}
+
+export async function requireRole(req: NextApiRequest, res: NextApiResponse, allowedRoles: string[]) {
+    const user = await requireAuth(req, res)
+    if (!user) return null
+    
+    if (!allowedRoles.includes(user.role)) {
+        res.status(403).json({ error: 'Access denied. Insufficient permissions.' })
+        return null
+    }
+    
+    return user
+}
+
+// Specific role requirements
+export async function requireAdmin(req: NextApiRequest, res: NextApiResponse) {
+    return requireRole(req, res, ['admin'])
+}
+
+export async function requireDoctorOrAdmin(req: NextApiRequest, res: NextApiResponse) {
+    return requireRole(req, res, ['admin', 'doctor'])
+}
+
+export async function requireStaffOrAbove(req: NextApiRequest, res: NextApiResponse) {
+    return requireRole(req, res, ['admin', 'doctor', 'staff'])
+}

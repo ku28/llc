@@ -8,6 +8,7 @@ export default function PatientsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
     const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+    const [searchQuery, setSearchQuery] = useState('')
     
     const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' }
     const [form, setForm] = useState(emptyForm)
@@ -161,7 +162,6 @@ export default function PatientsPage() {
                     </button>
                 )}
             </div>
-
             {!user && (
                 <div className="card mb-4">
                     <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm">
@@ -169,6 +169,31 @@ export default function PatientsPage() {
                     </div>
                 </div>
             )}
+            {/* Search Bar */}
+            <div className="card mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="flex-1 relative">
+                        <input
+                            type="text"
+                            placeholder="🔍 Search patients by name..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="w-full p-3 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        <svg className="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    {searchQuery && (
+                        <button
+                            onClick={() => setSearchQuery('')}
+                            className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                        >
+                            Clear
+                        </button>
+                    )}
+                </div>
+            </div>
 
             {/* Modal */}
             {isModalOpen && (
@@ -274,16 +299,33 @@ export default function PatientsPage() {
             <div className="card">
                 <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
                     <span>Patient Records</span>
-                    <span className="badge">{patients.length} patients</span>
+                    <span className="badge">{patients.filter(p => {
+                        if (!searchQuery) return true
+                        const fullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase()
+                        return fullName.includes(searchQuery.toLowerCase())
+                    }).length} patients</span>
                 </h3>
                 {patients.length === 0 ? (
                     <div className="text-center py-12 text-muted">
                         <p className="text-lg mb-2">No patients registered yet</p>
                         <p className="text-sm">Click "Register New Patient" to get started</p>
                     </div>
+                ) : patients.filter(p => {
+                    if (!searchQuery) return true
+                    const fullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase()
+                    return fullName.includes(searchQuery.toLowerCase())
+                }).length === 0 ? (
+                    <div className="text-center py-12 text-muted">
+                        <p className="text-lg mb-2">No patients found</p>
+                        <p className="text-sm">Try a different search term</p>
+                    </div>
                 ) : (
                     <div className="space-y-2">
-                        {patients.map(p => {
+                        {patients.filter(p => {
+                            if (!searchQuery) return true
+                            const fullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase()
+                            return fullName.includes(searchQuery.toLowerCase())
+                        }).map(p => {
                             const isExpanded = expandedRows.has(p.id)
                             const fullName = `${p.firstName || ''} ${p.lastName || ''}`.trim()
                             
@@ -323,7 +365,6 @@ export default function PatientsPage() {
                                             </button>
                                         </div>
                                     </div>
-
                                     {/* Expanded Details */}
                                     {isExpanded && (
                                         <div className="p-4 bg-white dark:bg-gray-900 space-y-4">
@@ -358,7 +399,6 @@ export default function PatientsPage() {
                                                     <div className="text-sm font-medium">{p.occupation || '-'}</div>
                                                 </div>
                                             </div>
-
                                             {/* Contact Info */}
                                             <div>
                                                 <div className="text-sm font-semibold mb-2">Contact Information</div>
@@ -377,7 +417,6 @@ export default function PatientsPage() {
                                                     </div>
                                                 </div>
                                             </div>
-
                                             {/* Medical Info */}
                                             <div>
                                                 <div className="text-sm font-semibold mb-2">Medical Information</div>

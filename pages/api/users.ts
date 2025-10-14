@@ -1,8 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
-import { requireAuth } from '../../lib/auth'
+import { requireAdmin, requireAuth } from '../../lib/auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    // User management restricted to admins only
+    const user = await requireAdmin(req, res)
+    if (!user) return
+    
     if (req.method === 'GET') {
         try {
             const items = await prisma.user.findMany({ orderBy: { createdAt: 'desc' } })

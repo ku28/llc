@@ -1,7 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
+import { requireStaffOrAbove } from '../../lib/auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    // Product batches restricted to staff and above
+    const user = await requireStaffOrAbove(req, res)
+    if (!user) return
+    
     if (req.method === 'GET') {
         try {
             const items = await prisma.productBatch.findMany({ orderBy: { createdAt: 'desc' } })

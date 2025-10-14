@@ -6,6 +6,7 @@ export default function VisitsPage() {
     const [visits, setVisits] = useState<any[]>([])
     const [patients, setPatients] = useState<any[]>([])
     const [form, setForm] = useState({ patientId: '', opdNo: '', diagnoses: '' })
+    const [searchQuery, setSearchQuery] = useState('')
     const [user, setUser] = useState<any>(null)
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
 
@@ -23,60 +24,72 @@ export default function VisitsPage() {
             <div className="section-header">
                 <h2 className="section-title">Patient Visits</h2>
                 <div className="flex items-center gap-3">
-                    <span className="badge">{visits.length} total visits</span>
+                    <span className="badge">
+                        {visits.filter(v => {
+                            if (!searchQuery) return true
+                            const patientName = (v.patient ? `${v.patient.firstName || ''} ${v.patient.lastName || ''}` : '').toLowerCase()
+                            const opdNo = (v.opdNo || '').toLowerCase()
+                            const search = searchQuery.toLowerCase()
+                            return patientName.includes(search) || opdNo.includes(search)
+                        }).length} total visits
+                    </span>
                     <Link href="/prescriptions" className="btn btn-primary text-sm">Create Visit with Prescriptions</Link>
                 </div>
             </div>
 
-            <div className="card mb-6">
-                <h3 className="text-lg font-semibold mb-4">Record New Visit</h3>
-                
-                {!user && (
-                    <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm">
-                        Please <a className="text-brand underline font-medium" href="/login">login</a> to record visits.
-                    </div>
-                )}
-
-                <form onSubmit={create} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                        <label className="block text-sm font-medium mb-1.5">Patient</label>
-                        <CustomSelect
-                            required
-                            value={form.patientId}
-                            onChange={(val) => setForm({ ...form, patientId: val })}
-                            options={[
-                                { value: '', label: 'Select patient' },
-                                ...patients.map(p => ({
-                                    value: String(p.id),
-                                    label: `${p.firstName} ${p.lastName}${p.opdNo ? ' · OPD: ' + p.opdNo : ''}`
-                                }))
-                            ]}
-                            placeholder="Select patient"
+            {/* Search Bar */}
+            <div className="card mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="flex-1 relative">
+                        <input
+                            type="text"
+                            placeholder="🔍 Search visits by patient name or OPD number..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
                         />
+                        <svg className="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1.5">OPD Number</label>
-                        <input placeholder="OPD-001" value={form.opdNo} onChange={e => setForm({ ...form, opdNo: e.target.value })} className="w-full p-2 border rounded" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1.5">Diagnosis</label>
-                        <input placeholder="Fever, Common Cold" value={form.diagnoses} onChange={e => setForm({ ...form, diagnoses: e.target.value })} className="w-full p-2 border rounded" />
-                    </div>
-                    <div className="sm:col-span-3 text-right pt-2">
-                        <button disabled={!user} className={`btn ${user ? 'btn-primary' : 'btn-secondary'}`}>
-                            {user ? 'Record Visit' : 'Login to record visits'}
+                    {searchQuery && (
+                        <button
+                            onClick={() => setSearchQuery('')}
+                            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            Clear
                         </button>
-                    </div>
-                </form>
+                    )}
+                </div>
             </div>
 
             <div className="card">
                 <h3 className="text-lg font-semibold mb-4">Visit History</h3>
-                {visits.length === 0 ? (
-                    <div className="text-center py-8 text-muted">No visits recorded yet</div>
-                ) : (
-                    <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                        {visits.map(v => (
+                {(() => {
+                    const filteredVisits = visits.filter(v => {
+                        if (!searchQuery) return true
+                        const patientName = (v.patient ? `${v.patient.firstName || ''} ${v.patient.lastName || ''}` : '').toLowerCase()
+                        const opdNo = (v.opdNo || '').toLowerCase()
+                        const search = searchQuery.toLowerCase()
+                        return patientName.includes(search) || opdNo.includes(search)
+                    })
+                    
+                    if (filteredVisits.length === 0 && searchQuery) {
+                        return (
+                            <div className="text-center py-8 text-muted">
+                                <p className="text-lg mb-2">No visits found</p>
+                                <p className="text-sm">Try adjusting your search query</p>
+                            </div>
+                        )
+                    }
+                    
+                    if (filteredVisits.length === 0) {
+                        return <div className="text-center py-8 text-muted">No visits recorded yet</div>
+                    }
+                    
+                    return (
+                        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                            {filteredVisits.map(v => (
                             <li key={v.id} className="list-item">
                                 <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
                                     <div className="flex-1">
@@ -105,7 +118,8 @@ export default function VisitsPage() {
                             </li>
                         ))}
                     </ul>
-                )}
+                    )
+                })()}
             </div>
         </div>
     )

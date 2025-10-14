@@ -38,6 +38,7 @@ model Patient {
   appointments Appointment[]
   invoices     Invoice[]
   visits       Visit[]
+  customerInvoices CustomerInvoice[]
 }
 
 model Appointment {
@@ -80,6 +81,10 @@ model Product {
   productOrders ProductOrder[]
   treatmentProducts TreatmentProduct[] // Products used in treatments
   prescriptions Prescription[] // Prescriptions using this product
+  purchaseOrderItems PurchaseOrderItem[]
+  customerInvoiceItems CustomerInvoiceItem[]
+  stockTransactions StockTransaction[]
+  demandForecasts DemandForecast[]
 }
 
 model Category {
@@ -255,4 +260,155 @@ model ProductOrder {
   status    String   @default("pending")
   orderVia  String?
   createdAt DateTime @default(now())
+}
+
+// ===== ACCOUNTING & INVENTORY MANAGEMENT MODELS =====
+
+model Supplier {
+  id                  Int             @id @default(autoincrement())
+  name                String
+  contactPerson       String?
+  email               String?
+  phone               String?
+  address             String?
+  city                String?
+  state               String?
+  pincode             String?
+  gstin               String?         // GST Identification Number
+  paymentTerms        String          @default("Net 30")
+  creditLimit         Int             @default(0)
+  outstandingBalance  Int             @default(0)
+  status              String          @default("active")
+  notes               String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  purchaseOrders      PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id              Int                  @id @default(autoincrement())
+  poNumber        String               @unique
+  supplier        Supplier             @relation(fields: [supplierId], references: [id])
+  supplierId      Int
+  orderDate       DateTime             @default(now())
+  expectedDate    DateTime?
+  receivedDate    DateTime?
+  status          String               @default("pending") // pending, received, cancelled
+  subtotal        Int                  @default(0)
+  taxAmount       Int                  @default(0)
+  discount        Int                  @default(0)
+  shippingCost    Int                  @default(0)
+  totalAmount     Int                  @default(0)
+  paidAmount      Int                  @default(0)
+  notes           String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  items           PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id                Int            @id @default(autoincrement())
+  purchaseOrder     PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId   Int
+  product           Product        @relation(fields: [productId], references: [id])
+  productId         Int
+  quantity          Int
+  unitPrice         Int
+  taxRate           Float          @default(0)
+  discount          Int            @default(0)
+  totalAmount       Int
+  receivedQuantity  Int            @default(0)
+  createdAt         DateTime       @default(now())
+}
+
+model CustomerInvoice {
+  id                  Int                   @id @default(autoincrement())
+  invoiceNumber       String                @unique
+  patient             Patient?              @relation(fields: [patientId], references: [id])
+  patientId           Int?
+  customerName        String
+  customerEmail       String?
+  customerPhone       String?
+  customerAddress     String?
+  customerGSTIN       String?
+  invoiceDate         DateTime              @default(now())
+  dueDate             DateTime?
+  status              String                @default("unpaid") // unpaid, partial, paid, cancelled
+  subtotal            Int                   @default(0)
+  taxAmount           Int                   @default(0)
+  discount            Int                   @default(0)
+  totalAmount         Int                   @default(0)
+  paidAmount          Int                   @default(0)
+  balanceAmount       Int                   @default(0)
+  paymentMethod       String?
+  notes               String?
+  termsAndConditions  String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  items               CustomerInvoiceItem[]
+  payments            Payment[]
+}
+
+model CustomerInvoiceItem {
+  id                  Int              @id @default(autoincrement())
+  customerInvoice     CustomerInvoice  @relation(fields: [customerInvoiceId], references: [id], onDelete: Cascade)
+  customerInvoiceId   Int
+  product             Product?         @relation(fields: [productId], references: [id])
+  productId           Int?
+  description         String
+  quantity            Int
+  unitPrice           Int
+  taxRate             Float            @default(0)
+  discount            Int              @default(0)
+  totalAmount         Int
+  createdAt           DateTime         @default(now())
+}
+
+model StockTransaction {
+  id                Int      @id @default(autoincrement())
+  product           Product  @relation(fields: [productId], references: [id])
+  productId         Int
+  transactionType   String   // IN, OUT, ADJUSTMENT, RETURN
+  quantity          Int
+  unitPrice         Int      @default(0)
+  totalValue        Int      @default(0)
+  balanceQuantity   Int      // Quantity after this transaction
+  referenceType     String?  // PurchaseOrder, CustomerInvoice, Visit, Manual
+  referenceId       Int?
+  notes             String?
+  transactionDate   DateTime @default(now())
+  performedBy       String?
+  createdAt         DateTime @default(now())
+}
+
+model DemandForecast {
+  id                      Int      @id @default(autoincrement())
+  product                 Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId               Int
+  forecastMonth           DateTime
+  predictedDemand         Int
+  actualDemand            Int      @default(0)
+  averageMonthlySales     Float    @default(0)
+  reorderPoint            Int      @default(0)
+  suggestedOrderQuantity  Int      @default(0)
+  notes                   String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  
+  @@unique([productId, forecastMonth])
+}
+
+model Payment {
+  id              Int              @id @default(autoincrement())
+  paymentNumber   String           @unique
+  paymentType     String           // RECEIVED, PAID
+  referenceType   String           // CustomerInvoice, PurchaseOrder
+  referenceId     Int
+  amount          Int
+  paymentMethod   String           // CASH, CARD, UPI, BANK_TRANSFER, CHEQUE
+  paymentDate     DateTime         @default(now())
+  transactionId   String?
+  notes           String?
+  createdAt       DateTime         @default(now())
+  customerInvoice CustomerInvoice? @relation(fields: [referenceId], references: [id])
 }
