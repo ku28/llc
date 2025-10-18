@@ -247,9 +247,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 })
 
                 return { visit: fullVisit, invoice }
+            }, {
+                timeout: 30000 // Increase timeout to 30 seconds
             })
 
-            return res.status(201).json(result)
+            return res.status(201).json(result.visit)
         } catch (err: any) {
             console.error('Error creating visit:', err)
             return res.status(500).json({ error: String(err?.message || err) })
