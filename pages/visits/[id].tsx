@@ -16,7 +16,7 @@ export default function VisitDetail() {
         })
     }, [id])
 
-    const generatePDF = () => {
+    const generatePDF = async () => {
         if (!visit) return
 
         const doc = new jsPDF({
@@ -24,6 +24,37 @@ export default function VisitDetail() {
             unit: 'mm',
             format: 'a4'
         })
+
+        // Function to add patient image if available
+        const addPatientImage = async () => {
+            if (visit.patient?.imageUrl) {
+                try {
+                    // Convert image URL to base64 and add to PDF
+                    const img = new Image()
+                    img.crossOrigin = 'Anonymous'
+                    
+                    return new Promise((resolve) => {
+                        img.onload = () => {
+                            // Add image in top right corner (30x30mm box)
+                            doc.addImage(img, 'JPEG', 175, 10, 25, 25, undefined, 'FAST')
+                            resolve(true)
+                        }
+                        img.onerror = () => {
+                            console.error('Failed to load patient image')
+                            resolve(false)
+                        }
+                        img.src = visit.patient.imageUrl
+                    })
+                } catch (error) {
+                    console.error('Error adding image to PDF:', error)
+                    return false
+                }
+            }
+            return false
+        }
+
+        // Add patient image
+        await addPatientImage()
 
         // Function to render prescription header
         const renderHeader = () => {
@@ -334,6 +365,16 @@ export default function VisitDetail() {
 
             {/* Patient Copy - Prescription Sheet WITHOUT Composition */}
             <div className="prescription-container prescription-patient-copy" style={{ background: 'white', color: 'black', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', maxWidth: '210mm', margin: '0 auto 2rem', borderRadius: '0.5rem' }}>
+                {/* Patient Image - Top Right */}
+                {visit.patient?.imageUrl && (
+                    <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', width: '25mm', height: '25mm', border: '2px solid #e5e7eb', borderRadius: '0.5rem', overflow: 'hidden' }}>
+                        <img 
+                            src={visit.patient.imageUrl} 
+                            alt="Patient" 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                    </div>
+                )}
                 {/* Top Header Section */}
                 <div style={{ borderBottom: '2px solid black', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1rem', fontSize: '0.75rem' }}>

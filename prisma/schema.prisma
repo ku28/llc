@@ -34,6 +34,7 @@ model Patient {
   height     Float?
   weight     Float?
   fatherHusbandGuardianName String?  // F/H/G Name from CSV
+  imageUrl   String?  // Cloudinary image URL
   createdAt  DateTime @default(now())
   appointments Appointment[]
   invoices     Invoice[]

@@ -9,8 +9,10 @@ export default function PatientsPage() {
     const [isAnimating, setIsAnimating] = useState(false)
     const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
     const [searchQuery, setSearchQuery] = useState('')
+    const [imagePreview, setImagePreview] = useState<string>('')
+    const [uploadingImage, setUploadingImage] = useState(false)
     
-    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '' }
+    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '', imageUrl: '' }
     const [form, setForm] = useState(emptyForm)
 
     // Calculate age from date of birth
@@ -46,7 +48,56 @@ export default function PatientsPage() {
             setIsModalOpen(false)
             setEditingId(null)
             setForm(emptyForm)
+            setImagePreview('')
         }, 300)
+    }
+
+    async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file')
+            return
+        }
+
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Image size should be less than 5MB')
+            return
+        }
+
+        try {
+            setUploadingImage(true)
+            
+            // Convert to base64
+            const reader = new FileReader()
+            reader.onloadend = async () => {
+                const base64Image = reader.result as string
+                setImagePreview(base64Image)
+
+                // Upload to Cloudinary
+                const res = await fetch('/api/upload-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64Image, folder: 'patients' })
+                })
+
+                if (!res.ok) {
+                    throw new Error('Failed to upload image')
+                }
+
+                const data = await res.json()
+                setForm({ ...form, imageUrl: data.url })
+                setUploadingImage(false)
+            }
+            reader.readAsDataURL(file)
+        } catch (error) {
+            console.error('Image upload error:', error)
+            alert('Failed to upload image')
+            setUploadingImage(false)
+        }
     }
 
     function toggleRowExpansion(id: number) {
@@ -89,8 +140,10 @@ export default function PatientsPage() {
             occupation: patient.occupation || '',
             pendingPaymentCents: patient.pendingPaymentCents ? String(patient.pendingPaymentCents) : '',
             height: patient.height ? String(patient.height) : '',
-            weight: patient.weight ? String(patient.weight) : ''
+            weight: patient.weight ? String(patient.weight) : '',
+            imageUrl: patient.imageUrl || ''
         })
+        setImagePreview(patient.imageUrl || '')
         openModal()
     }
 
@@ -211,6 +264,52 @@ export default function PatientsPage() {
                             
                             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
                                 <form onSubmit={submitPatient}>
+                                    {/* Patient Image Upload */}
+                                    <div className="mb-6 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                                            <div className="flex-shrink-0">
+                                                {imagePreview ? (
+                                                    <img 
+                                                        src={imagePreview} 
+                                                        alt="Patient" 
+                                                        className="w-32 h-32 object-cover rounded-lg border-2 border-gray-300 dark:border-gray-600"
+                                                    />
+                                                ) : (
+                                                    <div className="w-32 h-32 bg-gray-100 dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center">
+                                                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                        </svg>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="block text-sm font-medium mb-2">Patient Photo</label>
+                                                <input 
+                                                    type="file" 
+                                                    accept="image/*"
+                                                    onChange={handleImageUpload}
+                                                    disabled={uploadingImage}
+                                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-200"
+                                                />
+                                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                    {uploadingImage ? 'Uploading...' : 'PNG, JPG or GIF (MAX. 5MB)'}
+                                                </p>
+                                                {imagePreview && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setImagePreview('')
+                                                            setForm({ ...form, imageUrl: '' })
+                                                        }}
+                                                        className="mt-2 text-sm text-red-600 hover:text-red-800 dark:text-red-400"
+                                                    >
+                                                        Remove Photo
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">First Name *</label>

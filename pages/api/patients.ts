@@ -16,9 +16,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'POST') {
     const user = await requireAuth(req, res)
     if(!user) return
-    const { firstName, lastName, phone, email, dob, opdNo, date, age, address, gender, nextVisit, occupation, pendingPaymentCents, height, weight } = req.body
+    const { firstName, lastName, phone, email, dob, opdNo, date, age, address, gender, nextVisit, occupation, pendingPaymentCents, height, weight, imageUrl } = req.body
     try {
-      const patient = await prisma.patient.create({ data: { firstName, lastName, phone, email, dob: dob ? new Date(dob) : null, opdNo, date: date ? new Date(date) : undefined, age: age ? Number(age) : undefined, address, gender, nextVisit: nextVisit ? new Date(nextVisit) : undefined, occupation, pendingPaymentCents: pendingPaymentCents ? Number(pendingPaymentCents) : undefined, height: height ? Number(height) : undefined, weight: weight ? Number(weight) : undefined } })
+      const patient = await prisma.patient.create({ data: { firstName, lastName, phone, email, dob: dob ? new Date(dob) : null, opdNo, date: date ? new Date(date) : undefined, age: age ? Number(age) : undefined, address, gender, nextVisit: nextVisit ? new Date(nextVisit) : undefined, occupation, pendingPaymentCents: pendingPaymentCents ? Number(pendingPaymentCents) : undefined, height: height ? Number(height) : undefined, weight: weight ? Number(weight) : undefined, imageUrl } })
       return res.status(201).json(patient)
     } catch (err: any) {
       return res.status(400).json({ error: err.message })
@@ -28,9 +28,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'PUT') {
     const user = await requireAuth(req, res)
     if(!user) return
-    const { id, firstName, lastName, phone, email, dob, opdNo, date, age, address, gender, nextVisit, occupation, pendingPaymentCents, height, weight } = req.body
+    const { id, firstName, lastName, phone, email, dob, opdNo, date, age, address, gender, nextVisit, occupation, pendingPaymentCents, height, weight, imageUrl } = req.body
     try {
-      const p = await prisma.patient.update({ where: { id: Number(id) }, data: { firstName, lastName, phone, email, dob: dob ? new Date(dob) : null, opdNo, date: date ? new Date(date) : undefined, age: age ? Number(age) : undefined, address, gender, nextVisit: nextVisit ? new Date(nextVisit) : undefined, occupation, pendingPaymentCents: pendingPaymentCents ? Number(pendingPaymentCents) : undefined, height: height ? Number(height) : undefined, weight: weight ? Number(weight) : undefined } })
+      const p = await prisma.patient.update({ where: { id: Number(id) }, data: { firstName, lastName, phone, email, dob: dob ? new Date(dob) : null, opdNo, date: date ? new Date(date) : undefined, age: age ? Number(age) : undefined, address, gender, nextVisit: nextVisit ? new Date(nextVisit) : undefined, occupation, pendingPaymentCents: pendingPaymentCents ? Number(pendingPaymentCents) : undefined, height: height ? Number(height) : undefined, weight: weight ? Number(weight) : undefined, imageUrl } })
       return res.status(200).json(p)
     } catch (err: any) { return res.status(500).json({ error: String(err?.message || err) }) }
   }
