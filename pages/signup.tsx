@@ -133,14 +133,12 @@ export default function SignupPage() {
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-3 text-sm">
                     <strong>⚠️ Note:</strong> Your account will be activated only after admin approval.
                 </div>
-                <div className="text-right">
-                    <button 
-                        disabled={loading} 
-                        className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {loading ? 'Submitting...' : 'Submit Request'}
-                    </button>
-                </div>
+                <button 
+                    disabled={loading} 
+                    className="w-full px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {loading ? 'Submitting...' : 'Submit Request'}
+                </button>
             </form>
             <p className="text-sm text-center text-gray-600 dark:text-gray-400 mt-4">
                 Already have an account? <a href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">Login</a>
