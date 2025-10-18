@@ -114,7 +114,7 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
             {canAccess('/dashboard') && <Link href="/" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Dashboard</Link>}
             {canAccess('/patients') && <Link href="/patients" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Patients</Link>}
             {canAccess('/treatments') && <Link href="/treatments" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Treatments</Link>}
-            {canAccess('/products') && <Link href="/products" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Stock</Link>}
+            {canAccess('/products') && <Link href="/products" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Inventory</Link>}
             {canAccess('/visits') && <Link href="/visits" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Visits</Link>}
             
             {/* Show Invoices link directly for reception, or in dropdown for others */}

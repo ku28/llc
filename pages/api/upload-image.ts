@@ -25,10 +25,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No image data provided' })
     }
 
-    // Upload to Cloudinary
+    // Validate that it's a base64 image
+    if (!image.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Invalid image format' })
+    }
+
+    // Upload to Cloudinary - it will automatically handle format conversion
     const uploadResponse = await cloudinary.uploader.upload(image, {
       folder: `llc-erp/${folder}`,
       resource_type: 'image',
+      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'tiff', 'ico'],
       transformation: [
         { width: 500, height: 500, crop: 'limit' },
         { quality: 'auto' },

@@ -9,6 +9,7 @@ function ProductsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
+    const [loading, setLoading] = useState(true)
     
     // Filter states
     const [filterCategory, setFilterCategory] = useState<string>('')
@@ -34,8 +35,15 @@ function ProductsPage() {
     const [form, setForm] = useState(emptyForm)
 
     useEffect(() => {
-        fetch('/api/products').then(r => r.json()).then(data => setItems(Array.isArray(data) ? data : []))
-        fetch('/api/categories').then(r => r.json()).then(data => setCategories(Array.isArray(data) ? data : []))
+        setLoading(true)
+        Promise.all([
+            fetch('/api/products').then(r => r.json()),
+            fetch('/api/categories').then(r => r.json())
+        ]).then(([productsData, categoriesData]) => {
+            setItems(Array.isArray(productsData) ? productsData : [])
+            setCategories(Array.isArray(categoriesData) ? categoriesData : [])
+            setLoading(false)
+        }).catch(() => setLoading(false))
     }, [])
     const [user, setUser] = useState<any>(null)
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
@@ -508,6 +516,15 @@ function ProductsPage() {
                             
                             return true
                         })
+                        
+                        if (loading) {
+                            return (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                                    <p className="text-muted">Loading products...</p>
+                                </div>
+                            )
+                        }
                         
                         if (filteredItems.length === 0 && (searchQuery || filterCategory || filterStockStatus || filterPriceRange)) {
                             return (

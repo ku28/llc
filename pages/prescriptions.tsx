@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import CustomSelect from '../components/CustomSelect'
 import DateInput from '../components/DateInput'
+import dropdownOptions from '../data/dropdownOptions.json'
 
 export default function PrescriptionsPage() {
     const router = useRouter()
@@ -399,7 +400,13 @@ export default function PrescriptionsPage() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium mb-1.5">Gender</label>
-                                <input placeholder="Male / Female / Other" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })} className="w-full p-2 border rounded" />
+                                <CustomSelect
+                                    value={form.gender}
+                                    onChange={(val) => setForm({ ...form, gender: val })}
+                                    options={dropdownOptions.gender}
+                                    placeholder="Select gender"
+                                    allowCustom={true}
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium mb-1.5">Phone</label>
@@ -451,15 +458,33 @@ export default function PrescriptionsPage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Temperament</label>
-                            <input placeholder="Phlegmatic" value={form.temperament} onChange={e => setForm({ ...form, temperament: e.target.value })} className="w-full p-2 border rounded" />
+                            <CustomSelect
+                                value={form.temperament}
+                                onChange={(val) => setForm({ ...form, temperament: val })}
+                                options={dropdownOptions.temperament}
+                                placeholder="Select temperament"
+                                allowCustom={true}
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Pulse Diagnosis</label>
-                            <input placeholder="1/2/3-BRN" value={form.pulseDiagnosis} onChange={e => setForm({ ...form, pulseDiagnosis: e.target.value })} className="w-full p-2 border rounded" />
+                            <CustomSelect
+                                value={form.pulseDiagnosis}
+                                onChange={(val) => setForm({ ...form, pulseDiagnosis: val })}
+                                options={dropdownOptions.pulseDiagnosis}
+                                placeholder="Select pulse diagnosis"
+                                allowCustom={true}
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Pulse Diagnosis 2</label>
-                            <input placeholder="1/1/2-BM" value={form.pulseDiagnosis2} onChange={e => setForm({ ...form, pulseDiagnosis2: e.target.value })} className="w-full p-2 border rounded" />
+                            <CustomSelect
+                                value={form.pulseDiagnosis2}
+                                onChange={(val) => setForm({ ...form, pulseDiagnosis2: val })}
+                                options={dropdownOptions.pulseDiagnosis2}
+                                placeholder="Select pulse diagnosis 2"
+                                allowCustom={true}
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Major Complaints</label>

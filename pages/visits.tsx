@@ -8,9 +8,20 @@ export default function VisitsPage() {
     const [form, setForm] = useState({ patientId: '', opdNo: '', diagnoses: '' })
     const [searchQuery, setSearchQuery] = useState('')
     const [user, setUser] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
 
-    useEffect(() => { fetch('/api/visits').then(r => r.json()).then(setVisits); fetch('/api/patients').then(r => r.json()).then(setPatients) }, [])
+    useEffect(() => { 
+        setLoading(true)
+        Promise.all([
+            fetch('/api/visits').then(r => r.json()),
+            fetch('/api/patients').then(r => r.json())
+        ]).then(([visitsData, patientsData]) => {
+            setVisits(visitsData)
+            setPatients(patientsData)
+            setLoading(false)
+        }).catch(() => setLoading(false))
+    }, [])
 
     async function create(e: any) {
         e.preventDefault()
@@ -73,6 +84,15 @@ export default function VisitsPage() {
                         const search = searchQuery.toLowerCase()
                         return patientName.includes(search) || opdNo.includes(search)
                     })
+                    
+                    if (loading) {
+                        return (
+                            <div className="flex flex-col items-center justify-center py-12">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                                <p className="text-muted">Loading visits...</p>
+                            </div>
+                        )
+                    }
                     
                     if (filteredVisits.length === 0 && searchQuery) {
                         return (

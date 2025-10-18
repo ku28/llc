@@ -12,6 +12,7 @@ interface CustomSelectProps {
     placeholder?: string
     className?: string
     required?: boolean
+    allowCustom?: boolean  // Allow typing custom values
 }
 
 export default function CustomSelect({
@@ -20,53 +21,196 @@ export default function CustomSelect({
     options,
     placeholder = 'Select...',
     className = '',
-    required = false
+    required = false,
+    allowCustom = false
 }: CustomSelectProps) {
     const [isOpen, setIsOpen] = useState(false)
-    const [searchQuery, setSearchQuery] = useState('')
+    const [inputValue, setInputValue] = useState('')
+    const [highlightedIndex, setHighlightedIndex] = useState(0)
     const containerRef = useRef<HTMLDivElement>(null)
-    const searchInputRef = useRef<HTMLInputElement>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
+    const optionsRef = useRef<HTMLDivElement>(null)
+
+    // Update input value when value prop changes (for pre-filled forms)
+    useEffect(() => {
+        if (!isOpen) {
+            if (value) {
+                const option = options.find(opt => opt.value === value)
+                if (option) {
+                    setInputValue(option.label)
+                } else {
+                    // Show custom value (not in options list)
+                    setInputValue(value)
+                }
+            } else {
+                setInputValue('')
+            }
+        }
+    }, [value, options, allowCustom, isOpen])
 
     // Close dropdown when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false)
-                setSearchQuery('') // Clear search when closing
+                // Keep the custom value or restore the selected option label
+                if (!isOpen) return
+                const selectedOption = options.find(opt => opt.value === value)
+                if (selectedOption) {
+                    setInputValue(selectedOption.label)
+                } else if (value) {
+                    // Keep custom value
+                    setInputValue(value)
+                } else {
+                    setInputValue('')
+                }
             }
         }
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [])
+    }, [isOpen, value, options, allowCustom])
 
-    // Focus search input when dropdown opens
+    // Reset highlighted index when filtered options change
     useEffect(() => {
-        if (isOpen && searchInputRef.current) {
-            searchInputRef.current.focus()
+        setHighlightedIndex(0)
+    }, [inputValue])
+
+    // Scroll highlighted option into view
+    useEffect(() => {
+        if (isOpen && optionsRef.current && optionsRef.current.children[highlightedIndex]) {
+            const highlightedElement = optionsRef.current.children[highlightedIndex] as HTMLElement
+            if (highlightedElement) {
+                highlightedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+            }
         }
-    }, [isOpen])
+    }, [highlightedIndex, isOpen])
 
-    const selectedOption = options.find(opt => opt.value === value)
-    const displayText = selectedOption ? selectedOption.label : placeholder
-
-    // Filter options based on search query
+    // Filter options based on input value
     const filteredOptions = options.filter(option => 
-        option.label.toLowerCase().includes(searchQuery.toLowerCase())
+        option.label.toLowerCase().includes(inputValue.toLowerCase())
     )
+
+    // Handle keyboard navigation
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault()
+                if (!isOpen) {
+                    setIsOpen(true)
+                } else if (highlightedIndex < filteredOptions.length - 1) {
+                    setHighlightedIndex(highlightedIndex + 1)
+                }
+                break
+            case 'ArrowUp':
+                e.preventDefault()
+                if (!isOpen) {
+                    setIsOpen(true)
+                } else if (highlightedIndex > 0) {
+                    setHighlightedIndex(highlightedIndex - 1)
+                }
+                break
+            case 'Enter':
+                e.preventDefault()
+                if (isOpen && filteredOptions.length > 0) {
+                    const selectedOption = filteredOptions[highlightedIndex]
+                    if (selectedOption) {
+                        selectOption(selectedOption)
+                    }
+                } else if (isOpen && inputValue.trim()) {
+                    // If no options match, use the custom input value
+                    onChange(inputValue.trim())
+                    setIsOpen(false)
+                } else if (!isOpen) {
+                    setIsOpen(true)
+                }
+                break
+            case 'Escape':
+                e.preventDefault()
+                setIsOpen(false)
+                // Restore the selected option label or keep custom value
+                const selectedOption = options.find(opt => opt.value === value)
+                if (selectedOption) {
+                    setInputValue(selectedOption.label)
+                } else if (value) {
+                    // Keep custom value
+                    setInputValue(value)
+                } else {
+                    setInputValue('')
+                }
+                break
+            case 'Tab':
+                if (isOpen) {
+                    setIsOpen(false)
+                    // If there's a highlighted option, select it
+                    if (filteredOptions.length > 0) {
+                        const selectedOption = filteredOptions[highlightedIndex]
+                        if (selectedOption) {
+                            selectOption(selectedOption)
+                        }
+                    }
+                }
+                break
+        }
+    }
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newValue = e.target.value
+        setInputValue(newValue)
+        setIsOpen(true)
+        setHighlightedIndex(0)
+        
+        // Always update the value as user types (allows custom entries)
+        onChange(newValue)
+    }
+
+    const handleInputFocus = () => {
+        setIsOpen(true)
+        // Clear input if no value is selected (so placeholder shows properly)
+        if (!value) {
+            setInputValue('')
+        }
+    }
+
+    const selectOption = (option: Option) => {
+        onChange(option.value)
+        setInputValue(option.label)
+        setIsOpen(false)
+    }
+
+    const handleOptionClick = (option: Option) => {
+        selectOption(option)
+    }
 
     return (
         <div ref={containerRef} className={`custom-select ${className}`}>
-            <div
-                className="custom-select-trigger"
-                onClick={() => setIsOpen(!isOpen)}
-            >
-                <span className={!selectedOption ? 'placeholder' : ''}>{displayText}</span>
+            <div className="custom-select-input-wrapper">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputValue}
+                    onChange={handleInputChange}
+                    onFocus={handleInputFocus}
+                    onKeyDown={handleKeyDown}
+                    placeholder={placeholder}
+                    className="custom-select-input"
+                    autoComplete="off"
+                    required={required}
+                />
                 <svg
                     className={`arrow ${isOpen ? 'open' : ''}`}
                     width="16"
                     height="16"
                     viewBox="0 0 16 16"
                     fill="none"
+                    onClick={() => {
+                        if (isOpen) {
+                            setIsOpen(false)
+                        } else {
+                            setIsOpen(true)
+                            inputRef.current?.focus()
+                        }
+                    }}
+                    style={{ cursor: 'pointer' }}
                 >
                     <path
                         d="M4 6L8 10L12 6"
@@ -80,35 +224,27 @@ export default function CustomSelect({
 
             {isOpen && (
                 <div className="custom-select-dropdown">
-                    {/* Search Input */}
-                    <div className="px-2 py-2 border-b border-gray-200 dark:border-gray-700">
-                        <input
-                            ref={searchInputRef}
-                            type="text"
-                            placeholder="🔍 Search..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                        />
-                    </div>
-
-                    {/* Options List */}
-                    <div className="max-h-60 overflow-y-auto">
+                    <div className="max-h-60 overflow-y-auto" ref={optionsRef}>
                         {filteredOptions.length === 0 ? (
                             <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
-                                No options found
+                                {inputValue.trim() ? (
+                                    <div>
+                                        <div className="mb-2">No matching options</div>
+                                        <div className="text-xs text-green-600 dark:text-green-400 font-medium">
+                                            Press Enter to save: "{inputValue}"
+                                        </div>
+                                    </div>
+                                ) : (
+                                    'No options found'
+                                )}
                             </div>
                         ) : (
-                            filteredOptions.map(option => (
+                            filteredOptions.map((option, index) => (
                                 <div
                                     key={option.value}
-                                    className={`custom-select-option ${value === option.value ? 'selected' : ''}`}
-                                    onClick={() => {
-                                        onChange(option.value)
-                                        setIsOpen(false)
-                                        setSearchQuery('')
-                                    }}
+                                    className={`custom-select-option ${value === option.value ? 'selected' : ''} ${highlightedIndex === index ? 'highlighted' : ''}`}
+                                    onClick={() => handleOptionClick(option)}
+                                    onMouseEnter={() => setHighlightedIndex(index)}
                                 >
                                     {value === option.value && <span className="checkmark">✓ </span>}
                                     {option.label}

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import DateInput from '../components/DateInput'
+import CustomSelect from '../components/CustomSelect'
+import dropdownOptions from '../data/dropdownOptions.json'
 
 export default function PatientsPage() {
     const [patients, setPatients] = useState<any[]>([])
@@ -11,6 +13,7 @@ export default function PatientsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [imagePreview, setImagePreview] = useState<string>('')
     const [uploadingImage, setUploadingImage] = useState(false)
+    const [loading, setLoading] = useState(true)
     
     const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '', imageUrl: '' }
     const [form, setForm] = useState(emptyForm)
@@ -34,7 +37,16 @@ export default function PatientsPage() {
         setForm({ ...form, dob, age })
     }
 
-    useEffect(() => { fetch('/api/patients').then(r => r.json()).then(setPatients) }, [])
+    useEffect(() => { 
+        setLoading(true)
+        fetch('/api/patients')
+            .then(r => r.json())
+            .then(data => {
+                setPatients(data)
+                setLoading(false)
+            })
+            .catch(() => setLoading(false))
+    }, [])
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
 
     function openModal() {
@@ -56,15 +68,16 @@ export default function PatientsPage() {
         const file = e.target.files?.[0]
         if (!file) return
 
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            alert('Please select an image file')
+        // Validate file type - accept all image formats
+        const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml', 'image/tiff']
+        if (!file.type.startsWith('image/') && !validImageTypes.includes(file.type)) {
+            alert('Please select a valid image file (JPEG, PNG, WebP, GIF, etc.)')
             return
         }
 
-        // Validate file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            alert('Image size should be less than 5MB')
+        // Validate file size (max 10MB to accommodate various formats)
+        if (file.size > 10 * 1024 * 1024) {
+            alert('Image size should be less than 10MB')
             return
         }
 
@@ -74,28 +87,40 @@ export default function PatientsPage() {
             // Convert to base64
             const reader = new FileReader()
             reader.onloadend = async () => {
-                const base64Image = reader.result as string
-                setImagePreview(base64Image)
+                try {
+                    const base64Image = reader.result as string
+                    setImagePreview(base64Image)
 
-                // Upload to Cloudinary
-                const res = await fetch('/api/upload-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64Image, folder: 'patients' })
-                })
+                    // Upload to Cloudinary
+                    const res = await fetch('/api/upload-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: base64Image, folder: 'patients' })
+                    })
 
-                if (!res.ok) {
-                    throw new Error('Failed to upload image')
+                    const data = await res.json()
+
+                    if (!res.ok) {
+                        throw new Error(data.error || 'Failed to upload image')
+                    }
+
+                    setForm({ ...form, imageUrl: data.url })
+                    setUploadingImage(false)
+                } catch (error: any) {
+                    console.error('Image upload error:', error)
+                    alert(`Failed to upload image: ${error.message || 'Unknown error'}`)
+                    setUploadingImage(false)
+                    setImagePreview('')
                 }
-
-                const data = await res.json()
-                setForm({ ...form, imageUrl: data.url })
+            }
+            reader.onerror = () => {
+                alert('Failed to read image file')
                 setUploadingImage(false)
             }
             reader.readAsDataURL(file)
-        } catch (error) {
+        } catch (error: any) {
             console.error('Image upload error:', error)
-            alert('Failed to upload image')
+            alert(`Failed to upload image: ${error.message || 'Unknown error'}`)
             setUploadingImage(false)
         }
     }
@@ -292,7 +317,7 @@ export default function PatientsPage() {
                                                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-200"
                                                 />
                                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                    {uploadingImage ? 'Uploading...' : 'PNG, JPG or GIF (MAX. 5MB)'}
+                                                    {uploadingImage ? 'Uploading...' : 'All image formats supported: JPEG, PNG, WebP, GIF, etc. (MAX. 10MB)'}
                                                 </p>
                                                 {imagePreview && (
                                                     <button
@@ -347,7 +372,13 @@ export default function PatientsPage() {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Gender</label>
-                                            <input placeholder="Male / Female / Other" value={(form as any).gender || ''} onChange={e => setForm({ ...form, gender: e.target.value })} className="p-2 border rounded w-full" />
+                                            <CustomSelect
+                                                value={(form as any).gender || ''}
+                                                onChange={(val) => setForm({ ...form, gender: val })}
+                                                options={dropdownOptions.gender}
+                                                placeholder="Select gender"
+                                                allowCustom={true}
+                                            />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Occupation</label>
@@ -404,7 +435,12 @@ export default function PatientsPage() {
                         return fullName.includes(searchQuery.toLowerCase())
                     }).length} patients</span>
                 </h3>
-                {patients.length === 0 ? (
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                        <p className="text-muted">Loading patients...</p>
+                    </div>
+                ) : patients.length === 0 ? (
                     <div className="text-center py-12 text-muted">
                         <p className="text-lg mb-2">No patients registered yet</p>
                         <p className="text-sm">Click "Register New Patient" to get started</p>

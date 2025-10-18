@@ -16,6 +16,17 @@ model User {
   createdAt DateTime @default(now())
 }
 
+model PendingUser {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  passwordHash String?
+  role      String   @default("staff")
+  verificationToken String @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
 model Patient {
   id         Int      @id @default(autoincrement())
   firstName  String

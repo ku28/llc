@@ -10,6 +10,7 @@ function TreatmentsPage() {
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
     const [selectedPlanByDiagnosis, setSelectedPlanByDiagnosis] = useState<{[key: string]: number}>({})
     const [searchQuery, setSearchQuery] = useState('')
+    const [loading, setLoading] = useState(true)
     
     // Treatment plans array - each can have different medicines and details
     const [treatmentPlans, setTreatmentPlans] = useState<any[]>([])
@@ -27,10 +28,15 @@ function TreatmentsPage() {
     
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
     useEffect(() => { 
-        fetch('/api/treatments').then(r => r.json()).then(data => setItems(Array.isArray(data) ? data : []))
-    }, [])
-    useEffect(() => { 
-        fetch('/api/products').then(r => r.json()).then(data => setProducts(Array.isArray(data) ? data : []))
+        setLoading(true)
+        Promise.all([
+            fetch('/api/treatments').then(r => r.json()),
+            fetch('/api/products').then(r => r.json())
+        ]).then(([treatmentsData, productsData]) => {
+            setItems(Array.isArray(treatmentsData) ? treatmentsData : [])
+            setProducts(Array.isArray(productsData) ? productsData : [])
+            setLoading(false)
+        }).catch(() => setLoading(false))
     }, [])
 
     function updateProvDiagnosis(newDiagnosis: string) {
@@ -639,6 +645,15 @@ function TreatmentsPage() {
                         const search = searchQuery.toLowerCase()
                         return diagnosis.includes(search) || treatmentPlan.includes(search)
                     })
+                    
+                    if (loading) {
+                        return (
+                            <div className="flex flex-col items-center justify-center py-12">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                                <p className="text-muted">Loading treatments...</p>
+                            </div>
+                        )
+                    }
                     
                     if (filteredItems.length === 0 && searchQuery) {
                         return (

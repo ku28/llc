@@ -555,6 +555,70 @@ a:hover {
   width: 100%;
 }
 
+/* New input wrapper style */
+.custom-select-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-input {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.625rem 2.75rem 0.625rem 0.875rem;
+  background: var(--panel);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 12px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text);
+  cursor: text;
+}
+
+.dark .custom-select-input {
+  border-color: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05);
+}
+
+.custom-select-input::placeholder {
+  color: var(--muted);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.custom-select-input:hover {
+  border-color: var(--brand);
+  box-shadow: 0 4px 6px rgba(16, 185, 129, 0.15);
+  background-color: rgba(16, 185, 129, 0.02);
+}
+
+.dark .custom-select-input:hover {
+  background-color: rgba(16, 185, 129, 0.05);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.25);
+}
+
+.custom-select-input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+}
+
+.custom-select-input-wrapper .arrow {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--brand);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: auto;
+}
+
+.custom-select-input-wrapper .arrow.open {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+/* Legacy trigger style (kept for backwards compatibility if needed) */
 .custom-select-trigger {
   display: flex;
   align-items: center;
@@ -661,10 +725,24 @@ a:hover {
   color: var(--brand);
 }
 
+.custom-select-option.highlighted {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--brand);
+  outline: 2px solid rgba(16, 185, 129, 0.3);
+  outline-offset: -2px;
+}
+
 .custom-select-option.selected {
   background: var(--brand);
   color: white;
   font-weight: 600;
+}
+
+.custom-select-option.selected.highlighted {
+  background: #059669;
+  color: white;
+  outline: 2px solid rgba(5, 150, 105, 0.5);
+  outline-offset: -2px;
 }
 
 .custom-select-option.selected:hover {
@@ -782,6 +860,30 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .animate-scaleOut {
   animation: scaleOut 0.3s ease-in;
 }
+
+/* Toast Notification Animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+}
+
 
 
 
