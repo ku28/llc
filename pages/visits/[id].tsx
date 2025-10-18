@@ -27,7 +27,8 @@ export default function VisitDetail() {
 
         // Function to add patient image if available
         const addPatientImage = async () => {
-            if (visit.patient?.imageUrl) {
+            const imageUrl = visit.patient?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE
+            if (imageUrl) {
                 try {
                     // Convert image URL to base64 and add to PDF
                     const img = new Image()
@@ -43,7 +44,7 @@ export default function VisitDetail() {
                             console.error('Failed to load patient image')
                             resolve(false)
                         }
-                        img.src = visit.patient.imageUrl
+                        img.src = imageUrl
                     })
                 } catch (error) {
                     console.error('Error adding image to PDF:', error)
@@ -57,12 +58,12 @@ export default function VisitDetail() {
         await addPatientImage()
 
         // Function to render prescription header
-        const renderHeader = () => {
+        const renderHeader = async (includeImage = true) => {
             let yPos = 15
             doc.setFontSize(9)
 
             const leftCol = 15
-            const midCol = 85
+            const midCol = 55 // Adjusted to make room for image
             const rightCol = 145
 
             // Left Column
@@ -105,24 +106,54 @@ export default function VisitDetail() {
             doc.setFont('helvetica', 'normal')
             doc.text(visit.pulseDiagnosis || visit.pulseDiagnosis2 || '-', leftCol + 20, yPos)
 
-            // Middle Column
+            // Middle Column with Patient Image
             yPos = 15
+            
+            // Add patient image inline (small square next to patient info)
+            if (includeImage) {
+                const imageUrl = visit.patient?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE
+                if (imageUrl) {
+                    try {
+                        const img = new Image()
+                        img.crossOrigin = 'Anonymous'
+                        
+                        await new Promise((resolve) => {
+                            img.onload = () => {
+                                // Add 20x20mm image next to patient name
+                                doc.addImage(img, 'JPEG', midCol, 13, 20, 20, undefined, 'FAST')
+                                resolve(true)
+                            }
+                            img.onerror = () => {
+                                console.error('Failed to load patient image for header')
+                                resolve(false)
+                            }
+                            img.src = imageUrl
+                        })
+                    } catch (error) {
+                        console.error('Error adding inline image:', error)
+                    }
+                }
+            }
+            
+            // Patient info starts after image
+            const patientInfoCol = midCol + 25 // After 20mm image + 5mm gap
+            
             doc.setFont('helvetica', 'bold')
-            doc.text('Patient Name', midCol, yPos)
+            doc.text('Patient Name', patientInfoCol, yPos)
             doc.setFont('helvetica', 'bold')
-            doc.text(`${visit.patient?.firstName || ''} ${visit.patient?.lastName || ''}`, midCol + 30, yPos)
+            doc.text(`${visit.patient?.firstName || ''} ${visit.patient?.lastName || ''}`, patientInfoCol + 30, yPos)
 
             yPos += 5
             doc.setFont('helvetica', 'bold')
-            doc.text('F/H/G Name', midCol, yPos)
+            doc.text('F/H/G Name', patientInfoCol, yPos)
             doc.setFont('helvetica', 'normal')
-            doc.text(visit.fatherHusbandGuardianName || '-', midCol + 30, yPos)
+            doc.text(visit.fatherHusbandGuardianName || '-', patientInfoCol + 30, yPos)
 
             yPos += 5
             doc.setFont('helvetica', 'bold')
-            doc.text('Address', midCol, yPos)
+            doc.text('Address', patientInfoCol, yPos)
             doc.setFont('helvetica', 'normal')
-            doc.text(visit.address || visit.patient?.address || '-', midCol + 30, yPos)
+            doc.text(visit.address || visit.patient?.address || '-', patientInfoCol + 30, yPos)
 
             // Right Column
             yPos = 15
@@ -185,7 +216,7 @@ export default function VisitDetail() {
         doc.text('PATIENT COPY', 15, 8)
         doc.setTextColor(0, 0, 0)
 
-        let yPos = renderHeader()
+        let yPos = await renderHeader(true)
 
         // Patient Copy Table - WITHOUT composition
         const patientTableData = (visit.prescriptions || []).map((p: any, index: number) => {
@@ -253,7 +284,7 @@ export default function VisitDetail() {
         doc.text('OFFICE COPY (WITH COMPOSITION)', 15, 8)
         doc.setTextColor(0, 0, 0)
 
-        yPos = renderHeader()
+        yPos = await renderHeader(true)
 
         // Office Copy Table - WITH composition
         const officeTableData = (visit.prescriptions || []).map((p: any, index: number) => {
@@ -339,10 +370,17 @@ export default function VisitDetail() {
                             <span>Back to Visits</span>
                         </button>
                         <button 
+                            onClick={() => router.push(`/prescriptions?visitId=${visit.id}&edit=true`)} 
+                            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-sm"
+                        >
+                            <span>✏️</span>
+                            <span>Edit</span>
+                        </button>
+                        <button 
                             onClick={generatePDF} 
                             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
                         >
-                            <span>�</span>
+                            <span>📄</span>
                             <span>Download PDF</span>
                         </button>
                         <button 
@@ -364,17 +402,7 @@ export default function VisitDetail() {
             </div>
 
             {/* Patient Copy - Prescription Sheet WITHOUT Composition */}
-            <div className="prescription-container prescription-patient-copy" style={{ background: 'white', color: 'black', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', maxWidth: '210mm', margin: '0 auto 2rem', borderRadius: '0.5rem' }}>
-                {/* Patient Image - Top Right */}
-                {visit.patient?.imageUrl && (
-                    <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', width: '25mm', height: '25mm', border: '2px solid #e5e7eb', borderRadius: '0.5rem', overflow: 'hidden' }}>
-                        <img 
-                            src={visit.patient.imageUrl} 
-                            alt="Patient" 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                    </div>
-                )}
+            <div className="prescription-container prescription-patient-copy" style={{ background: 'white', color: 'black', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', maxWidth: '210mm', margin: '0 auto 2rem', borderRadius: '0.5rem', position: 'relative' }}>
                 {/* Top Header Section */}
                 <div style={{ borderBottom: '2px solid black', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1rem', fontSize: '0.75rem' }}>
@@ -406,19 +434,30 @@ export default function VisitDetail() {
                             </div>
                         </div>
 
-                        {/* Middle Column */}
-                        <div>
-                            <div className="mb-1">
-                                <span className="font-bold inline-block" style={{ minWidth: '90px' }}>Patient Name</span>
-                                <span className="font-bold">{visit.patient?.firstName || ''} {visit.patient?.lastName || 'EKAM BAJWA 04'}</span>
+                        {/* Middle Column with Patient Image */}
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                            {/* Patient Image */}
+                            <div style={{ flexShrink: 0, width: '60px', height: '60px', border: '2px solid #d1d5db', borderRadius: '0.375rem', overflow: 'hidden' }}>
+                                <img 
+                                    src={visit.patient?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
+                                    alt="Patient" 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
                             </div>
-                            <div className="mb-1">
-                                <span className="font-bold inline-block" style={{ minWidth: '90px' }}>F/H/G Name</span>
-                                <span>{visit.fatherHusbandGuardianName || 'MANRAJ S'}</span>
-                            </div>
-                            <div className="mb-1">
-                                <span className="font-bold inline-block" style={{ minWidth: '90px' }}>Address</span>
-                                <span>{visit.address || visit.patient?.address || 'CHANDIGARH'}</span>
+                            {/* Patient Info */}
+                            <div style={{ flex: 1 }}>
+                                <div className="mb-1">
+                                    <span className="font-bold inline-block" style={{ minWidth: '90px' }}>Patient Name</span>
+                                    <span className="font-bold">{visit.patient?.firstName || ''} {visit.patient?.lastName || 'EKAM BAJWA 04'}</span>
+                                </div>
+                                <div className="mb-1">
+                                    <span className="font-bold inline-block" style={{ minWidth: '90px' }}>F/H/G Name</span>
+                                    <span>{visit.fatherHusbandGuardianName || 'MANRAJ S'}</span>
+                                </div>
+                                <div className="mb-1">
+                                    <span className="font-bold inline-block" style={{ minWidth: '90px' }}>Address</span>
+                                    <span>{visit.address || visit.patient?.address || 'CHANDIGARH'}</span>
+                                </div>
                             </div>
                         </div>
 
@@ -585,7 +624,7 @@ export default function VisitDetail() {
             </div>
 
             {/* Office Copy - Prescription Sheet WITH Composition */}
-            <div className="prescription-container prescription-office-copy" style={{ background: 'white', color: 'black', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', maxWidth: '210mm', margin: '0 auto', borderRadius: '0.5rem' }}>
+            <div className="prescription-container prescription-office-copy" style={{ background: 'white', color: 'black', padding: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', maxWidth: '210mm', margin: '0 auto', borderRadius: '0.5rem', position: 'relative' }}>
                 {/* Top Header Section */}
                 <div style={{ borderBottom: '2px solid black', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '1rem', fontSize: '0.75rem' }}>
@@ -617,19 +656,30 @@ export default function VisitDetail() {
                             </div>
                         </div>
 
-                        {/* Middle Column */}
-                        <div>
-                            <div className="mb-1">
-                                <span className="font-bold inline-block" style={{ minWidth: '90px' }}>Patient Name</span>
-                                <span className="font-bold">{visit.patient?.firstName || ''} {visit.patient?.lastName || 'EKAM BAJWA 04'}</span>
+                        {/* Middle Column with Patient Image */}
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                            {/* Patient Image */}
+                            <div style={{ flexShrink: 0, width: '60px', height: '60px', border: '2px solid #d1d5db', borderRadius: '0.375rem', overflow: 'hidden' }}>
+                                <img 
+                                    src={visit.patient?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
+                                    alt="Patient" 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
                             </div>
-                            <div className="mb-1">
-                                <span className="font-bold inline-block" style={{ minWidth: '90px' }}>F/H/G Name</span>
-                                <span>{visit.fatherHusbandGuardianName || 'MANRAJ S'}</span>
-                            </div>
-                            <div className="mb-1">
-                                <span className="font-bold inline-block" style={{ minWidth: '90px' }}>Address</span>
-                                <span>{visit.address || visit.patient?.address || 'CHANDIGARH'}</span>
+                            {/* Patient Info */}
+                            <div style={{ flex: 1 }}>
+                                <div className="mb-1">
+                                    <span className="font-bold inline-block" style={{ minWidth: '90px' }}>Patient Name</span>
+                                    <span className="font-bold">{visit.patient?.firstName || ''} {visit.patient?.lastName || 'EKAM BAJWA 04'}</span>
+                                </div>
+                                <div className="mb-1">
+                                    <span className="font-bold inline-block" style={{ minWidth: '90px' }}>F/H/G Name</span>
+                                    <span>{visit.fatherHusbandGuardianName || 'MANRAJ S'}</span>
+                                </div>
+                                <div className="mb-1">
+                                    <span className="font-bold inline-block" style={{ minWidth: '90px' }}>Address</span>
+                                    <span>{visit.address || visit.patient?.address || 'CHANDIGARH'}</span>
+                                </div>
                             </div>
                         </div>
 

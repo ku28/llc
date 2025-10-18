@@ -91,8 +91,18 @@ export default function VisitsPage() {
                         <ul className="divide-y divide-gray-100 dark:divide-gray-800">
                             {filteredVisits.map(v => (
                             <li key={v.id} className="list-item">
-                                <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
-                                    <div className="flex-1">
+                                <div className="flex items-start gap-4">
+                                    {/* Patient Image Circle */}
+                                    <div className="flex-shrink-0">
+                                        <img 
+                                            src={v.patient?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
+                                            alt="Patient" 
+                                            className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                                        />
+                                    </div>
+                                    
+                                    {/* Visit Details */}
+                                    <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-2">
                                             <h4 className="font-semibold text-base">
                                                 {v.patient?.firstName} {v.patient?.lastName}
@@ -109,9 +119,14 @@ export default function VisitsPage() {
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 self-start">
+                                    
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-2 self-start flex-shrink-0">
                                         <Link href={`/visits/${v.id}`} className="btn btn-primary text-sm">
                                             View Details
+                                        </Link>
+                                        <Link href={`/prescriptions?visitId=${v.id}&edit=true`} className="btn btn-secondary text-sm">
+                                            Edit
                                         </Link>
                                     </div>
                                 </div>

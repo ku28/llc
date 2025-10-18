@@ -431,8 +431,18 @@ export default function PatientsPage() {
                             return (
                                 <div key={p.id} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                                     {/* Summary Row */}
-                                    <div className="bg-gray-50 dark:bg-gray-800 p-3 flex items-center justify-between">
-                                        <div className="flex-1">
+                                    <div className="bg-gray-50 dark:bg-gray-800 p-3 flex items-center gap-3">
+                                        {/* Patient Image Circle */}
+                                        <div className="flex-shrink-0">
+                                            <img 
+                                                src={p.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
+                                                alt="Patient" 
+                                                className="w-12 h-12 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
+                                            />
+                                        </div>
+                                        
+                                        {/* Patient Info */}
+                                        <div className="flex-1 min-w-0">
                                             <div className="font-semibold text-sm">{fullName || 'Unknown Patient'}</div>
                                             <div className="text-xs text-muted mt-0.5">
                                                 {p.opdNo && <span className="mr-2">OPD: {p.opdNo}</span>}
@@ -440,7 +450,9 @@ export default function PatientsPage() {
                                                 {p.age && <span>Age: {p.age}</span>}
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        
+                                        {/* Action Buttons */}
+                                        <div className="flex items-center gap-2 flex-shrink-0">
                                             <button
                                                 onClick={() => editPatient(p)}
                                                 className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
@@ -467,35 +479,47 @@ export default function PatientsPage() {
                                     {/* Expanded Details */}
                                     {isExpanded && (
                                         <div className="p-4 bg-white dark:bg-gray-900 space-y-4">
-                                            {/* Basic Info */}
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pb-3 border-b border-gray-200 dark:border-gray-700">
-                                                <div>
-                                                    <div className="text-xs text-muted mb-1">First Name</div>
-                                                    <div className="text-sm font-medium">{p.firstName || '-'}</div>
+                                            {/* Basic Info with Patient Image on Left */}
+                                            <div className="flex gap-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                                                {/* Patient Image - Left Side */}
+                                                <div className="flex-shrink-0">
+                                                    <img 
+                                                        src={p.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
+                                                        alt="Patient" 
+                                                        className="w-32 h-32 rounded-lg object-cover border-2 border-gray-300 dark:border-gray-600 shadow-md"
+                                                    />
                                                 </div>
-                                                <div>
-                                                    <div className="text-xs text-muted mb-1">Last Name</div>
-                                                    <div className="text-sm font-medium">{p.lastName || '-'}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs text-muted mb-1">OPD Number</div>
-                                                    <div className="text-sm font-medium font-mono">{p.opdNo || '-'}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs text-muted mb-1">Age</div>
-                                                    <div className="text-sm font-medium">{p.age || '-'}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs text-muted mb-1">Gender</div>
-                                                    <div className="text-sm font-medium">{p.gender || '-'}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs text-muted mb-1">Date of Birth</div>
-                                                    <div className="text-sm font-medium">{p.dob ? new Date(p.dob).toLocaleDateString() : '-'}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs text-muted mb-1">Occupation</div>
-                                                    <div className="text-sm font-medium">{p.occupation || '-'}</div>
+                                                
+                                                {/* Basic Info Grid */}
+                                                <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">First Name</div>
+                                                        <div className="text-sm font-medium">{p.firstName || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">Last Name</div>
+                                                        <div className="text-sm font-medium">{p.lastName || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">OPD Number</div>
+                                                        <div className="text-sm font-medium font-mono">{p.opdNo || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">Age</div>
+                                                        <div className="text-sm font-medium">{p.age || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">Gender</div>
+                                                        <div className="text-sm font-medium">{p.gender || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">Date of Birth</div>
+                                                        <div className="text-sm font-medium">{p.dob ? new Date(p.dob).toLocaleDateString() : '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">Occupation</div>
+                                                        <div className="text-sm font-medium">{p.occupation || '-'}</div>
+                                                    </div>
                                                 </div>
                                             </div>
                                             {/* Contact Info */}

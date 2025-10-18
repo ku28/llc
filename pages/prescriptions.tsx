@@ -5,6 +5,9 @@ import DateInput from '../components/DateInput'
 
 export default function PrescriptionsPage() {
     const router = useRouter()
+    const { visitId, edit } = router.query
+    const isEditMode = edit === 'true' && visitId
+    
     const [patients, setPatients] = useState<any[]>([])
     const [treatments, setTreatments] = useState<any[]>([])
     const [products, setProducts] = useState<any[]>([])
@@ -14,7 +17,7 @@ export default function PrescriptionsPage() {
         majorComplaints: '', historyReports: '', investigations: '', provisionalDiagnosis: '', 
         improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '', 
         nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', 
-        height: '', weight: '', fatherHusbandGuardianName: '',
+        height: '', weight: '', fatherHusbandGuardianName: '', imageUrl: '',
         // New financial fields
         amount: '', discount: '', payment: '', balance: '',
         // New tracking fields
@@ -31,6 +34,98 @@ export default function PrescriptionsPage() {
     useEffect(() => { fetch('/api/patients').then(r => r.json()).then(setPatients) }, [])
     useEffect(() => { fetch('/api/treatments').then(r => r.json()).then(setTreatments) }, [])
     useEffect(() => { fetch('/api/products').then(r => r.json()).then(setProducts) }, [])
+
+    // Load existing visit data when in edit mode
+    useEffect(() => {
+        if (isEditMode && visitId) {
+            setLoading(true)
+            fetch(`/api/visits?id=${visitId}`)
+                .then(r => r.json())
+                .then(visit => {
+                    if (!visit) {
+                        alert('Visit not found')
+                        router.push('/visits')
+                        return
+                    }
+                    
+                    // Split nextVisit into date and time
+                    let nextVisitDate = ''
+                    let nextVisitTime = ''
+                    if (visit.nextVisit) {
+                        const dt = new Date(visit.nextVisit).toISOString()
+                        nextVisitDate = dt.slice(0, 10)
+                        nextVisitTime = dt.slice(11, 16)
+                    }
+                    
+                    // Pre-fill form with existing data
+                    setForm({
+                        patientId: String(visit.patientId),
+                        opdNo: visit.opdNo || '',
+                        diagnoses: visit.diagnoses || '',
+                        temperament: visit.temperament || '',
+                        pulseDiagnosis: visit.pulseDiagnosis || '',
+                        pulseDiagnosis2: visit.pulseDiagnosis2 || '',
+                        majorComplaints: visit.majorComplaints || '',
+                        historyReports: visit.historyReports || '',
+                        investigations: visit.investigations || '',
+                        provisionalDiagnosis: visit.provisionalDiagnosis || '',
+                        improvements: visit.improvements || '',
+                        specialNote: visit.specialNote || '',
+                        dob: formatDateForInput(visit.patient?.dob),
+                        age: visit.patient?.age ?? '',
+                        address: visit.patient?.address || '',
+                        gender: visit.patient?.gender || '',
+                        phone: visit.patient?.phone || '',
+                        nextVisitDate,
+                        nextVisitTime,
+                        occupation: visit.patient?.occupation || '',
+                        pendingPaymentCents: visit.patient?.pendingPaymentCents ?? '',
+                        height: visit.patient?.height ?? '',
+                        weight: visit.patient?.weight ?? '',
+                        fatherHusbandGuardianName: visit.patient?.fatherHusbandGuardianName || '',
+                        imageUrl: visit.patient?.imageUrl || '',
+                        amount: visit.amount ?? '',
+                        discount: visit.discount ?? '',
+                        payment: visit.payment ?? '',
+                        balance: visit.balance ?? '',
+                        visitNumber: visit.visitNumber ?? '',
+                        followUpCount: visit.followUpCount ?? '',
+                        helper: visit.helper || '',
+                        procedureAdopted: visit.procedureAdopted || '',
+                        discussion: visit.discussion || '',
+                        extra: visit.extra || ''
+                    })
+                    
+                    // Pre-fill prescriptions
+                    if (visit.prescriptions && visit.prescriptions.length > 0) {
+                        setPrescriptions(visit.prescriptions.map((p: any) => ({
+                            treatmentId: p.treatmentId ? String(p.treatmentId) : '',
+                            productId: String(p.productId),
+                            comp1: p.comp1 || '',
+                            comp2: p.comp2 || '',
+                            comp3: p.comp3 || '',
+                            quantity: p.quantity || 1,
+                            timing: p.timing || '',
+                            dosage: p.dosage || '',
+                            additions: p.additions || '',
+                            procedure: p.procedure || '',
+                            presentation: p.presentation || '',
+                            droppersToday: p.droppersToday?.toString() || '',
+                            medicineQuantity: p.medicineQuantity?.toString() || '',
+                            administration: p.administration || '',
+                            taken: p.taken || false
+                        })))
+                    }
+                    
+                    setLoading(false)
+                })
+                .catch(err => {
+                    console.error(err)
+                    alert('Failed to load visit data')
+                    setLoading(false)
+                })
+        }
+    }, [isEditMode, visitId, router])
 
     function addSelectedProductToPrescription() {
         if (!selectedProductId) return alert('Select a medicine first')
@@ -162,21 +257,38 @@ export default function PrescriptionsPage() {
                 payload.nextVisit = `${form.nextVisitDate}T${form.nextVisitTime}`
             }
             
-            const res = await fetch('/api/visits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-            if (!res.ok) { const b = await res.json().catch(() => ({ error: res.statusText })); alert('Save failed: ' + (b?.error || res.statusText)); setLoading(false); return }
+            // If editing, include the visit ID
+            if (isEditMode && visitId) {
+                payload.id = visitId
+            }
+            
+            const res = await fetch('/api/visits', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(payload) 
+            })
+            if (!res.ok) { 
+                const b = await res.json().catch(() => ({ error: res.statusText }))
+                alert(`${isEditMode ? 'Update' : 'Save'} failed: ` + (b?.error || res.statusText))
+                setLoading(false)
+                return 
+            }
             const data = await res.json()
             setLastCreatedVisitId(data.id)
             setLastCreatedVisit(data)
             // Redirect to visit details page
             router.push(`/visits/${data.id}`)
-        } catch (err) { console.error(err); alert('Save failed') }
+        } catch (err) { 
+            console.error(err)
+            alert(`${isEditMode ? 'Update' : 'Save'} failed`) 
+        }
         setLoading(false)
     }
 
     return (
         <div>
             <div className="section-header">
-                <h2 className="section-title">Create Visit & Prescriptions</h2>
+                <h2 className="section-title">{isEditMode ? 'Edit Visit & Prescriptions' : 'Create Visit & Prescriptions'}</h2>
                 <p className="text-sm text-muted">Comprehensive visit recording with prescriptions and patient updates</p>
             </div>
 
@@ -218,7 +330,8 @@ export default function PrescriptionsPage() {
                                         occupation: found.occupation || '',
                                         pendingPaymentCents: found.pendingPaymentCents ?? '',
                                         height: found.height ?? '',
-                                        weight: found.weight ?? ''
+                                        weight: found.weight ?? '',
+                                        imageUrl: found.imageUrl || ''
                                     }))
                                 }}
                                 options={[
@@ -231,6 +344,45 @@ export default function PrescriptionsPage() {
                                 placeholder="-- select patient --"
                             />
                         </div>
+
+                        {/* Patient Image Display - Improved Layout */}
+                        {form.patientId && (
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 rounded-lg p-6 my-4">
+                                <div className="flex items-center gap-6">
+                                    {/* Patient Image */}
+                                    <div className="flex-shrink-0">
+                                        <img 
+                                            src={patients.find(p => String(p.id) === String(form.patientId))?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
+                                            alt="Patient" 
+                                            className="w-24 h-24 object-cover rounded-lg border-3 border-white shadow-lg ring-2 ring-blue-200"
+                                        />
+                                    </div>
+                                    {/* Patient Info */}
+                                    <div className="flex-grow">
+                                        <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-1">
+                                            {patients.find(p => String(p.id) === String(form.patientId))?.firstName} {patients.find(p => String(p.id) === String(form.patientId))?.lastName}
+                                        </h3>
+                                        <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-300">
+                                            {form.opdNo && (
+                                                <span className="flex items-center gap-1">
+                                                    <span className="font-semibold">OPD:</span> {form.opdNo}
+                                                </span>
+                                            )}
+                                            {form.age && (
+                                                <span className="flex items-center gap-1">
+                                                    <span className="font-semibold">Age:</span> {form.age}
+                                                </span>
+                                            )}
+                                            {form.gender && (
+                                                <span className="flex items-center gap-1">
+                                                    <span className="font-semibold">Gender:</span> {form.gender}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             <div>
@@ -607,7 +759,7 @@ export default function PrescriptionsPage() {
                         </div>
                         <div className="flex gap-3">
                             <button disabled={loading} className="btn btn-primary">
-                                {loading ? 'Saving...' : 'Save Visit & Prescriptions'}
+                                {loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Visit & Prescriptions' : 'Save Visit & Prescriptions')}
                             </button>
                             {lastCreatedVisitId && (
                                 <a href={`/visits/${lastCreatedVisitId}`} target="_blank" rel="noreferrer" className="btn btn-secondary">

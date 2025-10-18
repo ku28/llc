@@ -6,6 +6,26 @@ import { requireAuth } from '../../lib/auth'
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'GET') {
         try {
+            const { id } = req.query
+            
+            // If ID is provided, fetch single visit
+            if (id) {
+                const visit = await prisma.visit.findUnique({
+                    where: { id: Number(id) },
+                    include: {
+                        prescriptions: true,
+                        patient: true
+                    }
+                })
+                
+                if (!visit) {
+                    return res.status(404).json({ error: 'Visit not found' })
+                }
+                
+                return res.status(200).json(visit)
+            }
+            
+            // Otherwise fetch all visits
             const items = await prisma.visit.findMany({ 
                 orderBy: { date: 'desc' },
                 include: {
@@ -24,6 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const user = await requireAuth(req, res)
         if(!user) return
         const {
+            id, // If provided, this is an update operation
             patientId,
             opdNo,
             diagnoses,
@@ -52,38 +73,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             autoGenerateInvoice // flag to automatically create customer invoice
         } = req.body
 
+        const isUpdate = !!id
+
         try {
-            // Create visit, prescriptions, update inventory, and optionally create invoice - all in one transaction
+            // Create or update visit, prescriptions, update inventory, and optionally create invoice - all in one transaction
             const result = await prisma.$transaction(async (tx: any) => {
-                // 1. Create the visit
-                const visit = await tx.visit.create({ 
-                    data: {
-                        patientId: Number(patientId),
-                        opdNo: opdNo || '',
-                        diagnoses,
-                        temperament,
-                        pulseDiagnosis,
-                        majorComplaints,
-                        historyReports,
-                        investigations,
-                        provisionalDiagnosis,
-                        improvements,
-                        specialNote,
-                        dob: dob ? new Date(dob) : undefined,
-                        age: age ? Number(age) : undefined,
-                        address,
-                        gender,
-                        phone,
-                        nextVisit: nextVisit ? new Date(nextVisit) : undefined,
-                        occupation,
-                        pendingPaymentCents: pendingPaymentCents ? Number(pendingPaymentCents) : undefined,
-                        height: height ? Number(height) : undefined,
-                        weight: weight ? Number(weight) : undefined,
-                        amount: amount ? Number(amount) : undefined,
-                        payment: payment ? Number(payment) : undefined,
-                        balance: balance ? Number(balance) : undefined
-                    } 
-                })
+                // 1. Create or update the visit
+                const visitData = {
+                    patientId: Number(patientId),
+                    opdNo: opdNo || '',
+                    diagnoses,
+                    temperament,
+                    pulseDiagnosis,
+                    majorComplaints,
+                    historyReports,
+                    investigations,
+                    provisionalDiagnosis,
+                    improvements,
+                    specialNote,
+                    dob: dob ? new Date(dob) : undefined,
+                    age: age ? Number(age) : undefined,
+                    address,
+                    gender,
+                    phone,
+                    nextVisit: nextVisit ? new Date(nextVisit) : undefined,
+                    occupation,
+                    pendingPaymentCents: pendingPaymentCents ? Number(pendingPaymentCents) : undefined,
+                    height: height ? Number(height) : undefined,
+                    weight: weight ? Number(weight) : undefined,
+                    amount: amount ? Number(amount) : undefined,
+                    payment: payment ? Number(payment) : undefined,
+                    balance: balance ? Number(balance) : undefined
+                }
+                
+                let visit
+                if (isUpdate) {
+                    // Update existing visit
+                    visit = await tx.visit.update({
+                        where: { id: Number(id) },
+                        data: visitData
+                    })
+                    
+                    // Delete existing prescriptions for this visit
+                    await tx.prescription.deleteMany({
+                        where: { visitId: visit.id }
+                    })
+                } else {
+                    // Create new visit
+                    visit = await tx.visit.create({ data: visitData })
+                }
 
                 let createdPrescriptions: any[] = []
                 let invoiceItems: any[] = []
