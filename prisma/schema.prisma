@@ -13,6 +13,7 @@ model User {
   name      String?
   passwordHash String?
   role      String   @default("staff")
+  profileImage String?
   createdAt DateTime @default(now())
 }
 
@@ -22,6 +23,7 @@ model PendingUser {
   name      String?
   passwordHash String?
   role      String   @default("staff")
+  profileImage String?
   verificationToken String @unique
   createdAt DateTime @default(now())
   expiresAt DateTime

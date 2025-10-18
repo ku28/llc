@@ -884,6 +884,63 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   }
 }
 
+/* Dialog Fade Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+}
+
+.dialog-overlay-enter {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.dialog-overlay-exit {
+  animation: fadeOut 0.2s ease-in;
+}
+
+.dialog-content-enter {
+  animation: slideUp 0.3s ease-out;
+}
+
+.dialog-content-exit {
+  animation: slideDown 0.2s ease-in;
+}
+
 
 
 

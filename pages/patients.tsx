@@ -6,6 +6,7 @@ import dropdownOptions from '../data/dropdownOptions.json'
 export default function PatientsPage() {
     const [patients, setPatients] = useState<any[]>([])
     const [user, setUser] = useState<any>(null)
+    const [userLoading, setUserLoading] = useState(true)
     const [editingId, setEditingId] = useState<number | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
@@ -47,7 +48,16 @@ export default function PatientsPage() {
             })
             .catch(() => setLoading(false))
     }, [])
-    useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
+    useEffect(() => { 
+        setUserLoading(true)
+        fetch('/api/auth/me')
+            .then(r => r.json())
+            .then(d => {
+                setUser(d.user)
+                setUserLoading(false)
+            })
+            .catch(() => setUserLoading(false))
+    }, [])
 
     function openModal() {
         setIsModalOpen(true)
@@ -240,7 +250,7 @@ export default function PatientsPage() {
                     </button>
                 )}
             </div>
-            {!user && (
+            {!userLoading && !user && (
                 <div className="card mb-4">
                     <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm">
                         You must <a className="text-brand underline font-medium" href="/login">login</a> to register patients.

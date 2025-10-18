@@ -7,6 +7,8 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
   const [user, setUser] = useState<any>(null)
   const [dark, setDark] = useState<boolean>(false)
   const [accountingOpen, setAccountingOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false)
   const router = useRouter()
 
   // Helper to check if user can access a route
@@ -90,24 +92,45 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
     }
   }
 
-  async function logout() {
+  const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
       setUser(null)
-      // Use Next.js router instead of window.location to preserve theme
-      router.push('/')
-    } catch (err) {
-      console.error('Logout failed:', err)
-      // Fallback to window.location if router fails
-      window.location.href = '/'
+      setUserDropdownOpen(false)
+      router.push('/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
     }
   }
 
   return (
     <header className="panel shadow-sm py-4 mb-8 sticky top-0 z-50 backdrop-blur-sm bg-opacity-95">
-  <div className="max-w-6xl mx-auto px-2 sm:px-4 flex justify-between items-center">
-        <div className="flex items-center gap-6">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-brand to-green-600 bg-clip-text text-transparent">{title}</h1>
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 flex justify-between items-center">
+        <div className="flex items-center gap-3 sm:gap-6">
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Toggle menu"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+
+          {/* Logo and Title */}
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity">
+            <img 
+              src="/favicon.png" 
+              alt="LLC ERP Logo" 
+              className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+            />
+            <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-brand to-green-600 bg-clip-text text-transparent">{title}</h1>
+          </Link>
 
           {/* main nav - hidden on small screens */}
           <nav className="hidden md:flex items-center gap-1">
@@ -190,9 +213,6 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
 
         </div>
         <div className="flex items-center gap-3">
-          {/* quick access to prescriptions page */}
-          <Link href="/prescriptions" className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-green-600 transition-all hover:shadow-lg font-medium text-sm">Prescriptions</Link>
-
           {/* theme toggle (sun/moon) - shows both icons with a sliding knob */}
           <button
             aria-label="Toggle theme"
@@ -215,12 +235,56 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
           </button>
 
           {user ? (
-            <div className="flex items-center gap-3">
-              <div className="text-sm hidden sm:block">
-                <div className="font-medium">{user.name || user.email}</div>
-                <div className="text-xs text-muted">{user.role}</div>
-              </div>
-              <button onClick={logout} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all hover:shadow-lg font-medium text-sm">Logout</button>
+            <div 
+              className="relative"
+              onMouseEnter={() => setUserDropdownOpen(true)}
+              onMouseLeave={() => setUserDropdownOpen(false)}
+            >
+              <Link href="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
+                {user.profileImage ? (
+                  <img 
+                    src={user.profileImage} 
+                    alt="Profile" 
+                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600">
+                    <span className="text-sm font-bold text-white">
+                      {user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}
+                    </span>
+                  </div>
+                )}
+                <div className="text-sm hidden sm:block">
+                  <div className="font-medium">{user.name || user.email}</div>
+                  <div className="text-xs text-muted">{user.role}</div>
+                </div>
+              </Link>
+
+              {/* User Dropdown Menu */}
+              {userDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50">
+                  <Link 
+                    href="/profile" 
+                    className="block px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    onClick={() => setUserDropdownOpen(false)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>👤</span>
+                      <span>View Profile</span>
+                    </div>
+                  </Link>
+                  <hr className="my-1 border-gray-200 dark:border-gray-700" />
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>🚪</span>
+                      <span>Logout</span>
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex gap-2">
@@ -229,6 +293,104 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
           )}
         </div>
       </div>
+
+      {/* Mobile Menu Dropdown */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-gray-200 dark:border-gray-700 mt-4 pt-4 px-2 sm:px-4">
+          <nav className="flex flex-col space-y-1">
+            {canAccess('/dashboard') && (
+              <Link 
+                href="/" 
+                className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Dashboard
+              </Link>
+            )}
+            {canAccess('/patients') && (
+              <Link 
+                href="/patients" 
+                className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Patients
+              </Link>
+            )}
+            {canAccess('/treatments') && (
+              <Link 
+                href="/treatments" 
+                className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Treatments
+              </Link>
+            )}
+            {canAccess('/products') && (
+              <Link 
+                href="/products" 
+                className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Inventory
+              </Link>
+            )}
+            {canAccess('/visits') && (
+              <Link 
+                href="/visits" 
+                className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Visits
+              </Link>
+            )}
+            {canAccess('/invoices') && (
+              <Link 
+                href="/invoices" 
+                className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Invoices
+              </Link>
+            )}
+            {canAccess('/suppliers') && (
+              <Link 
+                href="/suppliers" 
+                className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Suppliers
+              </Link>
+            )}
+            {canAccess('/purchase-orders') && (
+              <Link 
+                href="/purchase-orders" 
+                className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Purchase Orders
+              </Link>
+            )}
+            {canAccess('/stock-transactions') && (
+              <Link 
+                href="/stock-transactions" 
+                className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Inventory History
+              </Link>
+            )}
+            {canAccess('/analytics') && (
+              <Link 
+                href="/analytics" 
+                className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Analytics
+              </Link>
+            )}
+          </nav>
+        </div>
+      )}
     </header>
   )
 }

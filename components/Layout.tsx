@@ -1,6 +1,7 @@
 import React from 'react'
 import Header from './Header'
 import Footer from './Footer'
+import FloatingPrescriptionButton from './FloatingPrescriptionButton'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,6 +11,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8">
         <main className="py-6">{children}</main>
       </div>
+
+      <FloatingPrescriptionButton />
 
       <Footer />
     </div>
