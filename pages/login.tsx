@@ -5,7 +5,7 @@ import ToastNotification from '../components/ToastNotification'
 import { useToast } from '../hooks/useToast'
 
 export default function LoginPage() {
-    const [email, setEmail] = useState('')
+    const [emailOrPhone, setEmailOrPhone] = useState('')
     const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
     const router = useRouter()
@@ -14,14 +14,14 @@ export default function LoginPage() {
     async function submit(e: any) {
         e.preventDefault()
         setLoading(true)
-        const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
+        const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emailOrPhone, password }) })
         setLoading(false)
         if (res.ok) {
             // Dispatch custom event to notify components of login
             window.dispatchEvent(new Event('user-login'))
             router.push('/')
         }
-        else showError('Invalid email or password. Please try again.')
+        else showError('Invalid email/phone or password. Please try again.')
     }
 
     return (
@@ -37,15 +37,17 @@ export default function LoginPage() {
 
                         <form onSubmit={submit} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium mb-1.5">Email</label>
+                            <label className="block text-sm font-medium mb-1.5">Email or Phone Number</label>
                             <input 
                                 required 
-                                type="email"
-                                value={email} 
-                                onChange={e => setEmail(e.target.value)} 
-                                placeholder="demo@email.com" 
+                                value={emailOrPhone} 
+                                onChange={e => setEmailOrPhone(e.target.value)} 
+                                placeholder="demo@email.com or 9876543210" 
                                 className="w-full p-2 border rounded" 
                             />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Enter your email address or 10-digit phone number
+                            </p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Password</label>
@@ -67,7 +69,9 @@ export default function LoginPage() {
                     </form>
 
                     <div className="mt-6 text-center text-sm text-muted">
-                        Don't have an account? <Link href="/signup" className="text-brand hover:underline font-medium">Sign up</Link>
+                        Don't have an account? <Link href="/user-signup" className="text-brand hover:underline font-medium">Sign up as User</Link>
+                        {' or '}
+                        <Link href="/signup" className="text-brand hover:underline font-medium">Sign up as Staff</Link>
                     </div>
                 </div>
             </div>

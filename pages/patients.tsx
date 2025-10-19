@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
 import DateInput from '../components/DateInput'
+import ToastNotification from '../components/ToastNotification'
+import { useToast } from '../hooks/useToast'
 import CustomSelect from '../components/CustomSelect'
 import dropdownOptions from '../data/dropdownOptions.json'
 
 export default function PatientsPage() {
+    const router = useRouter()
     const [patients, setPatients] = useState<any[]>([])
     const [user, setUser] = useState<any>(null)
     const [userLoading, setUserLoading] = useState(true)
@@ -15,8 +19,10 @@ export default function PatientsPage() {
     const [imagePreview, setImagePreview] = useState<string>('')
     const [uploadingImage, setUploadingImage] = useState(false)
     const [loading, setLoading] = useState(true)
+    const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; message?: string }>({ open: false })
+    const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     
-    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '', imageUrl: '' }
+    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '', imageUrl: '', fatherHusbandGuardianName: '' }
     const [form, setForm] = useState(emptyForm)
 
     // Calculate age from date of birth
@@ -58,6 +64,53 @@ export default function PatientsPage() {
             })
             .catch(() => setUserLoading(false))
     }, [])
+
+    // Handle pre-filled data from appointment request
+    useEffect(() => {
+        if (router.isReady && router.query.requestId) {
+            const { 
+                name, 
+                email, 
+                phone, 
+                dob, 
+                age, 
+                address, 
+                gender, 
+                occupation, 
+                height, 
+                weight, 
+                fatherHusbandGuardianName,
+                imageUrl 
+            } = router.query
+            
+            const [firstName = '', lastName = ''] = (name as string || '').split(' ', 2)
+            
+            setForm(prev => ({
+                ...prev,
+                firstName,
+                lastName: lastName || '',
+                email: email as string || '',
+                phone: phone as string || '',
+                dob: dob as string || '',
+                age: age as string || '',
+                address: address as string || '',
+                gender: gender as string || '',
+                occupation: occupation as string || '',
+                height: height as string || '',
+                weight: weight as string || '',
+                fatherHusbandGuardianName: fatherHusbandGuardianName as string || '',
+                imageUrl: imageUrl as string || ''
+            }))
+            
+            // Set image preview if available
+            if (imageUrl) {
+                setImagePreview(imageUrl as string)
+            }
+            
+            // Auto-open modal if coming from appointment request
+            openModal()
+        }
+    }, [router.isReady, router.query])
 
     function openModal() {
         setIsModalOpen(true)
@@ -176,7 +229,8 @@ export default function PatientsPage() {
             pendingPaymentCents: patient.pendingPaymentCents ? String(patient.pendingPaymentCents) : '',
             height: patient.height ? String(patient.height) : '',
             weight: patient.weight ? String(patient.weight) : '',
-            imageUrl: patient.imageUrl || ''
+            imageUrl: patient.imageUrl || '',
+            fatherHusbandGuardianName: patient.fatherHusbandGuardianName || ''
         })
         setImagePreview(patient.imageUrl || '')
         openModal()
@@ -211,9 +265,34 @@ export default function PatientsPage() {
                 return
             }
             
+            const savedPatient = await res.json()
+            
+            // If this patient was created from an appointment request, update the request
+            if (router.query.requestId && !editingId && savedPatient.id) {
+                try {
+                    await fetch('/api/appointment-requests', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            id: Number(router.query.requestId),
+                            patientId: savedPatient.id
+                        })
+                    })
+                    console.log('✓ Appointment request updated with patientId:', savedPatient.id)
+                } catch (err) {
+                    console.error('Failed to update appointment request:', err)
+                    // Don't fail the patient creation if request update fails
+                }
+            }
+            
             const list = await (await fetch('/api/patients')).json()
             setPatients(list)
             closeModal()
+            
+            // Redirect back to requests page if coming from appointment request
+            if (router.query.requestId) {
+                router.push('/requests')
+            }
         } catch (err) { 
             console.error(err)
             alert('Failed to save patient') 
@@ -221,22 +300,32 @@ export default function PatientsPage() {
     }
 
     async function deletePatient(id: number) {
-        if (!confirm('Are you sure you want to delete this patient?')) return
+        setConfirmModal({ open: true, id, message: 'Are you sure you want to delete this patient?' })
+    }
+
+    async function handleConfirmDelete(id?: number) {
+        if (!id) {
+            setConfirmModal({ open: false })
+            return
+        }
+        setConfirmModal({ open: false })
         try {
-            const response = await fetch('/api/patients', { 
-                method: 'DELETE', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ id }) 
+            const response = await fetch('/api/patients', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
             })
             if (response.ok) {
                 setPatients(await (await fetch('/api/patients')).json())
+                showSuccess('Patient deleted')
             } else {
                 const error = await response.json()
-                alert('Failed to delete patient: ' + (error.error || 'Unknown error'))
+                console.error('Delete failed:', error)
+                showError('Failed to delete patient')
             }
         } catch (error) {
             console.error('Delete error:', error)
-            alert('Failed to delete patient')
+            showError('Failed to delete patient')
         }
     }
 
@@ -434,6 +523,25 @@ export default function PatientsPage() {
                     </div>
                 </div>
             )}
+
+            {/* Confirm Delete Modal */}
+            {confirmModal.open && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg max-w-lg w-full">
+                        <div className="p-6">
+                            <h3 className="text-lg font-semibold">Confirm Delete</h3>
+                            <p className="text-sm text-muted mt-2">{confirmModal.message}</p>
+                            <div className="mt-4 flex justify-end gap-3">
+                                <button onClick={() => setConfirmModal({ open: false })} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                                <button onClick={() => handleConfirmDelete(confirmModal.id)} className="px-4 py-2 bg-red-600 text-white rounded">Yes, Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Toasts */}
+            <ToastNotification toasts={toasts} removeToast={removeToast} />
 
             {/* Patients List */}
             <div className="card">

@@ -9,10 +9,12 @@ datasource db {
 
 model User {
   id        Int      @id @default(autoincrement())
-  email     String   @unique
+  email     String?  @unique
+  phone     String?  @unique
   name      String?
   passwordHash String?
   role      String   @default("staff")
+  verified  Boolean  @default(false)
   profileImage String?
   createdAt DateTime @default(now())
 }
@@ -25,6 +27,15 @@ model PendingUser {
   role      String   @default("staff")
   profileImage String?
   verificationToken String @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+model OTP {
+  id        Int      @id @default(autoincrement())
+  identifier String  @unique // email or phone
+  otp       String
+  name      String?
   createdAt DateTime @default(now())
   expiresAt DateTime
 }
@@ -63,6 +74,20 @@ model Appointment {
   notes      String?
   status     String   @default("scheduled")
   createdAt  DateTime @default(now())
+}
+
+model AppointmentRequest {
+  id         Int      @id @default(autoincrement())
+  userId     Int      // User who made the request
+  userName   String
+  userEmail  String
+  userPhone  String
+  message    String?
+  status     String   @default("pending") // pending, approved, declined
+  patientId  Int?     // Set when approved and patient is created
+  appointmentId Int?  // Set when appointment is scheduled
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Invoice {

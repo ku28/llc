@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const user = await requireAuth(req, res)
     if (!user) return
 
-    const { name, email } = req.body
+    const { name, email, phone } = req.body
 
     if (!name?.trim()) {
         return res.status(400).json({ error: 'Name is required' })
@@ -31,18 +31,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
     }
 
+    // Check if phone is being changed and if it's already taken
+    if (phone && phone !== user.phone) {
+        const existingUserWithPhone = await prisma.user.findUnique({
+            where: { phone }
+        })
+
+        if (existingUserWithPhone && existingUserWithPhone.id !== user.id) {
+            return res.status(400).json({ error: 'Phone number is already in use' })
+        }
+    }
+
     try {
         const updatedUser = await prisma.user.update({
             where: { id: user.id },
             data: {
                 name: name.trim(),
-                email: email.trim()
+                email: email.trim(),
+                phone: phone?.trim() || null
             },
             select: {
                 id: true,
                 email: true,
+                phone: true,
                 name: true,
-                role: true
+                role: true,
+                profileImage: true
             }
         })
 

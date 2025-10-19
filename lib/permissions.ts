@@ -3,7 +3,8 @@ export const ROLES = {
     ADMIN: 'admin',
     DOCTOR: 'doctor',
     STAFF: 'staff',
-    RECEPTION: 'reception'
+    RECEPTION: 'reception',
+    USER: 'user'  // Patient/User role
 } as const
 
 export type Role = typeof ROLES[keyof typeof ROLES]
@@ -17,11 +18,11 @@ export const PERMISSIONS = {
     DELETE_PATIENTS: ['admin', 'doctor'],
     
     // Visits & Prescriptions
-    VIEW_VISITS: ['admin', 'doctor', 'staff', 'reception'],
+    VIEW_VISITS: ['admin', 'doctor', 'staff', 'reception', 'user'],  // Users can view their visits
     CREATE_VISITS: ['admin', 'doctor', 'staff'],
     EDIT_VISITS: ['admin', 'doctor', 'staff'],
     DELETE_VISITS: ['admin', 'doctor'],
-    VIEW_PRESCRIPTIONS: ['admin', 'doctor', 'staff', 'reception'],
+    VIEW_PRESCRIPTIONS: ['admin', 'doctor', 'staff', 'reception', 'user'],  // Users can view their prescriptions
     CREATE_PRESCRIPTIONS: ['admin', 'doctor', 'staff'],
     EDIT_PRESCRIPTIONS: ['admin', 'doctor', 'staff'],
     DELETE_PRESCRIPTIONS: ['admin', 'doctor'],
@@ -76,8 +77,13 @@ export const PERMISSIONS = {
     
     // Dashboard
     VIEW_DASHBOARD: ['admin', 'doctor', 'staff', 'reception'],
+    VIEW_USER_DASHBOARD: ['user'],  // Patient dashboard
     VIEW_LOW_STOCK_ALERTS: ['admin', 'staff'],
     VIEW_REVENUE_METRICS: ['admin', 'doctor', 'staff'],
+    
+    // Appointment Requests
+    VIEW_APPOINTMENT_REQUESTS: ['admin', 'doctor', 'staff', 'reception', 'user'],
+    MANAGE_APPOINTMENT_REQUESTS: ['admin', 'doctor', 'staff', 'reception'],
 } as const
 
 export type Permission = keyof typeof PERMISSIONS
@@ -92,6 +98,7 @@ export function hasPermission(userRole: string, permission: Permission): boolean
 export function canAccessRoute(userRole: string, route: string): boolean {
     const routePermissions: Record<string, Permission> = {
         '/dashboard': 'VIEW_DASHBOARD',
+        '/user-dashboard': 'VIEW_USER_DASHBOARD',
         '/patients': 'VIEW_PATIENTS',
         '/visits': 'VIEW_VISITS',
         '/prescriptions': 'VIEW_PRESCRIPTIONS',
@@ -103,6 +110,8 @@ export function canAccessRoute(userRole: string, route: string): boolean {
         '/stock-transactions': 'VIEW_STOCK_TRANSACTIONS',
         '/analytics': 'VIEW_ANALYTICS',
         '/users': 'VIEW_USERS',
+        '/requests': 'MANAGE_APPOINTMENT_REQUESTS',
+        '/my-requests': 'VIEW_APPOINTMENT_REQUESTS',
     }
     
     const permission = routePermissions[route]
@@ -117,7 +126,8 @@ export function getRoleDisplayName(role: string): string {
         admin: 'Administrator',
         doctor: 'Doctor',
         staff: 'Staff',
-        reception: 'Reception'
+        reception: 'Reception',
+        user: 'Patient'
     }
     return names[role] || role
 }
@@ -126,6 +136,7 @@ export function getRoleDisplayName(role: string): string {
 export function getAccessibleRoutes(userRole: string): string[] {
     const allRoutes = [
         '/dashboard',
+        '/user-dashboard',
         '/patients',
         '/visits',
         '/prescriptions',
@@ -163,5 +174,33 @@ export const RECEPTION_RESTRICTIONS = {
         'Invoices (create and view)',
         'Record Payments',
         'Schedule Appointments'
+    ]
+}
+
+// User/Patient role restrictions summary
+export const USER_RESTRICTIONS = {
+    cannotAccess: [
+        'Staff Dashboard',
+        'Patient Management',
+        'Create/Edit Visits',
+        'Create/Edit Prescriptions',
+        'Treatments',
+        'Inventory/Products',
+        'Suppliers',
+        'Purchase Orders',
+        'Invoices',
+        'Stock Transactions',
+        'Analytics & Reports',
+        'User Management',
+        'All Administrative Functions'
+    ],
+    canAccess: [
+        'User Dashboard (personal)',
+        'View Own Appointments (read-only)',
+        'View Own Prescriptions (read-only)',
+        'Book New Appointments',
+        'View Visit History',
+        'Update Profile',
+        'Contact Information'
     ]
 }

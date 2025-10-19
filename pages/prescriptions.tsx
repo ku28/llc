@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
+import Link from 'next/link'
 import CustomSelect from '../components/CustomSelect'
 import DateInput from '../components/DateInput'
 import dropdownOptions from '../data/dropdownOptions.json'
@@ -9,6 +10,7 @@ export default function PrescriptionsPage() {
     const { visitId, edit } = router.query
     const isEditMode = edit === 'true' && visitId
     
+    const [user, setUser] = useState<any>(null)
     const [patients, setPatients] = useState<any[]>([])
     const [treatments, setTreatments] = useState<any[]>([])
     const [products, setProducts] = useState<any[]>([])
@@ -31,7 +33,9 @@ export default function PrescriptionsPage() {
     const [lastCreatedVisitId, setLastCreatedVisitId] = useState<number | null>(null)
     const [lastCreatedVisit, setLastCreatedVisit] = useState<any | null>(null)
     const previewRef = useRef<HTMLDivElement | null>(null)
+    const isPatient = user?.role?.toLowerCase() === 'user'
 
+    useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
     useEffect(() => { fetch('/api/patients').then(r => r.json()).then(setPatients) }, [])
     useEffect(() => { fetch('/api/treatments').then(r => r.json()).then(setTreatments) }, [])
     useEffect(() => { fetch('/api/products').then(r => r.json()).then(setProducts) }, [])
@@ -288,12 +292,18 @@ export default function PrescriptionsPage() {
 
     return (
         <div>
-            <div className="section-header">
-                <h2 className="section-title">{isEditMode ? 'Edit Visit & Prescriptions' : 'Create Visit & Prescriptions'}</h2>
-                <p className="text-sm text-muted">Comprehensive visit recording with prescriptions and patient updates</p>
-            </div>
+            {isPatient ? (
+                // Patient view - Read-only prescription list
+                <UserPrescriptionsContent user={user} />
+            ) : (
+                // Staff view - Create/Edit prescriptions (original form)
+                <>
+                    <div className="section-header">
+                        <h2 className="section-title">{isEditMode ? 'Edit Visit & Prescriptions' : 'Create Visit & Prescriptions'}</h2>
+                        <p className="text-sm text-muted">Comprehensive visit recording with prescriptions and patient updates</p>
+                    </div>
 
-            <form onSubmit={submit} className="space-y-6">
+                    <form onSubmit={submit} className="space-y-6">
                 {/* Patient Selection Card */}
                 <div className="card">
                     <h3 className="text-lg font-semibold mb-4">Patient Information</h3>
@@ -930,6 +940,8 @@ export default function PrescriptionsPage() {
                     </div>
                 </div>
             )}
+                </>
+            )}
         </div>
     )
 }
@@ -1009,4 +1021,143 @@ function openPrintableWindow(node: HTMLDivElement | null){
     w.document.write(html)
     w.document.close()
     setTimeout(()=>{ w.focus(); w.print(); }, 500)
+}
+
+// User/Patient Prescriptions Content Component
+function UserPrescriptionsContent({ user }: { user: any }) {
+    const [visits, setVisits] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        if (!user) return
+        fetch('/api/visits')
+            .then(r => r.json())
+            .then(data => {
+                // Filter visits that belong to this user
+                const userVisits = data.filter((v: any) =>
+                    v.patient?.email === user.email || v.patient?.phone === user.phone
+                )
+                setVisits(userVisits)
+                setLoading(false)
+            })
+            .catch(() => setLoading(false))
+    }, [user])
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                <p className="text-muted">Loading your prescriptions...</p>
+            </div>
+        )
+    }
+
+    // Get all prescriptions from all visits
+    const allPrescriptions = visits.flatMap(v => 
+        (v.prescriptions || []).map((p: any) => ({ ...p, visit: v }))
+    )
+
+    return (
+        <div>
+            <div className="section-header">
+                <h2 className="section-title">My Prescriptions</h2>
+                <span className="badge">{allPrescriptions.length} prescription(s)</span>
+            </div>
+
+            {allPrescriptions.length === 0 ? (
+                <div className="card text-center py-12">
+                    <span className="text-6xl mb-4 block">💊</span>
+                    <h3 className="text-xl font-semibold mb-2">No Prescriptions Yet</h3>
+                    <p className="text-muted">Your prescribed medications will appear here after your doctor's visit.</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {visits.filter(v => v.prescriptions && v.prescriptions.length > 0).map(visit => (
+                        <div key={visit.id} className="card">
+                            {/* Visit Header */}
+                            <div className="border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="text-lg font-semibold mb-1">
+                                            Visit - {new Date(visit.date).toLocaleDateString('en-IN', { 
+                                                year: 'numeric', 
+                                                month: 'long', 
+                                                day: 'numeric' 
+                                            })}
+                                        </h3>
+                                        <p className="text-sm text-muted">OPD No: {visit.opdNo}</p>
+                                        {visit.diagnoses && (
+                                            <p className="text-sm mt-2">
+                                                <span className="font-medium">Diagnosis:</span> {visit.diagnoses}
+                                            </p>
+                                        )}
+                                        {visit.chiefComplaint && (
+                                            <p className="text-sm mt-1">
+                                                <span className="font-medium">Chief Complaint:</span> {visit.chiefComplaint}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <Link 
+                                        href={`/visits/${visit.id}`}
+                                        className="btn btn-secondary text-sm"
+                                    >
+                                        View Full Report
+                                    </Link>
+                                </div>
+                            </div>
+
+                            {/* Prescriptions List */}
+                            <h4 className="font-semibold mb-3">Prescribed Medications:</h4>
+                            <div className="space-y-3">
+                                {visit.prescriptions.map((prescription: any, idx: number) => (
+                                    <div 
+                                        key={idx} 
+                                        className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                                    >
+                                        <div className="flex items-start gap-4">
+                                            <div className="flex-shrink-0 w-10 h-10 bg-brand text-white rounded-full flex items-center justify-center font-bold">
+                                                {idx + 1}
+                                            </div>
+                                            <div className="flex-1">
+                                                <h5 className="font-semibold text-base mb-2">
+                                                    {prescription.product?.name || 'Medicine'}
+                                                </h5>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                                    {prescription.dosage && (
+                                                        <div>
+                                                            <span className="font-medium">Dosage:</span> {prescription.dosage}
+                                                        </div>
+                                                    )}
+                                                    {prescription.timing && (
+                                                        <div>
+                                                            <span className="font-medium">Timing:</span> {prescription.timing}
+                                                        </div>
+                                                    )}
+                                                    {prescription.quantity && (
+                                                        <div>
+                                                            <span className="font-medium">Quantity:</span> {prescription.quantity}
+                                                        </div>
+                                                    )}
+                                                    {prescription.administration && (
+                                                        <div>
+                                                            <span className="font-medium">Administration:</span> {prescription.administration}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {prescription.additions && (
+                                                    <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-sm">
+                                                        <span className="font-medium">Special Instructions:</span> {prescription.additions}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
 }

@@ -42,6 +42,12 @@ export default function Dashboard() {
           return
         }
         
+        // If user role is 'user', redirect to user dashboard
+        if (data.user.role?.toLowerCase() === 'user') {
+          router.push('/user-dashboard')
+          return
+        }
+        
         setAuthChecked(true)
         fetchDashboardData()
       } catch (err) {

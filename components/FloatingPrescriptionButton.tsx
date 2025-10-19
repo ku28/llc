@@ -1,11 +1,31 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+import { useEffect, useState } from 'react'
 
 export default function FloatingPrescriptionButton() {
     const router = useRouter()
+    const [user, setUser] = useState<any>(null)
 
-    // Don't show on profile, prescriptions, and visits pages
-    if (router.pathname === '/profile' || router.pathname === '/prescriptions' || router.pathname.startsWith('/visits')) {
+    useEffect(() => {
+        // Fetch user to check role
+        fetch('/api/auth/me')
+            .then(res => res.json())
+            .then(data => setUser(data.user))
+            .catch(() => setUser(null))
+    }, [])
+
+    // Don't show on profile, prescriptions, visits pages or the public landing page '/'
+    if (
+        router.pathname === '/' ||
+        router.pathname === '/profile' ||
+        router.pathname === '/prescriptions' ||
+        router.pathname.startsWith('/visits')
+    ) {
+        return null
+    }
+
+    // Don't show for user role (patients)
+    if (user?.role?.toLowerCase() === 'user') {
         return null
     }
 

@@ -9,6 +9,8 @@ export default function VisitsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    const isPatient = user?.role?.toLowerCase() === 'user'
+    
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
 
     useEffect(() => { 
@@ -17,11 +19,18 @@ export default function VisitsPage() {
             fetch('/api/visits').then(r => r.json()),
             fetch('/api/patients').then(r => r.json())
         ]).then(([visitsData, patientsData]) => {
-            setVisits(visitsData)
+            // Filter visits for user role - show only their own visits
+            let filteredVisits = visitsData
+            if (user?.role?.toLowerCase() === 'user') {
+                filteredVisits = visitsData.filter((v: any) => 
+                    v.patient?.email === user.email || v.patient?.phone === user.phone
+                )
+            }
+            setVisits(filteredVisits)
             setPatients(patientsData)
             setLoading(false)
         }).catch(() => setLoading(false))
-    }, [])
+    }, [user])
 
     async function create(e: any) {
         e.preventDefault()
@@ -33,7 +42,7 @@ export default function VisitsPage() {
     return (
         <div>
             <div className="section-header">
-                <h2 className="section-title">Patient Visits</h2>
+                <h2 className="section-title">{isPatient ? 'My Appointments' : 'Patient Visits'}</h2>
                 <div className="flex items-center gap-3">
                     <span className="badge">
                         {visits.filter(v => {
@@ -42,9 +51,11 @@ export default function VisitsPage() {
                             const opdNo = (v.opdNo || '').toLowerCase()
                             const search = searchQuery.toLowerCase()
                             return patientName.includes(search) || opdNo.includes(search)
-                        }).length} total visits
+                        }).length} total {isPatient ? 'appointments' : 'visits'}
                     </span>
-                    <Link href="/prescriptions" className="btn btn-primary text-sm">Create Visit with Prescriptions</Link>
+                    {!isPatient && (
+                        <Link href="/prescriptions" className="btn btn-primary text-sm">Create Visit with Prescriptions</Link>
+                    )}
                 </div>
             </div>
 
@@ -75,7 +86,7 @@ export default function VisitsPage() {
             </div>
 
             <div className="card">
-                <h3 className="text-lg font-semibold mb-4">Visit History</h3>
+                <h3 className="text-lg font-semibold mb-4">{isPatient ? 'My Appointment History' : 'Visit History'}</h3>
                 {(() => {
                     const filteredVisits = visits.filter(v => {
                         if (!searchQuery) return true
@@ -104,7 +115,11 @@ export default function VisitsPage() {
                     }
                     
                     if (filteredVisits.length === 0) {
-                        return <div className="text-center py-8 text-muted">No visits recorded yet</div>
+                        return (
+                            <div className="text-center py-8 text-muted">
+                                {isPatient ? 'You have no appointments yet' : 'No visits recorded yet'}
+                            </div>
+                        )
                     }
                     
                     return (
@@ -145,9 +160,11 @@ export default function VisitsPage() {
                                         <Link href={`/visits/${v.id}`} className="btn btn-primary text-sm">
                                             View Details
                                         </Link>
-                                        <Link href={`/prescriptions?visitId=${v.id}&edit=true`} className="btn btn-secondary text-sm">
-                                            Edit
-                                        </Link>
+                                        {!isPatient && (
+                                            <Link href={`/prescriptions?visitId=${v.id}&edit=true`} className="btn btn-secondary text-sm">
+                                                Edit
+                                            </Link>
+                                        )}
                                     </div>
                                 </div>
                             </li>

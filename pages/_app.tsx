@@ -11,7 +11,7 @@ export default function App({ Component, pageProps }: AppProps) {
   const [authChecked, setAuthChecked] = useState(false)
   
   // Pages that don't require authentication
-  const publicPages = ['/login', '/signup']
+  const publicPages = ['/login', '/signup', '/user-signup', '/', '/about', '/services', '/gallery', '/contact']
   const isPublicPage = publicPages.includes(router.pathname)
 
   useEffect(() => {

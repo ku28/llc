@@ -78,9 +78,9 @@ export default function SignupPage() {
         <>
             <ToastNotification toasts={toasts} removeToast={removeToast} />
             <div className="max-w-md mx-auto mt-12 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
-                <h2 className="text-2xl font-bold mb-2">Sign up</h2>
+                <h2 className="text-2xl font-bold mb-2">Staff Registration</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                    Create a new account. Your request will be sent to the administrator for approval.
+                    Register as Admin or Reception. Your request will be sent to the administrator for approval.
                 </p>
                 <form onSubmit={submit} className="space-y-4">
                 <div>
@@ -143,6 +143,11 @@ export default function SignupPage() {
             <p className="text-sm text-center text-gray-600 dark:text-gray-400 mt-4">
                 Already have an account? <a href="/login" className="text-blue-600 dark:text-blue-400 hover:underline">Login</a>
             </p>
+            <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-700">
+                <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                    Are you a patient? <a href="/user-signup" className="text-blue-600 dark:text-blue-400 hover:underline">Register as User</a>
+                </p>
+            </div>
         </div>
         </>
     )

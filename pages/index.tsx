@@ -1,33 +1,25 @@
-﻿import { useEffect } from 'react'
-import { useRouter } from 'next/router'
+﻿import LandingHeader from '../components/LandingHeader'
+import HeroSection from '../components/lastleaf/sections/hero'
+import TestimonialSection from '../components/lastleaf/sections/testimonial'
+import TeamSection from '../components/lastleaf/sections/team'
+import BenefitsSection from '../components/lastleaf/sections/benefits'
+import SponsorsSection from '../components/lastleaf/sections/sponsors'
+import CommunitySection from '../components/lastleaf/sections/community'
+import ContactSection from '../components/lastleaf/sections/contact'
+import FooterSection from '../components/lastleaf/sections/footer'
 
-export default function HomePage() {
-  const router = useRouter()
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await fetch('/api/auth/me')
-        const data = await res.json()
-        
-        if (data.user) {
-          router.push('/dashboard')
-        } else {
-          router.push('/login')
-        }
-      } catch (err) {
-        router.push('/login')
-      }
-    }
-    checkAuth()
-  }, [router])
-
+export default function LandingPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto mb-4"></div>
-        <p className="text-muted">Loading...</p>
-      </div>
-    </div>
+    <main className="min-h-screen bg-white dark:bg-[#0a0a0a]">
+      <LandingHeader />
+      <HeroSection />
+      <TestimonialSection />
+      <TeamSection />
+      <BenefitsSection />
+      <SponsorsSection />
+      <CommunitySection />
+      <ContactSection />
+      <FooterSection />
+    </main>
   )
 }

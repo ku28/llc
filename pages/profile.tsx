@@ -24,10 +24,27 @@ export default function ProfilePage() {
     const [uploading, setUploading] = useState(false)
     const [profileImage, setProfileImage] = useState<string | null>(null)
     const { toasts, removeToast, showSuccess, showError, showWarning } = useToast()
+    
+    // Additional patient fields for user role
+    const [phone, setPhone] = useState('')
+    const [dob, setDob] = useState('')
+    const [age, setAge] = useState('')
+    const [address, setAddress] = useState('')
+    const [gender, setGender] = useState('')
+    const [occupation, setOccupation] = useState('')
+    const [height, setHeight] = useState('')
+    const [weight, setWeight] = useState('')
+    const [fatherHusbandGuardianName, setFatherHusbandGuardianName] = useState('')
 
     useEffect(() => {
         fetchUser()
-    }, [])
+        
+        // Check for tab query parameter
+        const { tab } = router.query
+        if (tab && ['overview', 'edit', 'security', 'account'].includes(tab as string)) {
+            setActiveTab(tab as TabType)
+        }
+    }, [router.query])
 
     const fetchUser = async () => {
         try {
@@ -38,7 +55,13 @@ export default function ProfilePage() {
                 setUser(data.user)
                 setName(data.user.name || '')
                 setEmail(data.user.email || '')
+                setPhone(data.user.phone || '')
                 setProfileImage(data.user.profileImage || null)
+                
+                // Fetch patient data if user role
+                if (data.user.role?.toLowerCase() === 'user') {
+                    fetchPatientData(data.user.email, data.user.phone)
+                }
             } else {
                 router.push('/login')
             }
@@ -51,6 +74,43 @@ export default function ProfilePage() {
         }
     }
 
+    const fetchPatientData = async (userEmail: string, userPhone: string) => {
+        try {
+            const res = await fetch('/api/patients')
+            const patients = await res.json()
+            
+            // Find patient record matching user's email or phone
+            const patientRecord = patients.find((p: any) => 
+                p.email === userEmail || p.phone === userPhone
+            )
+            
+            if (patientRecord) {
+                setDob(patientRecord.dob ? new Date(patientRecord.dob).toISOString().split('T')[0] : '')
+                setAge(patientRecord.age?.toString() || '')
+                setAddress(patientRecord.address || '')
+                setGender(patientRecord.gender || '')
+                setOccupation(patientRecord.occupation || '')
+                setHeight(patientRecord.height?.toString() || '')
+                setWeight(patientRecord.weight?.toString() || '')
+                setFatherHusbandGuardianName(patientRecord.fatherHusbandGuardianName || '')
+            }
+        } catch (err) {
+            console.error('Failed to fetch patient data:', err)
+        }
+    }
+
+    const calculateAge = (dob: string) => {
+        if (!dob) return ''
+        const birthDate = new Date(dob)
+        const today = new Date()
+        let age = today.getFullYear() - birthDate.getFullYear()
+        const monthDiff = today.getMonth() - birthDate.getMonth()
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--
+        }
+        return age.toString()
+    }
+
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault()
 
@@ -61,22 +121,96 @@ export default function ProfilePage() {
 
         setSaving(true)
         try {
-            const res = await fetch('/api/auth/update-profile', {
+            const isUserRole = user?.role?.toLowerCase() === 'user'
+            
+            // Update user account
+            const userRes = await fetch('/api/auth/update-profile', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email })
+                body: JSON.stringify({ name, email, phone })
             })
 
-            const data = await res.json()
+            const userData = await userRes.json()
 
-            if (res.ok) {
-                setUser(data.user)
-                showSuccess('Profile updated successfully')
-                // Trigger header refresh
-                window.dispatchEvent(new Event('user-login'))
-            } else {
-                showError(data.error || 'Failed to update profile')
+            if (!userRes.ok) {
+                showError(userData.error || 'Failed to update profile')
+                setSaving(false)
+                return
             }
+
+            // Update local user and form fields with returned (saved) values
+            const updatedUser = userData.user
+            setUser(updatedUser)
+            setName(updatedUser.name || '')
+            setEmail(updatedUser.email || '')
+            setPhone(updatedUser.phone || '')
+
+            // If user role, also update or create patient record
+            if (isUserRole) {
+                const patientsRes = await fetch('/api/patients')
+                const patients = await patientsRes.json()
+                
+                // Find existing patient record using updated user identifiers
+                const existingPatient = patients.find((p: any) => 
+                    p.email === updatedUser.email || p.phone === updatedUser.phone
+                )
+
+                const nameParts = name.split(' ')
+                const firstName = nameParts[0] || ''
+                const lastName = nameParts.slice(1).join(' ') || ''
+
+                const patientData = {
+                    firstName,
+                    lastName,
+                    phone: updatedUser.phone || phone,
+                    email: updatedUser.email || email,
+                    dob: dob || null,
+                    age: age ? parseInt(age) : null,
+                    address: address || null,
+                    gender: gender || null,
+                    occupation: occupation || null,
+                    height: height ? parseFloat(height) : null,
+                    weight: weight ? parseFloat(weight) : null,
+                    fatherHusbandGuardianName: fatherHusbandGuardianName || null
+                }
+
+                if (existingPatient) {
+                    // Update existing patient
+                    const updateRes = await fetch('/api/patients', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            id: existingPatient.id,
+                            ...patientData
+                        })
+                    })
+
+                    if (!updateRes.ok) {
+                        const updateData = await updateRes.json()
+                        showError(updateData.error || 'Failed to update patient information')
+                        setSaving(false)
+                        return
+                    }
+                } else {
+                    // Create new patient record
+                    const createRes = await fetch('/api/patients', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(patientData)
+                    })
+
+                    if (!createRes.ok) {
+                        const createData = await createRes.json()
+                        showError(createData.error || 'Failed to create patient information')
+                        setSaving(false)
+                        return
+                    }
+                }
+            }
+
+            showSuccess('Profile updated successfully')
+            // Trigger header refresh
+            window.dispatchEvent(new Event('user-login'))
         } catch (err) {
             console.error('Update failed:', err)
             showError('An error occurred while updating profile')
@@ -397,6 +531,12 @@ export default function ProfilePage() {
                                             <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Email Address</h4>
                                             <p className="text-base sm:text-lg font-semibold break-all">{user?.email}</p>
                                         </div>
+                                        {phone && (
+                                            <div className="p-4 sm:p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                                                <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Phone Number</h4>
+                                                <p className="text-base sm:text-lg font-semibold">{phone}</p>
+                                            </div>
+                                        )}
                                         <div className="p-4 sm:p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
                                             <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Role</h4>
                                             <p className="text-base sm:text-lg font-semibold capitalize">{user?.role}</p>
@@ -408,6 +548,60 @@ export default function ProfilePage() {
                                                 Active
                                             </p>
                                         </div>
+                                        
+                                        {/* Patient-specific fields for user role */}
+                                        {user?.role?.toLowerCase() === 'user' && (
+                                            <>
+                                                {dob && (
+                                                    <div className="p-4 sm:p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                                                        <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Date of Birth</h4>
+                                                        <p className="text-base sm:text-lg font-semibold">{new Date(dob).toLocaleDateString()}</p>
+                                                    </div>
+                                                )}
+                                                {age && (
+                                                    <div className="p-4 sm:p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                                                        <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Age</h4>
+                                                        <p className="text-base sm:text-lg font-semibold">{age} years</p>
+                                                    </div>
+                                                )}
+                                                {gender && (
+                                                    <div className="p-4 sm:p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                                                        <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Gender</h4>
+                                                        <p className="text-base sm:text-lg font-semibold">{gender}</p>
+                                                    </div>
+                                                )}
+                                                {occupation && (
+                                                    <div className="p-4 sm:p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                                                        <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Occupation</h4>
+                                                        <p className="text-base sm:text-lg font-semibold">{occupation}</p>
+                                                    </div>
+                                                )}
+                                                {fatherHusbandGuardianName && (
+                                                    <div className="p-4 sm:p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow sm:col-span-2">
+                                                        <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Father/Husband/Guardian Name</h4>
+                                                        <p className="text-base sm:text-lg font-semibold">{fatherHusbandGuardianName}</p>
+                                                    </div>
+                                                )}
+                                                {address && (
+                                                    <div className="p-4 sm:p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow sm:col-span-2">
+                                                        <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Address</h4>
+                                                        <p className="text-base sm:text-lg font-semibold">{address}</p>
+                                                    </div>
+                                                )}
+                                                {height && (
+                                                    <div className="p-4 sm:p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                                                        <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Height</h4>
+                                                        <p className="text-base sm:text-lg font-semibold">{height} cm</p>
+                                                    </div>
+                                                )}
+                                                {weight && (
+                                                    <div className="p-4 sm:p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                                                        <h4 className="text-xs sm:text-sm font-medium text-muted mb-1 sm:mb-2">Weight</h4>
+                                                        <p className="text-base sm:text-lg font-semibold">{weight} kg</p>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -416,33 +610,170 @@ export default function ProfilePage() {
                                 <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md p-4 sm:p-6 md:p-8 border border-gray-200 dark:border-gray-700">
                                     <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">Edit Profile</h2>
                                     
-                                    <form onSubmit={handleUpdateProfile} className="max-w-2xl space-y-4 sm:space-y-6">
-                                        <div>
-                                            <label className="block text-sm font-semibold mb-2">Full Name</label>
-                                            <input
-                                                type="text"
-                                                value={name}
-                                                onChange={(e) => setName(e.target.value)}
-                                                className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
-                                                placeholder="Enter your name"
-                                                required
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-semibold mb-2">Email Address</label>
-                                            <input
-                                                type="email"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
-                                                placeholder="Enter your email"
-                                                required
-                                            />
-                                            <p className="mt-2 text-xs text-muted bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-200 dark:border-blue-800">
-                                                💡 We'll send verification email if you change your email address.
+                                    {user?.role?.toLowerCase() === 'user' && (
+                                        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                                            <p className="text-sm text-blue-700 dark:text-blue-300">
+                                                <span className="font-semibold">Note:</span> Fields marked with an asterisk (<span className="text-red-600">*</span>) are required to book appointments.
                                             </p>
                                         </div>
+                                    )}
+                                    
+                                    <form onSubmit={handleUpdateProfile} className="max-w-2xl space-y-4 sm:space-y-6">
+                                        {/* Basic Information */}
+                                        <div className="space-y-4">
+                                            <h3 className="text-lg font-semibold border-b pb-2">Basic Information</h3>
+                                            
+                                            <div>
+                                                <label className="block text-sm font-semibold mb-2">Full Name *</label>
+                                                <input
+                                                    type="text"
+                                                    value={name}
+                                                    onChange={(e) => setName(e.target.value)}
+                                                    className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                    placeholder="Enter your full name"
+                                                    required
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-semibold mb-2">Email Address *</label>
+                                                    <input
+                                                        type="email"
+                                                        value={email}
+                                                        onChange={(e) => setEmail(e.target.value)}
+                                                        className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                        placeholder="Enter your email"
+                                                        required
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-semibold mb-2">Phone Number *</label>
+                                                    <input
+                                                        type="tel"
+                                                        value={phone}
+                                                        onChange={(e) => setPhone(e.target.value)}
+                                                        className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                        placeholder="Enter your phone number"
+                                                        required={user?.role?.toLowerCase() === 'user'}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Patient-specific fields for user role */}
+                                        {user?.role?.toLowerCase() === 'user' && (
+                                            <>
+                                                <div className="space-y-4 pt-4 border-t">
+                                                    <h3 className="text-lg font-semibold border-b pb-2">Personal Details</h3>
+                                                    
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="block text-sm font-semibold mb-2">Date of Birth *</label>
+                                                            <input
+                                                                type="date"
+                                                                value={dob}
+                                                                onChange={(e) => {
+                                                                    setDob(e.target.value)
+                                                                    setAge(calculateAge(e.target.value))
+                                                                }}
+                                                                className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                                required
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-sm font-semibold mb-2">Age *</label>
+                                                            <input
+                                                                type="number"
+                                                                value={age}
+                                                                onChange={(e) => setAge(e.target.value)}
+                                                                className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                                placeholder="Age"
+                                                                readOnly={!!dob}
+                                                                required
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-sm font-semibold mb-2">Gender *</label>
+                                                            <select
+                                                                value={gender}
+                                                                onChange={(e) => setGender(e.target.value)}
+                                                                className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                                required
+                                                            >
+                                                                <option value="">Select Gender</option>
+                                                                <option value="Male">Male</option>
+                                                                <option value="Female">Female</option>
+                                                                <option value="Other">Other</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-sm font-semibold mb-2">Occupation</label>
+                                                            <input
+                                                                type="text"
+                                                                value={occupation}
+                                                                onChange={(e) => setOccupation(e.target.value)}
+                                                                className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                                placeholder="Enter your occupation"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-semibold mb-2">Father/Husband/Guardian Name</label>
+                                                        <input
+                                                            type="text"
+                                                            value={fatherHusbandGuardianName}
+                                                            onChange={(e) => setFatherHusbandGuardianName(e.target.value)}
+                                                            className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                            placeholder="Enter F/H/G name"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-sm font-semibold mb-2">Address *</label>
+                                                        <textarea
+                                                            value={address}
+                                                            onChange={(e) => setAddress(e.target.value)}
+                                                            className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                            rows={3}
+                                                            placeholder="Enter your address"
+                                                            required
+                                                        />
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="block text-sm font-semibold mb-2">Height (cm)</label>
+                                                            <input
+                                                                type="number"
+                                                                step="0.1"
+                                                                value={height}
+                                                                onChange={(e) => setHeight(e.target.value)}
+                                                                className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                                placeholder="Height in cm"
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-sm font-semibold mb-2">Weight (kg)</label>
+                                                            <input
+                                                                type="number"
+                                                                step="0.1"
+                                                                value={weight}
+                                                                onChange={(e) => setWeight(e.target.value)}
+                                                                className="w-full p-2.5 sm:p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-800 transition-all text-sm sm:text-base"
+                                                                placeholder="Weight in kg"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
 
                                         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2 sm:pt-4">
                                             <button
@@ -457,6 +788,11 @@ export default function ProfilePage() {
                                                 onClick={() => {
                                                     setName(user?.name || '')
                                                     setEmail(user?.email || '')
+                                                    setPhone(user?.phone || '')
+                                                    // Re-fetch patient data
+                                                    if (user?.role?.toLowerCase() === 'user') {
+                                                        fetchPatientData(user.email, user.phone)
+                                                    }
                                                 }}
                                                 className="w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-all shadow-md hover:shadow-lg font-medium text-sm sm:text-base"
                                             >
