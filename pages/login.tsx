@@ -19,7 +19,7 @@ export default function LoginPage() {
         if (res.ok) {
             // Dispatch custom event to notify components of login
             window.dispatchEvent(new Event('user-login'))
-            router.push('/')
+            router.push('/dashboard')
         }
         else showError('Invalid email/phone or password. Please try again.')
     }
