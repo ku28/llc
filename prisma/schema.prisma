@@ -8,446 +8,434 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String?  @unique
-  phone     String?  @unique
-  name      String?
+  id           Int      @id @default(autoincrement())
+  email        String?  @unique
+  name         String?
   passwordHash String?
-  role      String   @default("staff")
-  verified  Boolean  @default(false)
+  role         String   @default("staff")
+  createdAt    DateTime @default(now())
   profileImage String?
-  createdAt DateTime @default(now())
+  verified     Boolean  @default(false)
+  phone        String?  @unique
 }
 
 model PendingUser {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  passwordHash String?
-  role      String   @default("staff")
-  profileImage String?
-  verificationToken String @unique
-  createdAt DateTime @default(now())
-  expiresAt DateTime
+  id                Int      @id @default(autoincrement())
+  email             String   @unique
+  name              String?
+  passwordHash      String?
+  role              String   @default("staff")
+  verificationToken String   @unique
+  createdAt         DateTime @default(now())
+  expiresAt         DateTime
+  profileImage      String?
 }
 
 model OTP {
-  id        Int      @id @default(autoincrement())
-  identifier String  @unique // email or phone
-  otp       String
-  name      String?
-  createdAt DateTime @default(now())
-  expiresAt DateTime
+  id         Int      @id @default(autoincrement())
+  identifier String   @unique
+  otp        String
+  name       String?
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
 }
 
 model Patient {
-  id         Int      @id @default(autoincrement())
-  firstName  String
-  lastName   String
-  phone      String?
-  email      String?  @unique
-  opdNo      String?
-  date       DateTime? @default(now())
-  dob        DateTime?
-  age        Int?
-  address    String?
-  gender     String?
-  nextVisit  DateTime?
-  occupation String?
-  pendingPaymentCents Int @default(0)
-  height     Float?
-  weight     Float?
-  fatherHusbandGuardianName String?  // F/H/G Name from CSV
-  imageUrl   String?  // Cloudinary image URL
-  createdAt  DateTime @default(now())
-  appointments Appointment[]
-  invoices     Invoice[]
-  visits       Visit[]
-  customerInvoices CustomerInvoice[]
+  id                        Int               @id @default(autoincrement())
+  firstName                 String
+  lastName                  String
+  phone                     String?
+  email                     String?           @unique
+  opdNo                     String?
+  date                      DateTime?         @default(now())
+  dob                       DateTime?
+  age                       Int?
+  address                   String?
+  gender                    String?
+  nextVisit                 DateTime?
+  occupation                String?
+  pendingPaymentCents       Int               @default(0)
+  height                    Float?
+  weight                    Float?
+  fatherHusbandGuardianName String?
+  createdAt                 DateTime          @default(now())
+  imageUrl                  String?
+  appointments              Appointment[]
+  customerInvoices          CustomerInvoice[]
+  invoices                  Invoice[]
+  visits                    Visit[]
 }
 
 model Appointment {
-  id         Int      @id @default(autoincrement())
-  patient    Patient  @relation(fields: [patientId], references: [id])
-  patientId  Int
-  scheduled  DateTime
-  notes      String?
-  status     String   @default("scheduled")
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  patientId Int
+  scheduled DateTime
+  notes     String?
+  status    String   @default("scheduled")
+  createdAt DateTime @default(now())
+  patient   Patient  @relation(fields: [patientId], references: [id])
 }
 
 model AppointmentRequest {
-  id         Int      @id @default(autoincrement())
-  userId     Int      // User who made the request
-  userName   String
-  userEmail  String
-  userPhone  String
-  message    String?
-  status     String   @default("pending") // pending, approved, declined
-  patientId  Int?     // Set when approved and patient is created
-  appointmentId Int?  // Set when appointment is scheduled
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  userName      String
+  userEmail     String
+  userPhone     String
+  message       String?
+  status        String   @default("pending")
+  patientId     Int?
+  appointmentId Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Invoice {
-  id         Int      @id @default(autoincrement())
-  patient    Patient  @relation(fields: [patientId], references: [id])
+  id         Int       @id @default(autoincrement())
   patientId  Int
   totalCents Int
-  paid       Boolean  @default(false)
+  paid       Boolean   @default(false)
   dueDate    DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
+  patient    Patient   @relation(fields: [patientId], references: [id])
 }
 
 model Product {
-  id          Int     @id @default(autoincrement())
-  name        String
-  category    Category? @relation(fields: [categoryId], references: [id])
-  categoryId  Int?
-  unit        String? // UINT - unit of measurement (30 ml, 100 gm, etc.)
-  priceCents  Int     // RATE/U - selling price per unit in cents
-  purchasePriceCents Int @default(0) // P/PRICE - purchase price in cents
-  quantity    Int     @default(0) // INVENTORY - current stock quantity
-  inventoryValue Float? // INV/VAL - calculated value of inventory
-  totalPurchased Int @default(0) // PURCHASE - total units purchased
-  purchaseValue Float? // PUR/VAL - total purchase value
-  totalSales  Int @default(0) // SALES - total units sold
-  salesValue  Float? // SALE/VAL - total sales value
-  latestUpdate DateTime? // LATEST - last update date
-  actualInventory Int? // ACTUAL INVENTORY - physical count
-  batches     ProductBatch[]
-  productOrders ProductOrder[]
-  treatmentProducts TreatmentProduct[] // Products used in treatments
-  prescriptions Prescription[] // Prescriptions using this product
-  purchaseOrderItems PurchaseOrderItem[]
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  priceCents           Int
+  quantity             Int                   @default(0)
+  actualInventory      Int?
+  inventoryValue       Float?
+  latestUpdate         DateTime?
+  purchasePriceCents   Int                   @default(0)
+  purchaseValue        Float?
+  salesValue           Float?
+  totalPurchased       Int                   @default(0)
+  totalSales           Int                   @default(0)
+  unit                 String?
+  categoryId           Int?
   customerInvoiceItems CustomerInvoiceItem[]
-  stockTransactions StockTransaction[]
-  demandForecasts DemandForecast[]
+  demandForecasts      DemandForecast[]
+  prescriptions        Prescription[]
+  category             Category?             @relation(fields: [categoryId], references: [id])
+  batches              ProductBatch[]
+  productOrders        ProductOrder[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  stockTransactions    StockTransaction[]
+  treatmentProducts    TreatmentProduct[]
 }
 
 model Category {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  code      String?
-  reorderLevel Int   @default(0) // THRESH/IN - threshold for this category
-  products  Product[]
-  createdAt DateTime @default(now())
+  id           Int       @id @default(autoincrement())
+  name         String    @unique
+  code         String?
+  createdAt    DateTime  @default(now())
+  reorderLevel Int       @default(0)
+  products     Product[]
 }
 
 model Treatment {
-  id         Int      @id @default(autoincrement())
-  srNo       String?  // Serial Number
-  provDiagnosis String?  // Provisional Diagnosis (main condition name)
-  planNumber String?  // Plan variation number (01, 02, 03, etc.)
-  speciality String?  // Speciality field
-  organ      String?  // Organ field
-  diseaseAction String? // Disease Action field
-  treatmentPlan String? // Treatment Plan details
-  timing     String?  // Timing: BM (Before Meal), AM (After Meal), etc.
-  additions  String?  // Additions
-  dosage     String?
-  administration String?
-  procedure  String?
-  presentation String? // Presentation
-  droppersToday Int?  // Droppers Today
-  quantity   Int?     // Quantity
-  notes      String?
-  createdAt  DateTime @default(now())
-  prescriptions Prescription[]
-  treatmentProducts TreatmentProduct[] // Multiple products in this treatment
+  id                Int                @id @default(autoincrement())
+  dosage            String?
+  administration    String?
+  procedure         String?
+  notes             String?
+  createdAt         DateTime           @default(now())
+  additions         String?
+  diseaseAction     String?
+  droppersToday     Int?
+  organ             String?
+  presentation      String?
+  provDiagnosis     String?
+  quantity          Int?
+  speciality        String?
+  srNo              String?
+  timing            String?
+  treatmentPlan     String?
+  planNumber        String?
+  prescriptions     Prescription[]
+  treatmentProducts TreatmentProduct[]
 }
 
-// Junction table for Treatment-Product many-to-many relationship
 model TreatmentProduct {
-  id          Int      @id @default(autoincrement())
-  treatment   Treatment @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
-  treatmentId Int
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId   Int
-  comp1       String?  // Component 1 - composition
-  comp2       String?  // Component 2 - composition
-  comp3       String?  // Component 3 - composition
-  quantity    Int      @default(1) // Quantity of drops for this medicine
-  timing      String?  // Timing for this medicine (BM, AM, WM, HS, EMPTY)
-  dosage      String?  // Dosage instructions for this medicine
-  additions   String?  // Additional notes for this medicine
-  procedure   String?  // Procedure for this medicine
-  presentation String? // Presentation format (Tablet, Drops, etc.)
-  droppersToday Int?   // Number of droppers today
-  medicineQuantity Int? // Quantity of this medicine
-  createdAt   DateTime @default(now())
-  
+  id               Int       @id @default(autoincrement())
+  treatmentId      Int
+  productId        Int
+  comp1            String?
+  comp2            String?
+  comp3            String?
+  quantity         Int       @default(1)
+  createdAt        DateTime  @default(now())
+  additions        String?
+  dosage           String?
+  droppersToday    Int?
+  medicineQuantity Int?
+  presentation     String?
+  procedure        String?
+  timing           String?
+  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  treatment        Treatment @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
+
   @@unique([treatmentId, productId])
 }
 
 model Visit {
-  id                Int       @id @default(autoincrement())
-  patient           Patient   @relation(fields: [patientId], references: [id])
-  patientId         Int
-  opdNo             String
-  date              DateTime  @default(now())
-  diagnoses         String?
-  temperament       String?
-  pulseDiagnosis    String?    // Pulse Diagnosis 1
-  pulseDiagnosis2   String?    // Pulse Diagnosis 2
-  majorComplaints   String?    // Chief Complaints
-  historyReports    String?    // Hist/Reports
-  investigations    String?    // Lab tests/investigations
+  id                   Int            @id @default(autoincrement())
+  patientId            Int
+  opdNo                String
+  date                 DateTime       @default(now())
+  diagnoses            String?
+  temperament          String?
+  pulseDiagnosis       String?
+  pulseDiagnosis2      String?
+  majorComplaints      String?
+  historyReports       String?
+  investigations       String?
   provisionalDiagnosis String?
-  improvements      String?    // Imp
-  specialNote       String?
-  initials          String?
-  dob               DateTime?
-  age               Int?
-  address           String?
-  visitNumber       Int?       // V - visit number
-  followUpCount     Int?       // FU - follow-up count
-  gender            String?
-  phone             String?
-  nextVisit         DateTime?
-  occupation        String?
-  pendingPaymentCents Int    @default(0)
-  height            Float?
-  weight            Float?
-  procedureAdopted  String?    // PROCEDURE field
-  precautions       String?
-  discussion        String?    // DISCUSSION field
-  extra             String?    // EXTRA field
-  
-  // Financial fields
-  amount            Float?     // AMT - total amount
-  discount          Float?     // DISCOUNT
-  payment           Float?     // PAYMENT received
-  balance           Float?     // BAL - balance due
-  
-  // Additional tracking
-  helper            String?    // HELPER - staff/helper ID
-  
-  createdAt         DateTime @default(now())
-  prescriptions     Prescription[]
+  improvements         String?
+  specialNote          String?
+  initials             String?
+  dob                  DateTime?
+  age                  Int?
+  address              String?
+  visitNumber          Int?
+  followUpCount        Int?
+  gender               String?
+  phone                String?
+  nextVisit            DateTime?
+  occupation           String?
+  pendingPaymentCents  Int            @default(0)
+  height               Float?
+  weight               Float?
+  procedureAdopted     String?
+  precautions          String?
+  discussion           String?
+  extra                String?
+  amount               Float?
+  discount             Float?
+  payment              Float?
+  balance              Float?
+  helper               String?
+  createdAt            DateTime       @default(now())
+  prescriptions        Prescription[]
+  patient              Patient        @relation(fields: [patientId], references: [id])
 }
 
 model Prescription {
-  id          Int       @id @default(autoincrement())
-  visit       Visit     @relation(fields: [visitId], references: [id])
-  visitId     Int
-  treatment   Treatment @relation(fields: [treatmentId], references: [id])
-  treatmentId Int
-  product     Product?  @relation(fields: [productId], references: [id])
-  productId   Int?      // Optional - specific medicine from inventory
-  
-  // Treatment-specific fields (matching TreatmentProduct)
-  comp1       String?  // Component 1 - composition
-  comp2       String?  // Component 2 - composition
-  comp3       String?  // Component 3 - composition
-  quantity    Int      @default(1) // Quantity of drops/units
-  timing      String?  // Timing for this medicine (BM, AM, WM, HS, EMPTY)
-  dosage      String?  // Dosage instructions
-  additions   String?  // Additional notes
-  procedure   String?  // Procedure for this medicine
-  presentation String? // Presentation format (Tablet, Drops, etc.)
-  droppersToday Int?   // Number of droppers today
-  medicineQuantity Int? // Quantity of this medicine
-  administration String? // AD - administration method
-  
-  taken       Boolean   @default(false)
-  dispensed   Boolean   @default(false)
-  
-  createdAt   DateTime  @default(now())
+  id               Int       @id @default(autoincrement())
+  visitId          Int
+  treatmentId      Int
+  dosage           String?
+  administration   String?
+  quantity         Int       @default(1)
+  taken            Boolean   @default(false)
+  dispensed        Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  additions        String?
+  comp1            String?
+  comp2            String?
+  comp3            String?
+  droppersToday    Int?
+  medicineQuantity Int?
+  presentation     String?
+  procedure        String?
+  productId        Int?
+  timing           String?
+  product          Product?  @relation(fields: [productId], references: [id])
+  treatment        Treatment @relation(fields: [treatmentId], references: [id])
+  visit            Visit     @relation(fields: [visitId], references: [id])
 }
 
 model ProductBatch {
-  id             Int      @id @default(autoincrement())
-  product        Product  @relation(fields: [productId], references: [id])
-  productId      Int
-  sku            String?
-  quantity       Int
+  id                 Int        @id @default(autoincrement())
+  productId          Int
+  sku                String?
+  quantity           Int
   purchasePriceCents Int
-  salePriceCents Int
-  expiry         DateTime?
-  createdAt      DateTime @default(now())
-  purchases      Purchase[]
-  sales          Sale[]
+  salePriceCents     Int
+  expiry             DateTime?
+  createdAt          DateTime   @default(now())
+  product            Product    @relation(fields: [productId], references: [id])
+  purchases          Purchase[]
+  sales              Sale[]
 }
 
 model Purchase {
-  id             Int      @id @default(autoincrement())
-  productBatch   ProductBatch @relation(fields: [productBatchId], references: [id])
+  id             Int          @id @default(autoincrement())
   productBatchId Int
   quantity       Int
   totalCents     Int
   supplier       String?
-  date           DateTime @default(now())
+  date           DateTime     @default(now())
+  productBatch   ProductBatch @relation(fields: [productBatchId], references: [id])
 }
 
 model Sale {
-  id             Int      @id @default(autoincrement())
-  productBatch   ProductBatch @relation(fields: [productBatchId], references: [id])
+  id             Int          @id @default(autoincrement())
   productBatchId Int
   quantity       Int
   totalCents     Int
   customer       String?
-  date           DateTime @default(now())
+  date           DateTime     @default(now())
+  productBatch   ProductBatch @relation(fields: [productBatchId], references: [id])
 }
 
 model ProductOrder {
   id        Int      @id @default(autoincrement())
-  product   Product  @relation(fields: [productId], references: [id])
   productId Int
   quantity  Int
   status    String   @default("pending")
   orderVia  String?
   createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
 }
 
-// ===== ACCOUNTING & INVENTORY MANAGEMENT MODELS =====
-
 model Supplier {
-  id                  Int             @id @default(autoincrement())
-  name                String
-  contactPerson       String?
-  email               String?
-  phone               String?
-  address             String?
-  city                String?
-  state               String?
-  pincode             String?
-  gstin               String?         // GST Identification Number
-  paymentTerms        String          @default("Net 30")
-  creditLimit         Int             @default(0)
-  outstandingBalance  Int             @default(0)
-  status              String          @default("active")
-  notes               String?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  purchaseOrders      PurchaseOrder[]
+  id                 Int             @id @default(autoincrement())
+  name               String
+  contactPerson      String?
+  email              String?
+  phone              String?
+  address            String?
+  city               String?
+  state              String?
+  pincode            String?
+  gstin              String?
+  paymentTerms       String          @default("Net 30")
+  creditLimit        Int             @default(0)
+  outstandingBalance Int             @default(0)
+  status             String          @default("active")
+  notes              String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  purchaseOrders     PurchaseOrder[]
 }
 
 model PurchaseOrder {
-  id              Int                  @id @default(autoincrement())
-  poNumber        String               @unique
-  supplier        Supplier             @relation(fields: [supplierId], references: [id])
-  supplierId      Int
-  orderDate       DateTime             @default(now())
-  expectedDate    DateTime?
-  receivedDate    DateTime?
-  status          String               @default("pending") // pending, received, cancelled
-  subtotal        Int                  @default(0)
-  taxAmount       Int                  @default(0)
-  discount        Int                  @default(0)
-  shippingCost    Int                  @default(0)
-  totalAmount     Int                  @default(0)
-  paidAmount      Int                  @default(0)
-  notes           String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  items           PurchaseOrderItem[]
+  id           Int                 @id @default(autoincrement())
+  poNumber     String              @unique
+  supplierId   Int
+  orderDate    DateTime            @default(now())
+  expectedDate DateTime?
+  receivedDate DateTime?
+  status       String              @default("pending")
+  subtotal     Int                 @default(0)
+  taxAmount    Int                 @default(0)
+  discount     Int                 @default(0)
+  shippingCost Int                 @default(0)
+  totalAmount  Int                 @default(0)
+  paidAmount   Int                 @default(0)
+  notes        String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  items        PurchaseOrderItem[]
 }
 
 model PurchaseOrderItem {
-  id                Int            @id @default(autoincrement())
-  purchaseOrder     PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  purchaseOrderId   Int
-  product           Product        @relation(fields: [productId], references: [id])
-  productId         Int
-  quantity          Int
-  unitPrice         Int
-  taxRate           Float          @default(0)
-  discount          Int            @default(0)
-  totalAmount       Int
-  receivedQuantity  Int            @default(0)
-  createdAt         DateTime       @default(now())
+  id               Int           @id @default(autoincrement())
+  purchaseOrderId  Int
+  productId        Int
+  quantity         Int
+  unitPrice        Int
+  taxRate          Float         @default(0)
+  discount         Int           @default(0)
+  totalAmount      Int
+  receivedQuantity Int           @default(0)
+  createdAt        DateTime      @default(now())
+  product          Product       @relation(fields: [productId], references: [id])
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 }
 
 model CustomerInvoice {
-  id                  Int                   @id @default(autoincrement())
-  invoiceNumber       String                @unique
-  patient             Patient?              @relation(fields: [patientId], references: [id])
-  patientId           Int?
-  customerName        String
-  customerEmail       String?
-  customerPhone       String?
-  customerAddress     String?
-  customerGSTIN       String?
-  invoiceDate         DateTime              @default(now())
-  dueDate             DateTime?
-  status              String                @default("unpaid") // unpaid, partial, paid, cancelled
-  subtotal            Int                   @default(0)
-  taxAmount           Int                   @default(0)
-  discount            Int                   @default(0)
-  totalAmount         Int                   @default(0)
-  paidAmount          Int                   @default(0)
-  balanceAmount       Int                   @default(0)
-  paymentMethod       String?
-  notes               String?
-  termsAndConditions  String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  items               CustomerInvoiceItem[]
-  payments            Payment[]
+  id                 Int                   @id @default(autoincrement())
+  invoiceNumber      String                @unique
+  patientId          Int?
+  customerName       String
+  customerEmail      String?
+  customerPhone      String?
+  customerAddress    String?
+  customerGSTIN      String?
+  invoiceDate        DateTime              @default(now())
+  dueDate            DateTime?
+  status             String                @default("unpaid")
+  subtotal           Int                   @default(0)
+  taxAmount          Int                   @default(0)
+  discount           Int                   @default(0)
+  totalAmount        Int                   @default(0)
+  paidAmount         Int                   @default(0)
+  balanceAmount      Int                   @default(0)
+  paymentMethod      String?
+  notes              String?
+  termsAndConditions String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  patient            Patient?              @relation(fields: [patientId], references: [id])
+  items              CustomerInvoiceItem[]
+  payments           Payment[]
 }
 
 model CustomerInvoiceItem {
-  id                  Int              @id @default(autoincrement())
-  customerInvoice     CustomerInvoice  @relation(fields: [customerInvoiceId], references: [id], onDelete: Cascade)
-  customerInvoiceId   Int
-  product             Product?         @relation(fields: [productId], references: [id])
-  productId           Int?
-  description         String
-  quantity            Int
-  unitPrice           Int
-  taxRate             Float            @default(0)
-  discount            Int              @default(0)
-  totalAmount         Int
-  createdAt           DateTime         @default(now())
+  id                Int             @id @default(autoincrement())
+  customerInvoiceId Int
+  productId         Int?
+  description       String
+  quantity          Int
+  unitPrice         Int
+  taxRate           Float           @default(0)
+  discount          Int             @default(0)
+  totalAmount       Int
+  createdAt         DateTime        @default(now())
+  customerInvoice   CustomerInvoice @relation(fields: [customerInvoiceId], references: [id], onDelete: Cascade)
+  product           Product?        @relation(fields: [productId], references: [id])
 }
 
 model StockTransaction {
-  id                Int      @id @default(autoincrement())
-  product           Product  @relation(fields: [productId], references: [id])
-  productId         Int
-  transactionType   String   // IN, OUT, ADJUSTMENT, RETURN
-  quantity          Int
-  unitPrice         Int      @default(0)
-  totalValue        Int      @default(0)
-  balanceQuantity   Int      // Quantity after this transaction
-  referenceType     String?  // PurchaseOrder, CustomerInvoice, Visit, Manual
-  referenceId       Int?
-  notes             String?
-  transactionDate   DateTime @default(now())
-  performedBy       String?
-  createdAt         DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  productId       Int
+  transactionType String
+  quantity        Int
+  unitPrice       Int      @default(0)
+  totalValue      Int      @default(0)
+  balanceQuantity Int
+  referenceType   String?
+  referenceId     Int?
+  notes           String?
+  transactionDate DateTime @default(now())
+  performedBy     String?
+  createdAt       DateTime @default(now())
+  product         Product  @relation(fields: [productId], references: [id])
 }
 
 model DemandForecast {
-  id                      Int      @id @default(autoincrement())
-  product                 Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId               Int
-  forecastMonth           DateTime
-  predictedDemand         Int
-  actualDemand            Int      @default(0)
-  averageMonthlySales     Float    @default(0)
-  reorderPoint            Int      @default(0)
-  suggestedOrderQuantity  Int      @default(0)
-  notes                   String?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-  
+  id                     Int      @id @default(autoincrement())
+  productId              Int
+  forecastMonth          DateTime
+  predictedDemand        Int
+  actualDemand           Int      @default(0)
+  averageMonthlySales    Float    @default(0)
+  reorderPoint           Int      @default(0)
+  suggestedOrderQuantity Int      @default(0)
+  notes                  String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  product                Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
   @@unique([productId, forecastMonth])
 }
 
 model Payment {
-  id              Int              @id @default(autoincrement())
-  paymentNumber   String           @unique
-  paymentType     String           // RECEIVED, PAID
-  referenceType   String           // CustomerInvoice, PurchaseOrder
+  id              Int             @id @default(autoincrement())
+  paymentNumber   String          @unique
+  paymentType     String
+  referenceType   String
   referenceId     Int
   amount          Int
-  paymentMethod   String           // CASH, CARD, UPI, BANK_TRANSFER, CHEQUE
-  paymentDate     DateTime         @default(now())
+  paymentMethod   String
+  paymentDate     DateTime        @default(now())
   transactionId   String?
   notes           String?
-  createdAt       DateTime         @default(now())
-  customerInvoice CustomerInvoice? @relation(fields: [referenceId], references: [id])
+  createdAt       DateTime        @default(now())
+  customerInvoice CustomerInvoice @relation(fields: [referenceId], references: [id])
 }
