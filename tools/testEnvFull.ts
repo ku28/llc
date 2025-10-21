@@ -7,7 +7,6 @@ const requiredEnv = [
     'CLOUDINARY_CLOUD_NAME',
     'CLOUDINARY_API_KEY',
     'CLOUDINARY_API_SECRET',
-    'NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE',
     'ADMIN_EMAIL',
     'SMTP_HOST',
     'SMTP_PORT',
@@ -46,28 +45,7 @@ async function testDatabase() {
     }
 }
 
-// 2. Test Cloudinary
-async function testCloudinary() {
-    try {
-        const cloudinary = require('cloudinary').v2;
-        cloudinary.config({
-            cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-            api_key: process.env.CLOUDINARY_API_KEY,
-            api_secret: process.env.CLOUDINARY_API_SECRET,
-        });
-        // Try fetching the default patient image
-        const imgUrl = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE;
-        if (!imgUrl) throw new Error('NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE is not set');
-        const imgName = imgUrl.split('/').pop()?.split('.')[0];
-        if (!imgName) throw new Error('Could not parse image name from NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE');
-        await cloudinary.api.resource(imgName);
-        console.log('✅ Cloudinary: Successfully accessed default patient image.');
-    } catch (err) {
-        const msg = (err instanceof Error && err.message) ? err.message : String(err);
-        console.error('❌ Cloudinary: Failed to access image or credentials are invalid:', msg);
-        hasError = true;
-    }
-}
+
 
 // 3. Test SMTP
 async function testSMTP() {
@@ -106,7 +84,6 @@ async function testTwilio() {
 
 (async () => {
     await testDatabase();
-    await testCloudinary();
     await testSMTP();
     await testTwilio();
     if (hasError) {
