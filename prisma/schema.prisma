@@ -165,6 +165,8 @@ model TreatmentProduct {
   comp1            String?
   comp2            String?
   comp3            String?
+  comp4            String?
+  comp5            String?
   quantity         Int       @default(1)
   createdAt        DateTime  @default(now())
   additions        String?
@@ -236,6 +238,8 @@ model Prescription {
   comp1            String?
   comp2            String?
   comp3            String?
+  comp4            String?
+  comp5            String?
   droppersToday    Int?
   medicineQuantity Int?
   presentation     String?

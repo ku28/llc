@@ -297,5 +297,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
     }
 
+    if (req.method === 'DELETE') {
+        const user = await requireAuth(req, res)
+        if (!user) return
+        
+        const { id } = req.query
+        
+        if (!id) {
+            return res.status(400).json({ error: 'Visit ID is required' })
+        }
+        
+        try {
+            // Delete associated prescriptions first
+            await prisma.prescription.deleteMany({
+                where: { visitId: Number(id) }
+            })
+            
+            // Then delete the visit
+            await prisma.visit.delete({
+                where: { id: Number(id) }
+            })
+            
+            return res.status(200).json({ message: 'Visit deleted successfully' })
+        } catch (err: any) {
+            console.error('Error deleting visit:', err)
+            return res.status(500).json({ error: String(err?.message || err) })
+        }
+    }
+
     return res.status(405).json({ error: 'Method not allowed' })
 }

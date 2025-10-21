@@ -19,7 +19,10 @@ export default function PatientsPage() {
     const [imagePreview, setImagePreview] = useState<string>('')
     const [uploadingImage, setUploadingImage] = useState(false)
     const [loading, setLoading] = useState(true)
+    const [submitting, setSubmitting] = useState(false)
+    const [deleting, setDeleting] = useState(false)
     const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; message?: string }>({ open: false })
+    const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     
     const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '', imageUrl: '', fatherHusbandGuardianName: '' }
@@ -236,37 +239,66 @@ export default function PatientsPage() {
         openModal()
     }
 
+    // Inline validation state
+    const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
+
     async function submitPatient(e: any) {
-        e.preventDefault()
+        e.preventDefault();
+        // Validate required fields
+        const errors: { [key: string]: string } = {};
+        if (!form.firstName.trim()) errors.firstName = 'First Name is required';
+        if (!form.lastName.trim()) errors.lastName = 'Last Name is required';
+        if (!form.opdNo.trim()) errors.opdNo = 'OPD Number is required';
+        setFieldErrors(errors);
+        if (Object.keys(errors).length > 0) return;
+
+        setSubmitting(true);
         try {
-            const payload: any = { ...form }
-            if (payload.age) payload.age = Number(payload.age)
-            if (payload.pendingPaymentCents) payload.pendingPaymentCents = Number(payload.pendingPaymentCents)
-            if (payload.height) payload.height = Number(payload.height)
-            if (payload.weight) payload.weight = Number(payload.weight)
-            
+            const payload: any = { ...form };
+            // If email is blank, set to null so Prisma does not trigger unique constraint
+            if (!payload.email || payload.email.trim() === '') {
+                payload.email = null;
+            }
+            if (payload.age) payload.age = Number(payload.age);
+            if (payload.pendingPaymentCents) payload.pendingPaymentCents = Number(payload.pendingPaymentCents);
+            if (payload.height) payload.height = Number(payload.height);
+            if (payload.weight) payload.weight = Number(payload.weight);
+
             if (form.nextVisitDate && form.nextVisitTime) {
-                payload.nextVisit = `${form.nextVisitDate}T${form.nextVisitTime}`
+                payload.nextVisit = `${form.nextVisitDate}T${form.nextVisitTime}`;
             }
-            
-            const method = editingId ? 'PUT' : 'POST'
-            const body = editingId ? { id: editingId, ...payload } : payload
-            
-            const res = await fetch('/api/patients', { 
-                method, 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(body) 
-            })
-            
+
+            const method = editingId ? 'PUT' : 'POST';
+            const body = editingId ? { id: editingId, ...payload } : payload;
+
+            const res = await fetch('/api/patients', {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
             if (!res.ok) {
-                const err = await res.text()
-                console.error('Save patient failed:', err)
-                alert('Failed to save patient')
-                return
+                let errMsg = 'Failed to save patient';
+                let emailUniqueError = false;
+                try {
+                    const err = await res.json();
+                    errMsg = err.error || errMsg;
+                    // Prisma unique constraint error code for email
+                    if (errMsg.includes('Unique constraint failed') && errMsg.includes('email')) {
+                        setFieldErrors(prev => ({ ...prev, email: 'This email is already registered.' }));
+                        emailUniqueError = true;
+                    }
+                } catch {
+                    // fallback to text
+                    errMsg = await res.text();
+                }
+                console.error('Save patient failed:', errMsg);
+                if (!emailUniqueError) showError(errMsg);
+                return;
             }
-            
-            const savedPatient = await res.json()
-            
+
+            const savedPatient = await res.json();
+
             // If this patient was created from an appointment request, update the request
             if (router.query.requestId && !editingId && savedPatient.id) {
                 try {
@@ -277,38 +309,47 @@ export default function PatientsPage() {
                             id: Number(router.query.requestId),
                             patientId: savedPatient.id
                         })
-                    })
-                    console.log('✓ Appointment request updated with patientId:', savedPatient.id)
+                    });
+                    console.log('✓ Appointment request updated with patientId:', savedPatient.id);
                 } catch (err) {
-                    console.error('Failed to update appointment request:', err)
+                    console.error('Failed to update appointment request:', err);
                     // Don't fail the patient creation if request update fails
                 }
             }
-            
-            const list = await (await fetch('/api/patients')).json()
-            setPatients(list)
-            closeModal()
-            
+
+            const list = await (await fetch('/api/patients')).json();
+            setPatients(list);
+            showSuccess(editingId ? 'Patient updated successfully' : 'Patient registered successfully');
+            closeModal();
+
             // Redirect back to requests page if coming from appointment request
             if (router.query.requestId) {
-                router.push('/requests')
+                router.push('/requests');
             }
-        } catch (err) { 
-            console.error(err)
-            alert('Failed to save patient') 
+        } catch (err: any) {
+            console.error(err);
+            showError(err?.message || 'Failed to save patient');
+        } finally {
+            setSubmitting(false);
         }
     }
 
     async function deletePatient(id: number) {
         setConfirmModal({ open: true, id, message: 'Are you sure you want to delete this patient?' })
+        setTimeout(() => setConfirmModalAnimating(true), 10)
+    }
+
+    function closeConfirmModal() {
+        setConfirmModalAnimating(false)
+        setTimeout(() => setConfirmModal({ open: false }), 300)
     }
 
     async function handleConfirmDelete(id?: number) {
         if (!id) {
-            setConfirmModal({ open: false })
+            closeConfirmModal()
             return
         }
-        setConfirmModal({ open: false })
+        setDeleting(true)
         try {
             const response = await fetch('/api/patients', {
                 method: 'DELETE',
@@ -317,7 +358,8 @@ export default function PatientsPage() {
             })
             if (response.ok) {
                 setPatients(await (await fetch('/api/patients')).json())
-                showSuccess('Patient deleted')
+                showSuccess('Patient deleted successfully')
+                closeConfirmModal()
             } else {
                 const error = await response.json()
                 console.error('Delete failed:', error)
@@ -326,6 +368,8 @@ export default function PatientsPage() {
         } catch (error) {
             console.error('Delete error:', error)
             showError('Failed to delete patient')
+        } finally {
+            setDeleting(false)
         }
     }
 
@@ -437,11 +481,13 @@ export default function PatientsPage() {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">First Name <span className="text-red-600">*</span></label>
-                                            <input required placeholder="John" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} className="p-2 border rounded w-full" />
+                                            <input required placeholder="John" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} className={`p-2 rounded w-full border ${fieldErrors.firstName ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} />
+                                            {fieldErrors.firstName && <p className="text-xs text-red-600 mt-1">{fieldErrors.firstName}</p>}
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Last Name <span className="text-red-600">*</span></label>
-                                            <input required placeholder="Doe" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} className="p-2 border rounded w-full" />
+                                            <input required placeholder="Doe" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} className={`p-2 rounded w-full border ${fieldErrors.lastName ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} />
+                                            {fieldErrors.lastName && <p className="text-xs text-red-600 mt-1">{fieldErrors.lastName}</p>}
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">OPD Number <span className="text-red-600">*</span></label>
@@ -450,8 +496,9 @@ export default function PatientsPage() {
                                                 placeholder="251009 1 1" 
                                                 value={form.opdNo} 
                                                 onChange={e => setForm({ ...form, opdNo: e.target.value })} 
-                                                className="p-2 border rounded w-full font-mono" 
+                                                className={`p-2 rounded w-full font-mono border ${fieldErrors.opdNo ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} 
                                             />
+                                            {fieldErrors.opdNo && <p className="text-xs text-red-600 mt-1">{fieldErrors.opdNo}</p>}
                                         </div>
                                         {/* Optional fields below, not required */}
                                         <div>
@@ -460,7 +507,8 @@ export default function PatientsPage() {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Email</label>
-                                            <input type="email" placeholder="john.doe@example.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="p-2 border rounded w-full" />
+                                            <input type="email" placeholder="john.doe@example.com" value={form.email} onChange={e => { setForm({ ...form, email: e.target.value }); setFieldErrors(prev => ({ ...prev, email: '' })); }} className={`p-2 rounded w-full border ${fieldErrors.email ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} />
+                                            {fieldErrors.email && <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>}
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Date of Birth</label>
@@ -511,11 +559,17 @@ export default function PatientsPage() {
                                     </div>
                                     
                                     <div className="flex justify-end gap-2 pt-6 border-t mt-6">
-                                        <button type="button" onClick={closeModal} className="btn btn-secondary">
+                                        <button type="button" onClick={closeModal} disabled={submitting} className="btn btn-secondary">
                                             Cancel
                                         </button>
-                                        <button type="submit" className="btn btn-primary">
-                                            {editingId ? 'Update Patient' : 'Register Patient'}
+                                        <button type="submit" disabled={submitting} className="btn btn-primary flex items-center gap-2">
+                                            {submitting && (
+                                                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                            )}
+                                            {submitting ? 'Saving...' : (editingId ? 'Update Patient' : 'Register Patient')}
                                         </button>
                                     </div>
                                 </form>
@@ -527,14 +581,42 @@ export default function PatientsPage() {
 
             {/* Confirm Delete Modal */}
             {confirmModal.open && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-900 rounded-lg max-w-lg w-full">
+                <div className={`fixed inset-0 bg-black flex items-center justify-center z-50 p-4 transition-opacity duration-300 ${confirmModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} onClick={!deleting ? closeConfirmModal : undefined}>
+                    <div className={`bg-white dark:bg-gray-900 rounded-lg max-w-lg w-full shadow-2xl transform transition-all duration-300 ${confirmModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} onClick={e => e.stopPropagation()}>
                         <div className="p-6">
-                            <h3 className="text-lg font-semibold">Confirm Delete</h3>
-                            <p className="text-sm text-muted mt-2">{confirmModal.message}</p>
-                            <div className="mt-4 flex justify-end gap-3">
-                                <button onClick={() => setConfirmModal({ open: false })} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-                                <button onClick={() => handleConfirmDelete(confirmModal.id)} className="px-4 py-2 bg-red-600 text-white rounded">Yes, Delete</button>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Confirm Delete</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{confirmModal.message}</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex justify-end gap-3">
+                                <button 
+                                    onClick={closeConfirmModal} 
+                                    disabled={deleting} 
+                                    className="px-5 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={() => handleConfirmDelete(confirmModal.id)} 
+                                    disabled={deleting} 
+                                    className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors font-medium"
+                                >
+                                    {deleting && (
+                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    )}
+                                    {deleting ? 'Deleting...' : 'Yes, Delete'}
+                                </button>
                             </div>
                         </div>
                     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import CustomSelect from '../components/CustomSelect'
+import { useToast } from '../hooks/useToast'
 
 export default function VisitsPage() {
     const [visits, setVisits] = useState<any[]>([])
@@ -9,7 +10,11 @@ export default function VisitsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    const [deleting, setDeleting] = useState(false)
+    const [visitToDelete, setVisitToDelete] = useState<any>(null)
+    const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
     const isPatient = user?.role?.toLowerCase() === 'user'
+    const { toasts, removeToast, showSuccess, showError } = useToast()
     
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
 
@@ -37,6 +42,40 @@ export default function VisitsPage() {
         await fetch('/api/visits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
         setVisits(await (await fetch('/api/visits')).json())
         setForm({ patientId: '', opdNo: '', diagnoses: '' })
+    }
+
+    function openDeleteModal(visit: any) {
+        setVisitToDelete(visit)
+        setConfirmModalAnimating(false)
+    }
+
+    function closeConfirmModal() {
+        setConfirmModalAnimating(true)
+        setTimeout(() => {
+            setVisitToDelete(null)
+            setConfirmModalAnimating(false)
+        }, 300)
+    }
+
+    async function handleConfirmDelete() {
+        if (!visitToDelete) return
+        setDeleting(true)
+        try {
+            const res = await fetch(`/api/visits?id=${visitToDelete.id}`, { method: 'DELETE' })
+            if (res.ok) {
+                setVisits(visits.filter(v => v.id !== visitToDelete.id))
+                showSuccess('Visit deleted successfully')
+                closeConfirmModal()
+            } else {
+                const error = await res.json().catch(() => ({ error: 'Failed to delete visit' }))
+                showError(error.error || 'Failed to delete visit')
+            }
+        } catch (err) {
+            console.error(err)
+            showError('Failed to delete visit')
+        } finally {
+            setDeleting(false)
+        }
     }
 
     return (
@@ -161,9 +200,17 @@ export default function VisitsPage() {
                                             View Details
                                         </Link>
                                         {!isPatient && (
-                                            <Link href={`/prescriptions?visitId=${v.id}&edit=true`} className="btn btn-secondary text-sm">
-                                                Edit
-                                            </Link>
+                                            <>
+                                                <Link href={`/prescriptions?visitId=${v.id}&edit=true`} className="btn btn-secondary text-sm">
+                                                    Edit
+                                                </Link>
+                                                <button
+                                                    onClick={() => openDeleteModal(v)}
+                                                    className="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -173,6 +220,78 @@ export default function VisitsPage() {
                     )
                 })()}
             </div>
+
+            {/* Toast Notifications */}
+            <div className="fixed top-4 right-4 z-50 space-y-2">
+                {toasts.map(toast => (
+                    <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-slideIn ${
+                        toast.type === 'success' ? 'bg-green-500 text-white' :
+                        toast.type === 'error' ? 'bg-red-500 text-white' :
+                        'bg-blue-500 text-white'
+                    }`}>
+                        <span className="flex-1">{toast.message}</span>
+                        <button onClick={() => removeToast(toast.id)} className="text-white hover:text-gray-200">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                ))}
+            </div>
+
+            {/* Delete Confirmation Modal */}
+            {visitToDelete && (
+                <div 
+                    className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${
+                        confirmModalAnimating ? 'opacity-0' : 'opacity-100'
+                    }`}
+                    onClick={closeConfirmModal}
+                >
+                    <div 
+                        className={`bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl transition-transform duration-300 ${
+                            confirmModalAnimating ? 'scale-95' : 'scale-100'
+                        }`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+                                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete Visit</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">This action cannot be undone</p>
+                            </div>
+                        </div>
+                        <p className="text-gray-700 dark:text-gray-300 mb-6">
+                            Are you sure you want to delete the visit for <span className="font-semibold">{visitToDelete.patient?.firstName} {visitToDelete.patient?.lastName}</span> (OPD: {visitToDelete.opdNo})?
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={closeConfirmModal}
+                                disabled={deleting}
+                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmDelete}
+                                disabled={deleting}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {deleting && (
+                                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                )}
+                                {deleting ? 'Deleting...' : 'Delete Visit'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
