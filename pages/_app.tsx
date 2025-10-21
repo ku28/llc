@@ -5,16 +5,31 @@ import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import Script from 'next/script'
 import Layout from '../components/Layout'
+import ToastNotification from '../components/ToastNotification'
+import { useToast } from '../hooks/useToast'
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
   const [authChecked, setAuthChecked] = useState(false)
-  
+  const { toasts, removeToast, showError } = useToast()
   // Pages that don't require authentication
   const publicPages = ['/login', '/signup', '/user-signup', '/', '/about', '/services', '/gallery', '/contact']
   const isPublicPage = publicPages.includes(router.pathname)
 
   useEffect(() => {
+    // Check DB connection on every page load
+    const checkDb = async () => {
+      try {
+        const res = await fetch('/api/users')
+        if (!res.ok) {
+          showError('Database is not connected or crashed. Please contact support.')
+        }
+      } catch (err) {
+        showError('Database is not connected or crashed. Please contact support.')
+      }
+    }
+    checkDb()
+
     // Skip auth check for public pages
     if (isPublicPage) {
       setAuthChecked(true)
@@ -26,25 +41,22 @@ export default function App({ Component, pageProps }: AppProps) {
       try {
         const res = await fetch('/api/auth/me')
         const data = await res.json()
-        
         if (!data.user) {
           // Not authenticated - redirect to login
           router.push('/login')
           return
         }
-        
         setAuthChecked(true)
       } catch (err) {
-        // Error checking auth - redirect to login
         router.push('/login')
       }
     }
-
     checkAuth()
-  }, [router.pathname, isPublicPage, router])
+  }, [router.pathname, isPublicPage, router, showError])
 
   return (
     <>
+      <ToastNotification toasts={toasts} removeToast={removeToast} />
       <Head>
         <title>LLC ERP</title>
         {/* Prefer a PNG file (browsers reliably show PNG); keep .ico for legacy */}

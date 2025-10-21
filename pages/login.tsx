@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { useRouter } from 'next/router'
-import Link from 'next/link'
-import ToastNotification from '../components/ToastNotification'
-import { useToast } from '../hooks/useToast'
+import { useState } from 'react';
+import { useRouter } from 'next/router';
+import Link from 'next/link';
+import ToastNotification from '../components/ToastNotification';
+import { useToast } from '../hooks/useToast';
 
 export default function LoginPage() {
     const [emailOrPhone, setEmailOrPhone] = useState('')
@@ -10,6 +10,12 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false)
     const router = useRouter()
     const { toasts, removeToast, showError } = useToast()
+    // Forgot password modal state
+    const [showForgot, setShowForgot] = useState(false)
+    const [forgotEmail, setForgotEmail] = useState('')
+    const [forgotLoading, setForgotLoading] = useState(false)
+    const [forgotError, setForgotError] = useState('')
+    const [forgotSuccess, setForgotSuccess] = useState('')
 
     async function submit(e: any) {
         e.preventDefault()
@@ -22,6 +28,25 @@ export default function LoginPage() {
             router.push('/dashboard')
         }
         else showError('Invalid email/phone or password. Please try again.')
+    }
+
+    async function handleForgot(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        setForgotLoading(true);
+        setForgotError('');
+        setForgotSuccess('');
+        const res = await fetch('/api/auth/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: forgotEmail })
+        });
+        const data = await res.json();
+        setForgotLoading(false);
+        if (res.ok) {
+            setForgotSuccess('Reset link sent to your email and admin email.');
+        } else {
+            setForgotError(data.error || 'Error sending reset link');
+        }
     }
 
     return (
@@ -59,6 +84,11 @@ export default function LoginPage() {
                                 placeholder="••••••••" 
                                 className="w-full p-2 border rounded" 
                             />
+                            <div className="mt-2 text-right">
+                                <button type="button" className="text-blue-600 hover:underline text-sm" onClick={() => setShowForgot(true)}>
+                                    Forgot Password?
+                                </button>
+                            </div>
                         </div>
                         <button 
                             disabled={loading} 
@@ -66,6 +96,22 @@ export default function LoginPage() {
                         >
                             {loading ? 'Signing in...' : 'Sign In'}
                         </button>
+                    {/* Forgot Password Modal */}
+                    {showForgot && (
+                        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm relative">
+                                <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onClick={() => setShowForgot(false)}>&times;</button>
+                                <h3 className="text-lg font-bold mb-2">Forgot Password</h3>
+                                <form onSubmit={handleForgot}>
+                                    <label className="block text-sm font-medium mb-1.5">Enter your registered email</label>
+                                    <input type="email" required value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="w-full p-2 border rounded mb-3" placeholder="your@email.com" />
+                                    {forgotError && <div className="text-red-600 mb-2">{forgotError}</div>}
+                                    {forgotSuccess && <div className="text-green-600 mb-2">{forgotSuccess}</div>}
+                                    <button type="submit" className="w-full btn btn-primary" disabled={forgotLoading}>{forgotLoading ? 'Sending...' : 'Send Reset Link'}</button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
                     </form>
 
                     <div className="mt-6 text-center text-sm text-muted">

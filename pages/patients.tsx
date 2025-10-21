@@ -436,13 +436,24 @@ export default function PatientsPage() {
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium mb-1.5">First Name *</label>
+                                            <label className="block text-sm font-medium mb-1.5">First Name <span className="text-red-600">*</span></label>
                                             <input required placeholder="John" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} className="p-2 border rounded w-full" />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium mb-1.5">Last Name *</label>
+                                            <label className="block text-sm font-medium mb-1.5">Last Name <span className="text-red-600">*</span></label>
                                             <input required placeholder="Doe" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} className="p-2 border rounded w-full" />
                                         </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">OPD Number <span className="text-red-600">*</span></label>
+                                            <input 
+                                                required
+                                                placeholder="251009 1 1" 
+                                                value={form.opdNo} 
+                                                onChange={e => setForm({ ...form, opdNo: e.target.value })} 
+                                                className="p-2 border rounded w-full font-mono" 
+                                            />
+                                        </div>
+                                        {/* Optional fields below, not required */}
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Phone</label>
                                             <input placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="p-2 border rounded w-full" />
@@ -454,16 +465,6 @@ export default function PatientsPage() {
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Date of Birth</label>
                                             <DateInput type="date" placeholder="Select date of birth" value={form.dob} onChange={e => handleDobChange(e.target.value)} className="p-2 border rounded w-full" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1.5">OPD Number *</label>
-                                            <input 
-                                                required
-                                                placeholder="251009 1 1" 
-                                                value={form.opdNo} 
-                                                onChange={e => setForm({ ...form, opdNo: e.target.value })} 
-                                                className="p-2 border rounded w-full font-mono" 
-                                            />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Age</label>
