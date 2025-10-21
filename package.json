@@ -39,6 +39,7 @@
         "embla-carousel": "^8.6.0",
         "embla-carousel-react": "^8.6.0",
         "formidable": "^3.5.4",
+        "googleapis": "^144.0.0",
         "jspdf": "^3.0.3",
         "jspdf-autotable": "^5.0.2",
         "lucide-react": "^0.546.0",
@@ -61,7 +62,7 @@
     "devDependencies": {
         "@types/formidable": "^3.4.6",
         "@types/node": "20.5.6",
-        "@types/react": "18.2.21",
+        "@types/react": "^18.2.47",
         "autoprefixer": "10.4.14",
         "postcss": "8.4.43",
         "prisma": "5.9.0",

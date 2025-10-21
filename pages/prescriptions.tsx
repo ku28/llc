@@ -1327,7 +1327,7 @@ export default function PrescriptionsPage() {
             )}
                         {/* Prescription Preview Card */}
                         {lastCreatedVisit && (
-                            <div className="card mt-6" ref={el => previewRef.current = el}>
+                            <div className="card mt-6" ref={previewRef}>
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-semibold">Prescription Preview — Visit #{lastCreatedVisit.id}</h3>
                                     <button onClick={() => openPrintableWindow(previewRef.current)} className="btn btn-primary text-sm">
