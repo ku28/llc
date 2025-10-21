@@ -3,12 +3,9 @@ import prisma from '../../lib/prisma'
 import { requireAdmin, requireAuth } from '../../lib/auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    // User management restricted to admins only
-    const user = await requireAdmin(req, res)
-    if (!user) return
-    
     if (req.method === 'GET') {
         try {
+            // Allow unauthenticated GET for DB health check
             const items = await prisma.user.findMany({ orderBy: { createdAt: 'desc' } })
             return res.status(200).json(items)
         } catch (err: any) {
@@ -16,6 +13,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(500).json({ error: String(err?.message || err) })
         }
     }
+
+    // User management restricted to admins only for POST/PUT
+    const user = await requireAdmin(req, res)
+    if (!user) return
 
     if (req.method === 'POST') {
         const { email, name, role } = req.body
