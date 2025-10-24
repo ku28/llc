@@ -13,6 +13,7 @@ interface CustomSelectProps {
     className?: string
     required?: boolean
     allowCustom?: boolean  // Allow typing custom values
+    onOpenChange?: (isOpen: boolean) => void  // Callback when dropdown opens/closes
 }
 
 export default function CustomSelect({
@@ -22,7 +23,8 @@ export default function CustomSelect({
     placeholder = 'Select...',
     className = '',
     required = false,
-    allowCustom = false
+    allowCustom = false,
+    onOpenChange
 }: CustomSelectProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [inputValue, setInputValue] = useState('')
@@ -47,6 +49,13 @@ export default function CustomSelect({
             }
         }
     }, [value, options, allowCustom, isOpen])
+
+    // Notify parent when dropdown opens/closes
+    useEffect(() => {
+        if (onOpenChange) {
+            onOpenChange(isOpen)
+        }
+    }, [isOpen, onOpenChange])
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -164,11 +173,10 @@ export default function CustomSelect({
     }
 
     const handleInputFocus = () => {
+        // Clear the input value to show all options when clicking dropdown
+        setInputValue('')
         setIsOpen(true)
-        // Clear input if no value is selected (so placeholder shows properly)
-        if (!value) {
-            setInputValue('')
-        }
+        setHighlightedIndex(0)
     }
 
     const selectOption = (option: Option) => {
@@ -195,6 +203,7 @@ export default function CustomSelect({
                     className="custom-select-input"
                     autoComplete="off"
                     required={required}
+                    style={{ cursor: 'pointer' }}
                 />
                 <svg
                     className={`arrow ${isOpen ? 'open' : ''}`}
@@ -245,6 +254,7 @@ export default function CustomSelect({
                                     className={`custom-select-option ${value === option.value ? 'selected' : ''} ${highlightedIndex === index ? 'highlighted' : ''}`}
                                     onClick={() => handleOptionClick(option)}
                                     onMouseEnter={() => setHighlightedIndex(index)}
+                                    style={{ cursor: 'pointer' }}
                                 >
                                     {value === option.value && <span className="checkmark">✓ </span>}
                                     {option.label}

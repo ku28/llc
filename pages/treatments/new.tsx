@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import CustomSelect from '../../components/CustomSelect'
 import { requireDoctorOrAdmin } from '../../lib/withAuth'
 
 function NewTreatmentPage() {
@@ -305,16 +306,19 @@ function NewTreatmentPage() {
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
                                                             <div className="sm:col-span-2">
                                                                 <label className="block text-xs font-medium mb-1">Medicine</label>
-                                                                <select 
-                                                                    value={medicine.productId} 
-                                                                    onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'productId', e.target.value)}
-                                                                    className="p-1.5 border rounded w-full text-xs"
-                                                                >
-                                                                    <option value="">Select medicine</option>
-                                                                    {products.map(p => (
-                                                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                                                    ))}
-                                                                </select>
+                                                                <CustomSelect
+                                                                    value={medicine.productId}
+                                                                    onChange={(value) => updateMedicineInPlan(planIndex, medicineIndex, 'productId', value)}
+                                                                    options={[
+                                                                        { value: '', label: 'Select medicine' },
+                                                                        ...products.map(p => ({
+                                                                            value: String(p.id),
+                                                                            label: `${p.name} · Stock: ${p.quantity}`
+                                                                        }))
+                                                                    ]}
+                                                                    placeholder="Select medicine"
+                                                                    className="w-full"
+                                                                />
                                                             </div>
                                                             
                                                             {/* Components Section - All in one line */}

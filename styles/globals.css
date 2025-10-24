@@ -674,11 +674,11 @@ a:hover {
 }
 
 .custom-select-dropdown {
-  position: absolute;
+  position: absolute !important;
   top: calc(100% + 0.5rem);
   left: 0;
   right: 0;
-  background: var(--panel);
+  background: #ffffff;
   border: 1px solid rgba(0,0,0,0.1);
   border-radius: 12px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.05);
@@ -691,7 +691,7 @@ a:hover {
 
 .dark .custom-select-dropdown {
   border-color: rgba(255,255,255,0.15);
-  background: var(--panel);
+  background: #1e293b;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
@@ -706,6 +706,48 @@ a:hover {
   }
 }
 
+/* Loading Modal Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
 .custom-select-option {
   padding: 0.75rem 1rem;
   border-radius: 8px;
@@ -714,6 +756,11 @@ a:hover {
   color: var(--text);
   font-weight: 500;
   margin-bottom: 0.25rem;
+  background: transparent;
+}
+
+.dark .custom-select-option {
+  background: transparent;
 }
 
 .custom-select-option:last-child {
@@ -725,11 +772,19 @@ a:hover {
   color: var(--brand);
 }
 
+.dark .custom-select-option:hover {
+  background: rgba(16, 185, 129, 0.15);
+}
+
 .custom-select-option.highlighted {
   background: rgba(16, 185, 129, 0.15);
   color: var(--brand);
   outline: 2px solid rgba(16, 185, 129, 0.3);
   outline-offset: -2px;
+}
+
+.dark .custom-select-option.highlighted {
+  background: rgba(16, 185, 129, 0.2);
 }
 
 .custom-select-option.selected {
@@ -941,6 +996,31 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   animation: slideDown 0.2s ease-in;
 }
 
+/* Remove number input spinners/arrows */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Auto-uppercase for all text inputs */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+textarea {
+  text-transform: uppercase;
+}
+
+/* Ensure placeholder text is not uppercase */
+input::placeholder,
+textarea::placeholder {
+  text-transform: none;
+}
 
 
 

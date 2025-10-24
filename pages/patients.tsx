@@ -25,7 +25,7 @@ export default function PatientsPage() {
     const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     
-    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '', height: '', weight: '', imageUrl: '', fatherHusbandGuardianName: '' }
+    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', occupation: '', pendingPaymentCents: '', height: '', weight: '', imageUrl: '', fatherHusbandGuardianName: '' }
     const [form, setForm] = useState(emptyForm)
 
     // Calculate age from date of birth
@@ -41,10 +41,31 @@ export default function PatientsPage() {
         return age.toString()
     }
 
+    // Calculate approximate DOB from age
+    const calculateDobFromAge = (age: string) => {
+        if (!age || age === '') return ''
+        const ageNum = parseInt(age)
+        if (isNaN(ageNum) || ageNum < 0) return ''
+        const today = new Date()
+        const birthYear = today.getFullYear() - ageNum
+        const approxDob = new Date(birthYear, today.getMonth(), today.getDate())
+        return approxDob.toISOString().split('T')[0]
+    }
+
     // Handle DOB change
     const handleDobChange = (dob: string) => {
         const age = calculateAge(dob)
         setForm({ ...form, dob, age })
+    }
+
+    // Handle age change
+    const handleAgeChange = (age: string) => {
+        if (!form.dob) {
+            const dob = calculateDobFromAge(age)
+            setForm({ ...form, age, dob })
+        } else {
+            setForm({ ...form, age })
+        }
     }
 
     useEffect(() => { 
@@ -204,17 +225,6 @@ export default function PatientsPage() {
     function editPatient(patient: any) {
         setEditingId(patient.id)
         
-        const nextVisitSplit = (() => {
-            if (patient.nextVisit) {
-                const dt = new Date(patient.nextVisit).toISOString()
-                return {
-                    date: dt.slice(0, 10),
-                    time: dt.slice(11, 16)
-                }
-            }
-            return { date: '', time: '' }
-        })()
-        
         setForm({
             firstName: patient.firstName || '',
             lastName: patient.lastName || '',
@@ -226,8 +236,6 @@ export default function PatientsPage() {
             age: patient.age ? String(patient.age) : '',
             address: patient.address || '',
             gender: patient.gender || '',
-            nextVisitDate: nextVisitSplit.date,
-            nextVisitTime: nextVisitSplit.time,
             occupation: patient.occupation || '',
             pendingPaymentCents: patient.pendingPaymentCents ? String(patient.pendingPaymentCents) : '',
             height: patient.height ? String(patient.height) : '',
@@ -263,10 +271,6 @@ export default function PatientsPage() {
             if (payload.pendingPaymentCents) payload.pendingPaymentCents = Number(payload.pendingPaymentCents);
             if (payload.height) payload.height = Number(payload.height);
             if (payload.weight) payload.weight = Number(payload.weight);
-
-            if (form.nextVisitDate && form.nextVisitTime) {
-                payload.nextVisit = `${form.nextVisitDate}T${form.nextVisitTime}`;
-            }
 
             const method = editingId ? 'PUT' : 'POST';
             const body = editingId ? { id: editingId, ...payload } : payload;
@@ -481,12 +485,12 @@ export default function PatientsPage() {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">First Name <span className="text-red-600">*</span></label>
-                                            <input required placeholder="John" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} className={`p-2 rounded w-full border ${fieldErrors.firstName ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} />
+                                            <input required placeholder="John" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value.toUpperCase() })} className={`p-2 rounded w-full border ${fieldErrors.firstName ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} />
                                             {fieldErrors.firstName && <p className="text-xs text-red-600 mt-1">{fieldErrors.firstName}</p>}
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Last Name <span className="text-red-600">*</span></label>
-                                            <input required placeholder="Doe" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} className={`p-2 rounded w-full border ${fieldErrors.lastName ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} />
+                                            <input required placeholder="Doe" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value.toUpperCase() })} className={`p-2 rounded w-full border ${fieldErrors.lastName ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} />
                                             {fieldErrors.lastName && <p className="text-xs text-red-600 mt-1">{fieldErrors.lastName}</p>}
                                         </div>
                                         <div>
@@ -495,7 +499,7 @@ export default function PatientsPage() {
                                                 required
                                                 placeholder="251009 1 1" 
                                                 value={form.opdNo} 
-                                                onChange={e => setForm({ ...form, opdNo: e.target.value })} 
+                                                onChange={e => setForm({ ...form, opdNo: e.target.value.toUpperCase() })} 
                                                 className={`p-2 rounded w-full font-mono border ${fieldErrors.opdNo ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} 
                                             />
                                             {fieldErrors.opdNo && <p className="text-xs text-red-600 mt-1">{fieldErrors.opdNo}</p>}
@@ -503,11 +507,11 @@ export default function PatientsPage() {
                                         {/* Optional fields below, not required */}
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Phone</label>
-                                            <input placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="p-2 border rounded w-full" />
+                                            <input placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.toUpperCase() })} className="p-2 border rounded w-full" />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Email</label>
-                                            <input type="email" placeholder="john.doe@example.com" value={form.email} onChange={e => { setForm({ ...form, email: e.target.value }); setFieldErrors(prev => ({ ...prev, email: '' })); }} className={`p-2 rounded w-full border ${fieldErrors.email ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} />
+                                            <input type="email" placeholder="john.doe@example.com" value={form.email} onChange={e => { setForm({ ...form, email: e.target.value.toUpperCase() }); setFieldErrors(prev => ({ ...prev, email: '' })); }} className={`p-2 rounded w-full border ${fieldErrors.email ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} />
                                             {fieldErrors.email && <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>}
                                         </div>
                                         <div>
@@ -516,7 +520,7 @@ export default function PatientsPage() {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Age</label>
-                                            <input placeholder="35" type="number" value={(form as any).age || ''} onChange={e => setForm({ ...form, age: e.target.value })} className="p-2 border rounded w-full" />
+                                            <input placeholder="35" type="number" value={(form as any).age || ''} onChange={e => handleAgeChange(e.target.value)} className="p-2 border rounded w-full" />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Gender</label>
@@ -530,11 +534,11 @@ export default function PatientsPage() {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Occupation</label>
-                                            <input placeholder="Engineer" value={(form as any).occupation || ''} onChange={e => setForm({ ...form, occupation: e.target.value })} className="p-2 border rounded w-full" />
+                                            <input placeholder="Engineer" value={(form as any).occupation || ''} onChange={e => setForm({ ...form, occupation: e.target.value.toUpperCase() })} className="p-2 border rounded w-full" />
                                         </div>
                                         <div className="sm:col-span-2 lg:col-span-3">
                                             <label className="block text-sm font-medium mb-1.5">Address</label>
-                                            <input placeholder="123 Main St, City" value={(form as any).address || ''} onChange={e => setForm({ ...form, address: e.target.value })} className="p-2 border rounded w-full" />
+                                            <input placeholder="123 Main St, City" value={(form as any).address || ''} onChange={e => setForm({ ...form, address: e.target.value.toUpperCase() })} className="p-2 border rounded w-full" />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Height (cm)</label>
@@ -547,14 +551,6 @@ export default function PatientsPage() {
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Pending Payment (₹)</label>
                                             <input placeholder="500.00" type="number" step="0.01" value={(form as any).pendingPaymentCents || ''} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} className="p-2 border rounded w-full" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1.5">Next Visit Date</label>
-                                            <DateInput type="date" placeholder="Select visit date" value={form.nextVisitDate} onChange={e => setForm({ ...form, nextVisitDate: e.target.value })} className="p-2 border rounded w-full" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1.5">Next Visit Time</label>
-                                            <input type="time" placeholder="Select time" value={form.nextVisitTime} onChange={e => setForm({ ...form, nextVisitTime: e.target.value })} className="p-2 border rounded w-full" />
                                         </div>
                                     </div>
                                     
@@ -788,12 +784,6 @@ export default function PatientsPage() {
                                                     <div>
                                                         <div className="text-xs text-muted mb-1">Weight</div>
                                                         <div className="text-sm font-medium">{p.weight ? `${p.weight} kg` : '-'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-muted mb-1">Next Visit</div>
-                                                        <div className="text-sm font-medium">
-                                                            {p.nextVisit ? new Date(p.nextVisit).toLocaleString() : '-'}
-                                                        </div>
                                                     </div>
                                                     <div>
                                                         <div className="text-xs text-muted mb-1">Pending Payment</div>
