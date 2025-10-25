@@ -8,6 +8,7 @@ export default function HeroSection() {
     const [content, setContent] = useState({
         badge: 'An Electrohomeopathy Centre',
         heading: 'Welcome to Last Leaf Care landing page',
+        headingGreen: 'Last Leaf Care',
         tagline: 'We Care.',
         imageUrl: 'https://res.cloudinary.com/dwgsflt8h/image/upload/v1749928246/banner_qf5r5l.png'
     })
@@ -19,6 +20,7 @@ export default function HeroSection() {
                 setContent({
                     badge: data.badge,
                     heading: data.heading,
+                    headingGreen: data.headingGreen || 'Last Leaf Care',
                     tagline: data.tagline,
                     imageUrl: data.imageUrl
                 })
@@ -43,7 +45,14 @@ export default function HeroSection() {
 
                     <div className="max-w-screen-md mx-auto text-center text-4xl md:text-6xl font-bold">
                         <h1 className="text-gray-900 dark:text-white">
-                            {content.heading}
+                            {content.heading.split(content.headingGreen).map((part, index, arr) => (
+                                <span key={index}>
+                                    {part}
+                                    {index < arr.length - 1 && (
+                                        <span className="text-brand">{content.headingGreen}</span>
+                                    )}
+                                </span>
+                            ))}
                         </h1>
                     </div>
 

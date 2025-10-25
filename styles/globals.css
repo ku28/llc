@@ -1008,15 +1008,7 @@ input[type="number"] {
   appearance: textfield;
 }
 
-/* Auto-uppercase for all text inputs */
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-textarea {
-  text-transform: uppercase;
-}
-
-/* Ensure placeholder text is not uppercase */
+/* Placeholder styling */
 input::placeholder,
 textarea::placeholder {
   text-transform: none;

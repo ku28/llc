@@ -22,10 +22,14 @@ export default function EditAboutPage() {
     })
 
     useEffect(() => {
+        // Show loading modal immediately
+        setStatusModal({ isOpen: true, status: 'loading', message: 'Loading about content...' })
+        
         fetch('/api/auth/me')
             .then(r => r.json())
             .then(d => {
                 if (!d.user || d.user.role !== 'admin') {
+                    setStatusModal({ isOpen: false, status: 'loading', message: '' })
                     router.push('/')
                     return
                 }
@@ -33,12 +37,12 @@ export default function EditAboutPage() {
                 loadContent()
             })
             .catch(() => {
+                setStatusModal({ isOpen: false, status: 'loading', message: '' })
                 router.push('/')
             })
     }, [])
 
     const loadContent = async () => {
-        setStatusModal({ isOpen: true, status: 'loading', message: 'Loading about content...' })
         try {
             const res = await fetch('/api/about-content')
             if (res.ok) {

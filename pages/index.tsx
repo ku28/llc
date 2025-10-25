@@ -2,11 +2,11 @@
 import { useRouter } from 'next/router'
 import LandingHeader from '../components/LandingHeader'
 import HeroSection from '../components/lastleaf/sections/hero'
-import TestimonialSection from '../components/lastleaf/sections/testimonial'
-import TeamSection from '../components/lastleaf/sections/team'
+import ServicesSection from '../components/lastleaf/sections/services'
+import AchievementsSection from '../components/lastleaf/sections/achievements'
 import BenefitsSection from '../components/lastleaf/sections/benefits'
-import SponsorsSection from '../components/lastleaf/sections/sponsors'
-import CommunitySection from '../components/lastleaf/sections/community'
+import OurVideosSection from '../components/lastleaf/sections/our-videos'
+import SpecialitiesSection from '../components/lastleaf/sections/specialities'
 import ContactSection from '../components/lastleaf/sections/contact'
 import FooterSection from '../components/lastleaf/sections/footer'
 
@@ -33,7 +33,7 @@ export default function LandingPage() {
       {!loading && user && user.role === 'admin' && (
         <button
           onClick={() => router.push('/edit')}
-          className="fixed top-20 right-8 z-50 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg transition-colors font-medium text-sm"
+          className="fixed top-4 right-4 z-[9999] flex items-center gap-2 px-4 py-2.5 bg-white/10 dark:bg-gray-900/30 backdrop-blur-md text-white rounded-full shadow-xl transition-all duration-300 font-semibold text-sm border border-white/20 hover:bg-green-500/20 hover:border-green-400 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:scale-110"
           title="Edit Landing Page Content"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,11 +44,11 @@ export default function LandingPage() {
       )}
       
       <HeroSection />
-      <TestimonialSection />
-      <TeamSection />
+      <ServicesSection />
+      <AchievementsSection />
       <BenefitsSection />
-      <SponsorsSection />
-      <CommunitySection />
+      <OurVideosSection />
+      <SpecialitiesSection />
       <ContactSection />
       <FooterSection />
     </main>

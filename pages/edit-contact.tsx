@@ -29,10 +29,14 @@ export default function EditContactPage() {
   });
 
   useEffect(() => {
+    // Show loading modal immediately
+    setStatusModal({ isOpen: true, status: 'loading', message: 'Loading contact information...' })
+    
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
         if (!d.user || d.user.role !== 'admin') {
+          setStatusModal({ isOpen: false, status: 'loading', message: '' })
           router.push('/');
           return;
         }
@@ -40,12 +44,12 @@ export default function EditContactPage() {
         loadContent();
       })
       .catch(() => {
+        setStatusModal({ isOpen: false, status: 'loading', message: '' })
         router.push('/');
       });
   }, []);
 
   async function loadContent() {
-    setStatusModal({ isOpen: true, status: 'loading', message: 'Loading contact information...' })
     try {
       const res = await fetch('/api/contact-info');
       const data = await res.json();

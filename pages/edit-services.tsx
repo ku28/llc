@@ -28,10 +28,14 @@ export default function EditServicesPage() {
     })
 
     useEffect(() => {
+        // Show loading modal immediately
+        setStatusModal({ isOpen: true, status: 'loading', message: 'Loading services...' })
+        
         fetch('/api/auth/me')
             .then(r => r.json())
             .then(d => {
                 if (!d.user || d.user.role !== 'admin') {
+                    setStatusModal({ isOpen: false, status: 'loading', message: '' })
                     router.push('/')
                     return
                 }
@@ -39,12 +43,12 @@ export default function EditServicesPage() {
                 loadServices()
             })
             .catch(() => {
+                setStatusModal({ isOpen: false, status: 'loading', message: '' })
                 router.push('/')
             })
     }, [])
 
     const loadServices = async () => {
-        setStatusModal({ isOpen: true, status: 'loading', message: 'Loading services...' })
         try {
             const res = await fetch('/api/services-content')
             if (res.ok) {
@@ -193,24 +197,42 @@ export default function EditServicesPage() {
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-sm font-medium mb-2">Service Image</label>
-                                        <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-green-500 transition-all bg-gray-50 dark:bg-gray-800/50">
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={(e) => handleImageUpload(index, e)}
-                                                className="hidden"
-                                            />
-                                            <div className="text-center">
-                                                <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                </svg>
-                                                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                                                    Upload image
-                                                </p>
+                                        {service.image ? (
+                                            <div className="relative group">
+                                                <img src={service.image} alt="Service" className="w-full h-48 object-cover rounded-lg border border-gray-300 dark:border-gray-600" />
+                                                <button
+                                                    onClick={() => {
+                                                        const input = document.createElement('input')
+                                                        input.type = 'file'
+                                                        input.accept = 'image/*'
+                                                        input.onchange = (e: any) => handleImageUpload(index, e)
+                                                        input.click()
+                                                    }}
+                                                    className="absolute top-2 right-2 p-2 bg-blue-600 text-white rounded-full opacity-0 group-hover:opacity-100 hover:bg-blue-700 transition-all"
+                                                    title="Change image"
+                                                >
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                    </svg>
+                                                </button>
                                             </div>
-                                        </label>
-                                        {service.image && (
-                                            <img src={service.image} alt="Service" className="mt-3 w-full h-48 object-cover rounded-lg" />
+                                        ) : (
+                                            <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-green-500 transition-all bg-gray-50 dark:bg-gray-800/50">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={(e) => handleImageUpload(index, e)}
+                                                    className="hidden"
+                                                />
+                                                <div className="text-center">
+                                                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                    </svg>
+                                                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                                        Upload image
+                                                    </p>
+                                                </div>
+                                            </label>
                                         )}
                                     </div>
 

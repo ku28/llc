@@ -11,7 +11,7 @@ interface ServiceCard {
   description: string;
 }
 
-export default function TestimonialSection() {
+export default function ServicesSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [services, setServices] = useState<ServiceCard[]>([]);
 
@@ -24,15 +24,32 @@ export default function TestimonialSection() {
   }, []);
 
   const nextSlide = () => {
-    setCurrentIndex((prev) => (prev + 1) % services.length);
+    setCurrentIndex((prev) => {
+      // Loop back to start after last card
+      if (prev >= services.length - 1) {
+        return 0;
+      }
+      return prev + 1;
+    });
   };
 
   const prevSlide = () => {
-    setCurrentIndex((prev) => (prev - 1 + services.length) % services.length);
+    setCurrentIndex((prev) => {
+      // Loop to end from first card
+      if (prev <= 0) {
+        return services.length - 1;
+      }
+      return prev - 1;
+    });
+  };
+
+  const truncateText = (text: string, maxLength: number = 100) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
   };
 
   return (
-    <section id="testimonials" className="w-full py-24 sm:py-32 px-4 sm:px-6 lg:px-8">
+    <section id="services" className="w-full py-24 sm:py-32 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-lg text-brand text-center mb-2 tracking-wider font-semibold">
@@ -76,7 +93,7 @@ export default function TestimonialSection() {
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white">{service.name}</h3>
                           <p className="text-sm text-gray-600 dark:text-gray-400">&quot;{service.tagline}&quot;</p>
                           <p className="text-sm text-gray-600 dark:text-gray-400">{service.info}</p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 pt-2">{service.description}</p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 pt-2">{truncateText(service.description)}</p>
                           <Link href="/services" className="inline-block mt-4 text-brand hover:underline">
                             Read More
                           </Link>

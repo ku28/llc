@@ -28,10 +28,14 @@ export default function EditGalleryPage() {
   });
 
   useEffect(() => {
+    // Show loading modal immediately
+    setStatusModal({ isOpen: true, status: 'loading', message: 'Loading gallery...' })
+    
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
         if (!d.user || d.user.role !== 'admin') {
+          setStatusModal({ isOpen: false, status: 'loading', message: '' })
           router.push('/');
           return;
         }
@@ -39,12 +43,12 @@ export default function EditGalleryPage() {
         loadGallery();
       })
       .catch(() => {
+        setStatusModal({ isOpen: false, status: 'loading', message: '' })
         router.push('/');
       });
   }, []);
 
   async function loadGallery() {
-    setStatusModal({ isOpen: true, status: 'loading', message: 'Loading gallery...' })
     try {
       const res = await fetch('/api/gallery-content');
       const data = await res.json();

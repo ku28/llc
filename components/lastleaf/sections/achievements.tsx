@@ -7,13 +7,13 @@ interface GalleryImage {
   order: number;
 }
 
-export default function TeamSection() {
+export default function AchievementsSection() {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [images, setImages] = useState<GalleryImage[]>([]);
 
   useEffect(() => {
-    // Fetch images from gallery API
-    fetch('/api/gallery-content')
+    // Fetch images from achievements API
+    fetch('/api/achievements-content')
       .then(res => res.json())
       .then(data => setImages(data))
       .catch(err => console.error('Error loading gallery images:', err));
@@ -30,7 +30,7 @@ export default function TeamSection() {
   }, [images]);
 
   return (
-    <section id="team" className="w-full py-24 sm:py-32 px-4 sm:px-6 lg:px-8">
+    <section id="achievements" className="w-full py-24 sm:py-32 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-lg text-brand text-center mb-2 tracking-wider font-semibold">
@@ -66,7 +66,7 @@ export default function TeamSection() {
                       alt={`Achievement ${index + 1}`}
                       width={300}
                       height={300}
-                      className="w-[300px] h-auto"
+                      className="w-[300px] h-[300px] object-cover"
                     />
                   </div>
                 </div>

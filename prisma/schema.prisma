@@ -443,13 +443,14 @@ model Payment {
 
 // Landing Page Content Models
 model LandingHero {
-  id        Int      @id @default(autoincrement())
-  badge     String
-  heading   String
-  tagline   String
-  imageUrl  String
-  updatedAt DateTime @updatedAt
-  updatedBy String?
+  id            Int      @id @default(autoincrement())
+  badge         String
+  heading       String
+  headingGreen  String   @default("Last Leaf Care")
+  tagline       String
+  imageUrl      String
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
 }
 
 model LandingBenefit {
@@ -501,6 +502,14 @@ model ServiceCard {
 }
 
 model GalleryImage {
+  id        Int      @id @default(autoincrement())
+  imageUrl  String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AchievementImage {
   id        Int      @id @default(autoincrement())
   imageUrl  String
   order     Int      @default(0)

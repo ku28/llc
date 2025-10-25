@@ -6,9 +6,10 @@ interface Video {
   title: string;
 }
 
-export default function SponsorsSection() {
+export default function OurVideosSection() {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
     fetch('/api/landing/videos')
@@ -18,15 +19,17 @@ export default function SponsorsSection() {
   }, [])
 
   useEffect(() => {
+    if (isPaused) return; // Don't scroll when paused
+
     const interval = setInterval(() => {
       setScrollPosition((prev) => prev + 1);
     }, 30);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isPaused]);
 
   return (
-    <section id="sponsors" className="w-full pb-24 sm:pb-32 px-4 sm:px-6 lg:px-8">
+    <section id="our-videos" className="w-full pb-24 sm:pb-32 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <h2 className="text-lg md:text-xl text-center mb-8 text-gray-900 dark:text-white font-semibold">
           Our Videos
@@ -44,6 +47,8 @@ export default function SponsorsSection() {
             <div
               key={`${embedUrl}-${index}`}
               className="w-[560px] h-[315px] flex-shrink-0"
+              onMouseEnter={() => setIsPaused(true)}
+              onMouseLeave={() => setIsPaused(false)}
             >
               <iframe
                 width="560"

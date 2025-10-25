@@ -6,7 +6,7 @@ interface SpecialitiesContent {
   quote: string;
 }
 
-export default function CommunitySection() {
+export default function SpecialitiesSection() {
   const [content, setContent] = useState<SpecialitiesContent>({
     title: 'Our Specialities',
     description: '',
@@ -21,7 +21,7 @@ export default function CommunitySection() {
       .catch(err => console.error('Error loading specialities:', err));
   }, []);
   return (
-    <section id="community" className="w-full py-12">
+    <section id="specialities" className="w-full py-12">
       <hr className="border-gray-300 dark:border-gray-700" />
       <div className="w-full py-20 sm:py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">

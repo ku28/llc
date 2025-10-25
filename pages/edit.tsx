@@ -2,8 +2,15 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import EditLayout from '../components/EditLayout'
 import StatusModal from '../components/StatusModal'
+import ConfirmModal from '../components/ConfirmModal'
+import Image from 'next/image'
 
-type TabType = 'hero' | 'benefits' | 'videos' | 'specialities'
+type TabType = 'hero' | 'benefits' | 'videos' | 'achievements' | 'specialities'
+
+interface AchievementImage {
+    imageUrl: string
+    order: number
+}
 
 export default function EditHomePage() {
     const router = useRouter()
@@ -18,10 +25,17 @@ export default function EditHomePage() {
         message: ''
     })
 
+    // Achievements states
+    const [achievements, setAchievements] = useState<AchievementImage[]>([])
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [deleteIndex, setDeleteIndex] = useState<number | null>(null)
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+
     // Hero Section Content
     const [heroContent, setHeroContent] = useState({
         badge: 'An Electrohomeopathy Centre',
         heading: 'Welcome to Last Leaf Care landing page',
+        headingGreen: 'Last Leaf Care',
         tagline: 'We Care.',
         imageUrl: 'https://res.cloudinary.com/dwgsflt8h/image/upload/v1749928246/banner_qf5r5l.png'
     })
@@ -82,10 +96,14 @@ export default function EditHomePage() {
     })
 
     useEffect(() => {
+        // Show loading modal immediately
+        setStatusModal({ isOpen: true, status: 'loading', message: 'Loading home page content...' })
+        
         fetch('/api/auth/me')
             .then(r => r.json())
             .then(d => {
                 if (!d.user || d.user.role !== 'admin') {
+                    setStatusModal({ isOpen: false, status: 'loading', message: '' })
                     router.push('/')
                     return
                 }
@@ -93,12 +111,12 @@ export default function EditHomePage() {
                 loadContent()
             })
             .catch(() => {
+                setStatusModal({ isOpen: false, status: 'loading', message: '' })
                 router.push('/')
             })
     }, [])
 
     const loadContent = async () => {
-        setStatusModal({ isOpen: true, status: 'loading', message: 'Loading home page content...' })
         try {
             // Load hero
             const heroRes = await fetch('/api/landing/hero')
@@ -107,6 +125,7 @@ export default function EditHomePage() {
                 setHeroContent({
                     badge: heroData.badge,
                     heading: heroData.heading,
+                    headingGreen: heroData.headingGreen || 'Last Leaf Care',
                     tagline: heroData.tagline,
                     imageUrl: heroData.imageUrl
                 })
@@ -128,6 +147,13 @@ export default function EditHomePage() {
             if (videosRes.ok) {
                 const videosData = await videosRes.json()
                 setVideos(videosData)
+            }
+
+            // Load achievements
+            const achievementsRes = await fetch('/api/achievements-content')
+            if (achievementsRes.ok) {
+                const achievementsData = await achievementsRes.json()
+                setAchievements(achievementsData)
             }
 
             // Load specialities
@@ -158,6 +184,7 @@ export default function EditHomePage() {
         { id: 'hero' as TabType, label: 'Hero Section', icon: '🏠' },
         { id: 'benefits' as TabType, label: 'Benefits', icon: '✨' },
         { id: 'videos' as TabType, label: 'Our Videos', icon: '🎥' },
+        { id: 'achievements' as TabType, label: 'Achievements', icon: '🏆' },
         { id: 'specialities' as TabType, label: 'Specialities', icon: '⭐' }
     ]
 
@@ -183,6 +210,10 @@ export default function EditHomePage() {
                 case 'videos':
                     endpoint = '/api/landing/videos'
                     data = videos
+                    break
+                case 'achievements':
+                    endpoint = '/api/achievements-content'
+                    data = achievements
                     break
                 case 'specialities':
                     endpoint = '/api/landing/specialities'
@@ -216,45 +247,51 @@ export default function EditHomePage() {
         }
     }
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
+    const handleImageUpload = () => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.onchange = async (e: any) => {
+            const file = e.target.files?.[0]
+            if (!file) return
 
-        setStatusModal({ isOpen: true, status: 'loading', message: 'Uploading hero image...' })
-        try {
-            // Convert to base64
-            const reader = new FileReader()
-            reader.readAsDataURL(file)
-            reader.onload = async () => {
-                const base64 = reader.result as string
+            setStatusModal({ isOpen: true, status: 'loading', message: 'Uploading hero image...' })
+            try {
+                // Convert to base64
+                const reader = new FileReader()
+                reader.readAsDataURL(file)
+                reader.onload = async () => {
+                    const base64 = reader.result as string
 
-                // Upload to Cloudinary
-                const res = await fetch('/api/upload-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64, folder: 'landing' })
-                })
-
-                const data = await res.json()
-                if (data.url) {
-                    setHeroContent({ ...heroContent, imageUrl: data.url })
-                    setStatusModal({ 
-                        isOpen: true, 
-                        status: 'success', 
-                        message: 'Hero image uploaded successfully!' 
+                    // Upload to Cloudinary
+                    const res = await fetch('/api/upload-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: base64, folder: 'landing' })
                     })
-                } else {
-                    throw new Error('Upload failed')
+
+                    const data = await res.json()
+                    if (data.url) {
+                        setHeroContent({ ...heroContent, imageUrl: data.url })
+                        setStatusModal({ 
+                            isOpen: true, 
+                            status: 'success', 
+                            message: 'Hero image uploaded successfully!' 
+                        })
+                    } else {
+                        throw new Error('Upload failed')
+                    }
                 }
+            } catch (error: any) {
+                console.error('Upload error:', error)
+                setStatusModal({ 
+                    isOpen: true, 
+                    status: 'error', 
+                    message: error.message || 'Failed to upload image. Please try again.' 
+                })
             }
-        } catch (error: any) {
-            console.error('Upload error:', error)
-            setStatusModal({ 
-                isOpen: true, 
-                status: 'error', 
-                message: error.message || 'Failed to upload image. Please try again.' 
-            })
         }
+        input.click()
     }
 
     const addVideo = () => {
@@ -269,6 +306,145 @@ export default function EditHomePage() {
         const updated = [...videos]
         updated[index].embedUrl = embedUrl
         setVideos(updated)
+    }
+
+    // Achievement handlers
+    const handleAchievementUpload = () => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.onchange = async (e: any) => {
+            const file = e.target.files[0]
+            if (!file) return
+
+            setStatusModal({ isOpen: true, status: 'loading', message: 'Uploading achievement image...' })
+            try {
+                const reader = new FileReader()
+                reader.readAsDataURL(file)
+                reader.onloadend = async () => {
+                    const base64 = reader.result as string
+                    const uploadRes = await fetch('/api/upload-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            image: base64,
+                            folder: 'achievements'
+                        })
+                    })
+                    const uploadData = await uploadRes.json()
+                    
+                    if (uploadData.url) {
+                        setAchievements([...achievements, { imageUrl: uploadData.url, order: achievements.length }])
+                        setStatusModal({ 
+                            isOpen: true, 
+                            status: 'success', 
+                            message: 'Achievement image uploaded successfully!' 
+                        })
+                    } else {
+                        throw new Error(uploadData.error || 'Upload failed')
+                    }
+                }
+            } catch (error: any) {
+                console.error('Error uploading achievement:', error)
+                setStatusModal({ 
+                    isOpen: true, 
+                    status: 'error', 
+                    message: error.message || 'Failed to upload image. Please try again.' 
+                })
+            }
+        }
+        input.click()
+    }
+
+    const handleAchievementEdit = (index: number) => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.onchange = async (e: any) => {
+            const file = e.target.files[0]
+            if (!file) return
+
+            setStatusModal({ isOpen: true, status: 'loading', message: 'Uploading replacement image...' })
+            try {
+                const reader = new FileReader()
+                reader.readAsDataURL(file)
+                reader.onloadend = async () => {
+                    const base64 = reader.result as string
+                    const uploadRes = await fetch('/api/upload-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            image: base64,
+                            folder: 'achievements'
+                        })
+                    })
+                    const uploadData = await uploadRes.json()
+                    
+                    if (uploadData.url) {
+                        const updatedAchievements = [...achievements]
+                        updatedAchievements[index].imageUrl = uploadData.url
+                        setAchievements(updatedAchievements)
+                        setStatusModal({ 
+                            isOpen: true, 
+                            status: 'success', 
+                            message: 'Achievement image replaced successfully!' 
+                        })
+                    } else {
+                        throw new Error(uploadData.error || 'Upload failed')
+                    }
+                }
+            } catch (error: any) {
+                console.error('Error uploading achievement:', error)
+                setStatusModal({ 
+                    isOpen: true, 
+                    status: 'error', 
+                    message: error.message || 'Failed to upload image. Please try again.' 
+                })
+            }
+        }
+        input.click()
+    }
+
+    const deleteAchievement = (index: number) => {
+        setDeleteIndex(index)
+        setShowDeleteConfirm(true)
+    }
+
+    const confirmDeleteAchievement = () => {
+        if (deleteIndex !== null) {
+            const newAchievements = achievements.filter((_, i) => i !== deleteIndex)
+            // Reorder after deletion
+            const reordered = newAchievements.map((img, i) => ({ ...img, order: i }))
+            setAchievements(reordered)
+        }
+        setShowDeleteConfirm(false)
+        setDeleteIndex(null)
+    }
+
+    const handleDragStart = (index: number) => {
+        setDraggedIndex(index)
+    }
+
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault()
+        if (draggedIndex === null || draggedIndex === index) return
+
+        const newAchievements = [...achievements]
+        const draggedAchievement = newAchievements[draggedIndex]
+        newAchievements.splice(draggedIndex, 1)
+        newAchievements.splice(index, 0, draggedAchievement)
+        
+        // Update order
+        newAchievements.forEach((img, idx) => {
+            img.order = idx
+        })
+        
+        setAchievements(newAchievements)
+        setDraggedIndex(index)
+    }
+
+    const handleDragEnd = () => {
+        setDraggedIndex(null)
     }
 
     const renderEditor = () => {
@@ -299,6 +475,18 @@ export default function EditHomePage() {
                         </div>
 
                         <div>
+                            <label className="block text-sm font-medium mb-2">Heading (Green Highlight)</label>
+                            <input
+                                type="text"
+                                value={heroContent.headingGreen}
+                                onChange={(e) => setHeroContent({ ...heroContent, headingGreen: e.target.value })}
+                                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                                placeholder="e.g., Last Leaf Care"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">This text will be highlighted in green within the main heading</p>
+                        </div>
+
+                        <div>
                             <label className="block text-sm font-medium mb-2">Tagline</label>
                             <input
                                 type="text"
@@ -312,33 +500,16 @@ export default function EditHomePage() {
                         <div>
                             <label className="block text-sm font-medium mb-2">Hero Image</label>
                             <div className="space-y-3">
-                                <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-green-500 dark:hover:border-green-500 transition-all bg-gray-50 dark:bg-gray-800/50">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageUpload}
-                                        className="hidden"
-                                    />
-                                    <div className="text-center">
-                                        <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                                            Click to upload hero image
-                                        </p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                                    </div>
-                                </label>
                                 {heroContent.imageUrl && (
-                                    <div className="relative">
+                                    <div className="relative group">
                                         <img src={heroContent.imageUrl} alt="Hero preview" className="w-full max-w-md rounded-lg border border-gray-300 dark:border-gray-600" />
                                         <button
-                                            onClick={() => setHeroContent({ ...heroContent, imageUrl: '' })}
-                                            className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-                                            title="Remove image"
+                                            onClick={handleImageUpload}
+                                            className="absolute top-2 right-2 p-2 bg-blue-600 text-white rounded-full opacity-0 group-hover:opacity-100 hover:bg-blue-700 transition-all"
+                                            title="Change image"
                                         >
                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                             </svg>
                                         </button>
                                     </div>
@@ -463,6 +634,87 @@ export default function EditHomePage() {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )
+
+            case 'achievements':
+                return (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            {achievements.map((img, index) => (
+                                <div 
+                                    key={index} 
+                                    className={`relative group border-2 ${draggedIndex === index ? 'border-green-500 scale-105' : 'border-gray-300 dark:border-gray-600'} rounded-lg overflow-hidden cursor-move transition-all`}
+                                    draggable
+                                    onDragStart={() => handleDragStart(index)}
+                                    onDragOver={(e) => handleDragOver(e, index)}
+                                    onDragEnd={handleDragEnd}
+                                >
+                                    <Image
+                                        src={img.imageUrl}
+                                        alt={`Achievement ${index + 1}`}
+                                        width={300}
+                                        height={300}
+                                        className="w-full h-48 object-cover"
+                                    />
+                                    <div className="absolute top-2 right-2 flex gap-1">
+                                        <button
+                                            onClick={() => handleAchievementEdit(index)}
+                                            className="bg-blue-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-700"
+                                            title="Replace image"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            onClick={() => deleteAchievement(index)}
+                                            className="bg-red-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                                            title="Delete image"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm flex items-center gap-1">
+                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                        </svg>
+                                        #{index + 1}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Add Achievement Image Button */}
+                            <button
+                                onClick={handleAchievementUpload}
+                                className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg h-48 flex flex-col items-center justify-center hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span className="text-gray-600 dark:text-gray-400">Add Achievement</span>
+                            </button>
+                        </div>
+
+                        <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div>
+                                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Achievement Management Tips</h3>
+                                    <ul className="text-sm text-blue-800 dark:text-blue-200 mt-1 space-y-1">
+                                        <li>• Click &quot;Add Achievement&quot; to upload new achievement images</li>
+                                        <li>• Drag and drop images to reorder them</li>
+                                        <li>• Hover over an image and click the blue edit icon to replace it</li>
+                                        <li>• Hover over an image and click the red trash icon to delete it</li>
+                                        <li>• Images are automatically numbered based on their order</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )
 
@@ -607,6 +859,14 @@ export default function EditHomePage() {
                 status={statusModal.status}
                 message={statusModal.message}
                 onClose={() => setStatusModal({ ...statusModal, isOpen: false })}
+            />
+
+            <ConfirmModal
+                isOpen={showDeleteConfirm}
+                title="Delete Achievement"
+                message="Are you sure you want to delete this achievement image? This action cannot be undone."
+                onConfirm={confirmDeleteAchievement}
+                onCancel={() => setShowDeleteConfirm(false)}
             />
         </EditLayout>
     )
