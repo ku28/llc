@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
+import ConfirmModal from '../components/ConfirmModal'
+import LoadingModal from '../components/LoadingModal'
 
 export default function SuppliersPage() {
     const [suppliers, setSuppliers] = useState<any[]>([])
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [deleteId, setDeleteId] = useState<number | null>(null)
     const [editingId, setEditingId] = useState<number | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
@@ -95,9 +99,14 @@ export default function SuppliersPage() {
     }
 
     async function deleteSupplier(id: number) {
-        if (!confirm('Are you sure you want to delete this supplier?')) return
+        setDeleteId(id)
+        setShowDeleteConfirm(true)
+    }
+
+    async function confirmDelete() {
+        if (deleteId === null) return
         try {
-            const response = await fetch(`/api/suppliers?id=${id}`, { method: 'DELETE' })
+            const response = await fetch(`/api/suppliers?id=${deleteId}`, { method: 'DELETE' })
             if (response.ok) {
                 await fetchSuppliers()
                 alert('Supplier deleted successfully!')
@@ -107,6 +116,9 @@ export default function SuppliersPage() {
         } catch (error) {
             console.error('Error deleting supplier:', error)
             alert('Failed to delete supplier')
+        } finally {
+            setShowDeleteConfirm(false)
+            setDeleteId(null)
         }
     }
 
@@ -153,6 +165,7 @@ export default function SuppliersPage() {
     })
 
     return (
+        <Layout>
             <div>
                 <div className="section-header flex justify-between items-center">
                     <h2 className="section-title">Supplier Management</h2>
@@ -522,5 +535,20 @@ export default function SuppliersPage() {
                     )}
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={showDeleteConfirm}
+                title="Delete Supplier"
+                message="Are you sure you want to delete this supplier? This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="danger"
+                onConfirm={confirmDelete}
+                onCancel={() => {
+                    setShowDeleteConfirm(false)
+                    setDeleteId(null)
+                }}
+            />
+        </Layout>
     )
 }

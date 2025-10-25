@@ -1,27 +1,21 @@
 "use client";
 import { useEffect, useState } from "react";
 
-const videos = [
-  {
-    embedUrl: "https://www.youtube.com/embed/b0akJtrJb7c?si=ATmgLLyvBAr3OAck",
-    title: "YouTube video player"
-  },
-  {
-    embedUrl: "https://www.youtube.com/embed/JxqXi4JhWvg?si=vdo0EWvUxy426vhs",
-    title: "YouTube video player"
-  },
-  {
-    embedUrl: "https://www.youtube.com/embed/BE5v5OZPpMw?si=KoqkZmYW9fzB1oGp",
-    title: "YouTube video player"
-  },
-  {
-    embedUrl: "https://www.youtube.com/embed/-e8aabBBWN0?si=9DOmQ0wFQ14OgR9o",
-    title: "YouTube video player"
-  },
-];
+interface Video {
+  embedUrl: string;
+  title: string;
+}
 
 export default function SponsorsSection() {
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [videos, setVideos] = useState<Video[]>([]);
+
+  useEffect(() => {
+    fetch('/api/landing/videos')
+      .then(r => r.json())
+      .then(data => setVideos(data))
+      .catch(err => console.error('Error loading videos:', err))
+  }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {

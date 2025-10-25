@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
+import ConfirmModal from '../components/ConfirmModal'
+import LoadingModal from '../components/LoadingModal'
 
 export default function PurchaseOrdersPage() {
     const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
@@ -8,6 +10,8 @@ export default function PurchaseOrdersPage() {
     const [editingId, setEditingId] = useState<number | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [deleteId, setDeleteId] = useState<number | null>(null)
     const [isReceivingModalOpen, setIsReceivingModalOpen] = useState(false)
     const [receivingPO, setReceivingPO] = useState<any>(null)
     const [searchQuery, setSearchQuery] = useState('')
@@ -149,9 +153,14 @@ export default function PurchaseOrdersPage() {
     }
 
     async function deletePurchaseOrder(id: number) {
-        if (!confirm('Are you sure you want to delete this purchase order?')) return
+        setDeleteId(id)
+        setShowDeleteConfirm(true)
+    }
+
+    async function confirmDelete() {
+        if (deleteId === null) return
         try {
-            const response = await fetch(`/api/purchase-orders?id=${id}`, { method: 'DELETE' })
+            const response = await fetch(`/api/purchase-orders?id=${deleteId}`, { method: 'DELETE' })
             if (response.ok) {
                 await fetchPurchaseOrders()
                 alert('Purchase order deleted!')
@@ -161,6 +170,9 @@ export default function PurchaseOrdersPage() {
         } catch (error) {
             console.error('Error deleting:', error)
             alert('Failed to delete purchase order')
+        } finally {
+            setShowDeleteConfirm(false)
+            setDeleteId(null)
         }
     }
 
@@ -262,6 +274,7 @@ export default function PurchaseOrdersPage() {
     }
 
     return (
+        <Layout>
             <div>
                 <div className="section-header flex justify-between items-center">
                     <h2 className="section-title">Purchase Orders</h2>
@@ -746,5 +759,20 @@ export default function PurchaseOrdersPage() {
                     )}
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={showDeleteConfirm}
+                title="Delete Purchase Order"
+                message="Are you sure you want to delete this purchase order? This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="danger"
+                onConfirm={confirmDelete}
+                onCancel={() => {
+                    setShowDeleteConfirm(false)
+                    setDeleteId(null)
+                }}
+            />
+        </Layout>
     )
 }

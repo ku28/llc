@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
+import ConfirmModal from '../components/ConfirmModal'
+import LoadingModal from '../components/LoadingModal'
 
 export default function InvoicesPage() {
     const [invoices, setInvoices] = useState<any[]>([])
@@ -8,6 +10,8 @@ export default function InvoicesPage() {
     const [editingId, setEditingId] = useState<number | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [deleteId, setDeleteId] = useState<number | null>(null)
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
     const [paymentInvoice, setPaymentInvoice] = useState<any>(null)
     const [searchQuery, setSearchQuery] = useState('')
@@ -157,9 +161,14 @@ export default function InvoicesPage() {
     }
 
     async function deleteInvoice(id: number) {
-        if (!confirm('Are you sure you want to delete this invoice?')) return
+        setDeleteId(id)
+        setShowDeleteConfirm(true)
+    }
+
+    async function confirmDelete() {
+        if (deleteId === null) return
         try {
-            const response = await fetch(`/api/customer-invoices?id=${id}`, { method: 'DELETE' })
+            const response = await fetch(`/api/customer-invoices?id=${deleteId}`, { method: 'DELETE' })
             if (response.ok) {
                 await fetchInvoices()
                 alert('Invoice deleted!')
@@ -169,6 +178,9 @@ export default function InvoicesPage() {
         } catch (error) {
             console.error('Error deleting:', error)
             alert('Failed to delete invoice')
+        } finally {
+            setShowDeleteConfirm(false)
+            setDeleteId(null)
         }
     }
 
@@ -263,6 +275,7 @@ export default function InvoicesPage() {
     }
 
     return (
+        <Layout>
             <div>
                 <div className="section-header flex justify-between items-center">
                     <h2 className="section-title">Customer Invoices</h2>
@@ -465,6 +478,21 @@ export default function InvoicesPage() {
                         </div>
                     </div>
                 )}
+
+            <ConfirmModal
+                isOpen={showDeleteConfirm}
+                title="Delete Invoice"
+                message="Are you sure you want to delete this invoice? This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="danger"
+                onConfirm={confirmDelete}
+                onCancel={() => {
+                    setShowDeleteConfirm(false)
+                    setDeleteId(null)
+                }}
+            />
             </div>
+        </Layout>
     )
 }

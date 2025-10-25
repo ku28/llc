@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -52,6 +53,7 @@ model Patient {
   age                       Int?
   address                   String?
   gender                    String?
+  nextVisit                 DateTime?
   occupation                String?
   pendingPaymentCents       Int               @default(0)
   height                    Float?
@@ -164,8 +166,6 @@ model TreatmentProduct {
   comp1            String?
   comp2            String?
   comp3            String?
-  comp4            String?
-  comp5            String?
   quantity         Int       @default(1)
   createdAt        DateTime  @default(now())
   additions        String?
@@ -186,13 +186,13 @@ model Visit {
   patientId            Int
   opdNo                String
   date                 DateTime       @default(now())
+  diagnoses            String?
   temperament          String?
   pulseDiagnosis       String?
   pulseDiagnosis2      String?
   majorComplaints      String?
   historyReports       String?
   investigations       String?
-  reports              String?
   provisionalDiagnosis String?
   improvements         String?
   specialNote          String?
@@ -209,6 +209,10 @@ model Visit {
   pendingPaymentCents  Int            @default(0)
   height               Float?
   weight               Float?
+  procedureAdopted     String?
+  precautions          String?
+  discussion           String?
+  extra                String?
   amount               Float?
   discount             Float?
   payment              Float?
@@ -233,8 +237,6 @@ model Prescription {
   comp1            String?
   comp2            String?
   comp3            String?
-  comp4            String?
-  comp5            String?
   droppersToday    Int?
   medicineQuantity Int?
   presentation     String?
@@ -437,4 +439,81 @@ model Payment {
   notes           String?
   createdAt       DateTime        @default(now())
   customerInvoice CustomerInvoice @relation(fields: [referenceId], references: [id])
+}
+
+// Landing Page Content Models
+model LandingHero {
+  id        Int      @id @default(autoincrement())
+  badge     String
+  heading   String
+  tagline   String
+  imageUrl  String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model LandingBenefit {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @db.Text
+  benefits    Json     // Array of {icon, title, description}
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+}
+
+model LandingVideo {
+  id        Int      @id @default(autoincrement())
+  embedUrl  String
+  title     String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LandingSpecialist {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @db.Text
+  quote       String   @db.Text
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+}
+
+model AboutContent {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @db.Text
+  quote       String   @db.Text
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+}
+
+model ServiceCard {
+  id          Int      @id @default(autoincrement())
+  image       String
+  name        String
+  tagline     String
+  info        String
+  description String   @db.Text
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model GalleryImage {
+  id        Int      @id @default(autoincrement())
+  imageUrl  String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ContactInfo {
+  id          Int      @id @default(autoincrement())
+  address     String   @db.Text
+  phone       String
+  email       String
+  hours       String   @db.Text
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
 }

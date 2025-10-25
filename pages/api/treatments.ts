@@ -9,7 +9,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (req.method === 'GET') {
         try {
+            // Check if we want to include deleted treatments
+            const includeDeleted = req.query.includeDeleted === 'true'
+            
             const items = await prisma.treatment.findMany({ 
+                where: includeDeleted ? {} : {
+                    deleted: { not: true }
+                },
                 orderBy: { createdAt: 'desc' },
                 include: {
                     treatmentProducts: {
@@ -32,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if(!user) return
         
         const { 
-            srNo, provDiagnosis, planNumber, speciality, organ, diseaseAction, 
+            provDiagnosis, planNumber, speciality, organ, diseaseAction, 
             treatmentPlan, administration, notes, products 
         } = req.body
         
@@ -40,7 +46,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Create treatment with products
             const t = await prisma.treatment.create({ 
                 data: { 
-                    srNo,
                     provDiagnosis,
                     planNumber,
                     speciality,
@@ -87,7 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if(!user) return
         
         const { 
-            id, srNo, provDiagnosis, planNumber, speciality, organ, diseaseAction, 
+            id, provDiagnosis, planNumber, speciality, organ, diseaseAction, 
             treatmentPlan, administration, notes, products 
         } = req.body
         
@@ -101,7 +106,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const t = await prisma.treatment.update({ 
                 where: { id },
                 data: { 
-                    srNo,
                     provDiagnosis,
                     planNumber,
                     speciality,
@@ -149,7 +153,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         const { id } = req.body
         try {
-            await prisma.treatment.delete({ where: { id } })
+            // Get the treatment being deleted
+            const treatment = await prisma.treatment.findUnique({ where: { id } })
+            if (!treatment) {
+                return res.status(404).json({ error: 'Treatment not found' })
+            }
+
+            const deletedPlanNumber = treatment.planNumber ? parseInt(treatment.planNumber, 10) : null
+
+            // Mark as deleted instead of actually deleting
+            await prisma.treatment.update({
+                where: { id },
+                data: {
+                    deleted: true,
+                    planNumber: null // Remove plan number from deleted treatments
+                }
+            })
+
+            // If the deleted treatment had a plan number, renumber the remaining plans
+            if (deletedPlanNumber !== null && !isNaN(deletedPlanNumber)) {
+                // Get all non-deleted treatments with plan numbers greater than the deleted one
+                const treatmentsToRenumber = await prisma.treatment.findMany({
+                    where: {
+                        deleted: { not: true },
+                        planNumber: { not: null }
+                    },
+                    orderBy: { planNumber: 'asc' }
+                })
+
+                // Renumber plans sequentially starting from 01
+                for (let i = 0; i < treatmentsToRenumber.length; i++) {
+                    const newPlanNumber = String(i + 1).padStart(2, '0')
+                    await prisma.treatment.update({
+                        where: { id: treatmentsToRenumber[i].id },
+                        data: { planNumber: newPlanNumber }
+                    })
+                }
+            }
+
             return res.status(200).json({ success: true })
         } catch (err: any) {
             console.error('Delete treatment error:', err)

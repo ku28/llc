@@ -18,6 +18,8 @@ export default function PatientsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [imagePreview, setImagePreview] = useState<string>('')
     const [uploadingImage, setUploadingImage] = useState(false)
+    const [showCamera, setShowCamera] = useState(false)
+    const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [deleting, setDeleting] = useState(false)
@@ -211,6 +213,87 @@ export default function PatientsPage() {
             setUploadingImage(false)
         }
     }
+
+    async function startCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } 
+            })
+            setCameraStream(stream)
+            setShowCamera(true)
+            
+            // Set video stream after a small delay to ensure video element is rendered
+            setTimeout(() => {
+                const videoElement = document.getElementById('camera-video') as HTMLVideoElement
+                if (videoElement) {
+                    videoElement.srcObject = stream
+                }
+            }, 100)
+        } catch (error: any) {
+            console.error('Camera error:', error)
+            alert('Failed to access camera. Please check camera permissions.')
+        }
+    }
+
+    function stopCamera() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop())
+            setCameraStream(null)
+        }
+        setShowCamera(false)
+    }
+
+    async function capturePhoto() {
+        const videoElement = document.getElementById('camera-video') as HTMLVideoElement
+        const canvas = document.createElement('canvas')
+        
+        if (videoElement) {
+            canvas.width = videoElement.videoWidth
+            canvas.height = videoElement.videoHeight
+            const ctx = canvas.getContext('2d')
+            
+            if (ctx) {
+                ctx.drawImage(videoElement, 0, 0)
+                const base64Image = canvas.toDataURL('image/jpeg', 0.9)
+                
+                try {
+                    setUploadingImage(true)
+                    setImagePreview(base64Image)
+                    
+                    // Upload to Cloudinary
+                    const res = await fetch('/api/upload-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: base64Image, folder: 'patients' })
+                    })
+
+                    const data = await res.json()
+
+                    if (!res.ok) {
+                        throw new Error(data.error || 'Failed to upload image')
+                    }
+
+                    setForm({ ...form, imageUrl: data.url })
+                    setUploadingImage(false)
+                    stopCamera()
+                } catch (error: any) {
+                    console.error('Image upload error:', error)
+                    alert(`Failed to upload image: ${error.message || 'Unknown error'}`)
+                    setUploadingImage(false)
+                    setImagePreview('')
+                }
+            }
+        }
+    }
+
+    // Cleanup camera on unmount
+    useEffect(() => {
+        return () => {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop())
+            }
+        }
+    }, [cameraStream])
 
     function toggleRowExpansion(id: number) {
         const newExpanded = new Set(expandedRows)
@@ -456,15 +539,35 @@ export default function PatientsPage() {
                                             </div>
                                             <div className="flex-1">
                                                 <label className="block text-sm font-medium mb-2">Patient Photo</label>
-                                                <input 
-                                                    type="file" 
-                                                    accept="image/*"
-                                                    onChange={handleImageUpload}
-                                                    disabled={uploadingImage}
-                                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900 dark:file:text-blue-200"
-                                                />
+                                                <div className="flex flex-wrap gap-2 mb-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={startCamera}
+                                                        disabled={uploadingImage}
+                                                        className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        </svg>
+                                                        Take Photo
+                                                    </button>
+                                                    <label className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-semibold cursor-pointer">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                                        </svg>
+                                                        Upload Photo
+                                                        <input 
+                                                            type="file" 
+                                                            accept="image/*"
+                                                            onChange={handleImageUpload}
+                                                            disabled={uploadingImage}
+                                                            className="hidden"
+                                                        />
+                                                    </label>
+                                                </div>
                                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                    {uploadingImage ? 'Uploading...' : 'All image formats supported: JPEG, PNG, WebP, GIF, etc. (MAX. 10MB)'}
+                                                    {uploadingImage ? 'Uploading...' : 'Take a photo with camera or upload from device. All image formats supported (MAX. 10MB)'}
                                                 </p>
                                                 {imagePreview && (
                                                     <button
@@ -612,6 +715,71 @@ export default function PatientsPage() {
                                         </svg>
                                     )}
                                     {deleting ? 'Deleting...' : 'Yes, Delete'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Camera Modal */}
+            {showCamera && (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg max-w-3xl w-full shadow-2xl">
+                        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Take Patient Photo</h3>
+                            <button
+                                onClick={stopCamera}
+                                disabled={uploadingImage}
+                                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="p-4">
+                            <div className="relative bg-black rounded-lg overflow-hidden" style={{ maxHeight: '60vh' }}>
+                                <video 
+                                    id="camera-video" 
+                                    autoPlay 
+                                    playsInline
+                                    className="w-full h-full object-contain"
+                                    style={{ transform: 'scaleX(-1)' }}
+                                />
+                            </div>
+                            <div className="flex justify-center gap-3 mt-4">
+                                <button
+                                    type="button"
+                                    onClick={stopCamera}
+                                    disabled={uploadingImage}
+                                    className="px-5 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={capturePhoto}
+                                    disabled={uploadingImage}
+                                    className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors font-medium"
+                                >
+                                    {uploadingImage ? (
+                                        <>
+                                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Uploading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                            Capture Photo
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>

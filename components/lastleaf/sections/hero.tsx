@@ -1,10 +1,30 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import BookingModal from '../../BookingModal'
 
 export default function HeroSection() {
     const [isBookingModalOpen, setIsBookingModalOpen] = useState(false)
+    const [content, setContent] = useState({
+        badge: 'An Electrohomeopathy Centre',
+        heading: 'Welcome to Last Leaf Care landing page',
+        tagline: 'We Care.',
+        imageUrl: 'https://res.cloudinary.com/dwgsflt8h/image/upload/v1749928246/banner_qf5r5l.png'
+    })
+
+    useEffect(() => {
+        fetch('/api/landing/hero')
+            .then(r => r.json())
+            .then(data => {
+                setContent({
+                    badge: data.badge,
+                    heading: data.heading,
+                    tagline: data.tagline,
+                    imageUrl: data.imageUrl
+                })
+            })
+            .catch(err => console.error('Error loading hero:', err))
+    }, [])
 
     return (
         <>
@@ -17,22 +37,18 @@ export default function HeroSection() {
                             <span className="mr-2 px-2 py-1 bg-brand text-white rounded-full text-xs font-medium">
                                 New
                             </span>
-                            <span className="text-gray-700 dark:text-gray-300"> An Electrohomeopathy Centre </span>
+                            <span className="text-gray-700 dark:text-gray-300"> {content.badge} </span>
                         </div>
                     </div>
 
                     <div className="max-w-screen-md mx-auto text-center text-4xl md:text-6xl font-bold">
                         <h1 className="text-gray-900 dark:text-white">
-                            Welcome to
-                            <span className="text-brand px-2">
-                                Last Leaf Care
-                            </span>
-                            landing page
+                            {content.heading}
                         </h1>
                     </div>
 
                     <p className="max-w-screen-sm mx-auto text-xl text-gray-600 dark:text-gray-400">
-                        {`We Care.`}
+                        {content.tagline}
                     </p>
 
                     <div className="space-y-4 md:space-y-0 md:space-x-4">
@@ -60,7 +76,7 @@ export default function HeroSection() {
                         width={1200}
                         height={1200}
                         className="w-full md:w-[1200px] mx-auto rounded-lg relative leading-none flex items-center border-2 border-gray-200 dark:border-gray-800 border-t-brand/30"
-                        src="https://res.cloudinary.com/dwgsflt8h/image/upload/v1749928246/banner_qf5r5l.png"
+                        src={content.imageUrl}
                         alt="dashboard"
                     />
 

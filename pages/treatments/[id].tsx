@@ -2,21 +2,32 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import CustomSelect from '../../components/CustomSelect'
 import LoadingModal from '../../components/LoadingModal'
+import ConfirmationModal from '../../components/ConfirmationModal'
 import { requireDoctorOrAdmin } from '../../lib/withAuth'
+import dropdownOptions from '../../data/dropdownOptions.json'
 
 function EditTreatmentPage() {
     const router = useRouter()
     const { id } = router.query
     const [products, setProducts] = useState<any[]>([])
-    const [treatmentPlans, setTreatmentPlans] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [showSuccessModal, setShowSuccessModal] = useState(false)
+    const [selectedProductId, setSelectedProductId] = useState('')
+    const [selectedMedicines, setSelectedMedicines] = useState<string[]>([])
+    const [medicines, setMedicines] = useState<any[]>([])
+    const [planNumber, setPlanNumber] = useState('01')
+    const [allTreatments, setAllTreatments] = useState<any[]>([])
+    const [uniqueDiagnoses, setUniqueDiagnoses] = useState<string[]>([])
     
     const emptyForm = {
-        srNo: '',
         speciality: '',
         organ: '',
         diseaseAction: '',
-        provDiagnosis: ''
+        provDiagnosis: '',
+        treatmentPlan: '',
+        administration: '',
+        notes: ''
     }
     
     const [form, setForm] = useState(emptyForm)
@@ -26,6 +37,19 @@ function EditTreatmentPage() {
     useEffect(() => { 
         fetch('/api/products').then(r => r.json()).then(data => {
             setProducts(Array.isArray(data) ? data : [])
+        })
+        
+        // Fetch all treatments to get unique diagnoses
+        fetch('/api/treatments').then(r => r.json()).then(treatments => {
+            setAllTreatments(Array.isArray(treatments) ? treatments : [])
+            
+            // Get unique diagnoses
+            const diagnoses = Array.from(new Set(
+                treatments
+                    .filter((t: any) => t.provDiagnosis && !t.deleted)
+                    .map((t: any) => t.provDiagnosis)
+            )) as string[]
+            setUniqueDiagnoses(diagnoses.sort())
         })
     }, [])
 
@@ -44,43 +68,39 @@ function EditTreatmentPage() {
                     return
                 }
                 
-                // Load treatment data
+                // Load treatment data - convert to uppercase
                 setForm({
-                    srNo: treatment.srNo || '',
-                    speciality: treatment.speciality || '',
-                    organ: treatment.organ || '',
-                    diseaseAction: treatment.diseaseAction || '',
-                    provDiagnosis: treatment.provDiagnosis || ''
+                    speciality: treatment.speciality?.toUpperCase() || '',
+                    organ: treatment.organ?.toUpperCase() || '',
+                    diseaseAction: treatment.diseaseAction?.toUpperCase() || '',
+                    provDiagnosis: treatment.provDiagnosis?.toUpperCase() || '',
+                    treatmentPlan: treatment.treatmentPlan?.toUpperCase() || '',
+                    administration: treatment.administration?.toUpperCase() || '',
+                    notes: treatment.notes?.toUpperCase() || ''
                 })
                 
-                // Load existing treatment plan (for edit mode, convert single plan to array format)
+                setPlanNumber(treatment.planNumber || '01')
+                
+                // Load existing medicines
                 if (treatment.treatmentProducts && treatment.treatmentProducts.length > 0) {
-                    setTreatmentPlans([{
-                        planNumber: treatment.planNumber || '01',
-                        treatmentPlan: treatment.treatmentPlan || '',
-                        administration: treatment.administration || '',
-                        notes: treatment.notes || '',
-                        medicines: treatment.treatmentProducts.map((tp: any) => ({
-                            id: tp.id,
-                            productId: tp.productId.toString(),
-                            comp1: tp.comp1 || '',
-                            comp2: tp.comp2 || '',
-                            comp3: tp.comp3 || '',
-                            // Treat empty strings as undefined to hide comp4/comp5
-                            comp4: (tp.comp4 && tp.comp4.trim()) ? tp.comp4 : undefined,
-                            comp5: (tp.comp5 && tp.comp5.trim()) ? tp.comp5 : undefined,
-                            quantity: tp.quantity || 1,
-                            timing: tp.timing || '',
-                            dosage: tp.dosage || '',
-                            additions: tp.additions || '',
-                            procedure: tp.procedure || '',
-                            presentation: tp.presentation || '',
-                            droppersToday: tp.droppersToday?.toString() || '',
-                            medicineQuantity: tp.medicineQuantity?.toString() || ''
-                        }))
-                    }])
-                } else {
-                    setTreatmentPlans([])
+                    setMedicines(treatment.treatmentProducts.map((tp: any) => ({
+                        id: tp.id,
+                        productId: tp.productId.toString(),
+                        comp1: tp.comp1 || '',
+                        comp2: tp.comp2 || '',
+                        comp3: tp.comp3 || '',
+                        // Treat empty strings as undefined to hide comp4/comp5
+                        comp4: (tp.comp4 && tp.comp4.trim()) ? tp.comp4 : undefined,
+                        comp5: (tp.comp5 && tp.comp5.trim()) ? tp.comp5 : undefined,
+                        quantity: tp.quantity || 1,
+                        timing: tp.timing || '',
+                        dosage: tp.dosage || '',
+                        additions: tp.additions || '',
+                        procedure: tp.procedure || '',
+                        presentation: tp.presentation || '',
+                        droppersToday: tp.droppersToday?.toString() || '',
+                        medicineQuantity: tp.medicineQuantity?.toString() || ''
+                    })))
                 }
                 
                 setLoading(false)
@@ -93,48 +113,70 @@ function EditTreatmentPage() {
     }, [id])
 
     function updateProvDiagnosis(newDiagnosis: string) {
-        setForm({ ...form, provDiagnosis: newDiagnosis })
-        // Update all existing treatment plan details with new diagnosis
-        if (treatmentPlans.length > 0) {
-            const updatedPlans = treatmentPlans.map(plan => ({
-                ...plan,
-                treatmentPlan: newDiagnosis ? `${newDiagnosis} ${plan.planNumber}` : ''
-            }))
-            setTreatmentPlans(updatedPlans)
+        const upperDiagnosis = newDiagnosis.toUpperCase()
+        // Auto-fill other fields based on selected diagnosis
+        if (upperDiagnosis && allTreatments.length > 0) {
+            const matchingTreatment = allTreatments.find((t: any) => 
+                t.provDiagnosis?.toUpperCase() === upperDiagnosis
+            )
+            if (matchingTreatment) {
+                setForm({
+                    provDiagnosis: upperDiagnosis,
+                    speciality: matchingTreatment.speciality?.toUpperCase() || '',
+                    organ: matchingTreatment.organ?.toUpperCase() || '',
+                    diseaseAction: matchingTreatment.diseaseAction?.toUpperCase() || '',
+                    treatmentPlan: upperDiagnosis,
+                    administration: form.administration.toUpperCase(),
+                    notes: form.notes.toUpperCase()
+                })
+                return
+            }
         }
-    }
-
-    function addTreatmentPlan() {
-        const newPlanNumber = String(treatmentPlans.length + 1).padStart(2, '0')
-        const treatmentPlanDetails = form.provDiagnosis ? `${form.provDiagnosis} ${newPlanNumber}` : ''
         
-        setTreatmentPlans([...treatmentPlans, { 
-            planNumber: newPlanNumber,
-            treatmentPlan: treatmentPlanDetails,
-            administration: '',
-            notes: '',
-            medicines: []
-        }])
+        setForm({ 
+            ...form, 
+            provDiagnosis: upperDiagnosis,
+            treatmentPlan: upperDiagnosis
+        })
     }
 
-    function removeTreatmentPlan(index: number) {
-        setTreatmentPlans(treatmentPlans.filter((_, i) => i !== index))
+    // Medicine list functionality
+    function removeFromSelectedMedicines(productId: string) {
+        setSelectedMedicines(selectedMedicines.filter(id => id !== productId))
     }
 
-    function updateTreatmentPlan(index: number, field: string, value: any) {
-        const updated = [...treatmentPlans]
-        updated[index] = { ...updated[index], [field]: value }
-        setTreatmentPlans(updated)
+    function removeAllSelectedMedicines() {
+        setSelectedMedicines([])
     }
 
-    function addMedicineToPlan(planIndex: number) {
-        const updated = [...treatmentPlans]
-        updated[planIndex].medicines.push({ 
-            productId: '', 
+    function addAllSelectedMedicinesToTreatment() {
+        const newMedicines = selectedMedicines.map(productId => ({
+            productId: productId,
             comp1: '',
             comp2: '',
             comp3: '',
-            // comp4/comp5 are optional and should be undefined until explicitly added
+            quantity: 0,
+            timing: '',
+            dosage: '',
+            additions: '',
+            procedure: '',
+            presentation: '',
+            droppersToday: '',
+            medicineQuantity: ''
+        }))
+        setMedicines([...medicines, ...newMedicines])
+        setSelectedMedicines([])
+    }
+
+    function addMedicine(productId: string) {
+        if (!productId || productId === '') return
+        
+        // Add medicine to the list
+        setMedicines([...medicines, {
+            productId: productId,
+            comp1: '',
+            comp2: '',
+            comp3: '',
             comp4: undefined,
             comp5: undefined,
             quantity: 1,
@@ -145,55 +187,55 @@ function EditTreatmentPage() {
             presentation: '',
             droppersToday: '',
             medicineQuantity: ''
-        })
-        setTreatmentPlans(updated)
+        }])
+        
+        // Clear selection
+        setSelectedProductId('')
     }
 
-    function removeMedicineFromPlan(planIndex: number, medicineIndex: number) {
-        const updated = [...treatmentPlans]
-        updated[planIndex].medicines = updated[planIndex].medicines.filter((_: any, i: number) => i !== medicineIndex)
-        setTreatmentPlans(updated)
+    function removeMedicine(index: number) {
+        setMedicines(medicines.filter((_, i) => i !== index))
     }
 
-    function updateMedicineInPlan(planIndex: number, medicineIndex: number, field: string, value: any) {
-        const updated = [...treatmentPlans]
-        updated[planIndex].medicines[medicineIndex] = { 
-            ...updated[planIndex].medicines[medicineIndex], 
-            [field]: value 
+    function updateMedicine(index: number, field: string, value: any) {
+        const updated = [...medicines]
+        // Convert specific fields to uppercase
+        if (['comp1', 'comp2', 'comp3', 'comp4', 'comp5', 'dosage', 'additions', 'procedure', 'presentation'].includes(field)) {
+            value = typeof value === 'string' ? value.toUpperCase() : value
         }
-        setTreatmentPlans(updated)
+        updated[index] = { ...updated[index], [field]: value }
+        setMedicines(updated)
     }
 
     async function update(e: any) {
         e.preventDefault()
         
-        // Update the treatment (only one plan when editing)
-        if (treatmentPlans.length > 0) {
-            const plan = treatmentPlans[0]
+        setSaving(true)
+        
+        try {
             const treatmentData = {
                 id: parseInt(id as string),
-                srNo: form.srNo,
-                speciality: form.speciality,
-                organ: form.organ,
-                diseaseAction: form.diseaseAction,
-                provDiagnosis: form.provDiagnosis,
-                planNumber: plan.planNumber,
-                treatmentPlan: plan.treatmentPlan,
-                administration: plan.administration,
-                notes: plan.notes,
-                products: plan.medicines.filter((p: any) => p.productId).map((p: any) => ({
+                speciality: form.speciality.toUpperCase(),
+                organ: form.organ.toUpperCase(),
+                diseaseAction: form.diseaseAction.toUpperCase(),
+                provDiagnosis: form.provDiagnosis.toUpperCase(),
+                planNumber: planNumber,
+                treatmentPlan: (form.treatmentPlan || form.provDiagnosis).toUpperCase(),
+                administration: form.administration.toUpperCase(),
+                notes: form.notes.toUpperCase(),
+                products: medicines.filter((p: any) => p.productId).map((p: any) => ({
                     productId: p.productId,
-                    comp1: p.comp1,
-                    comp2: p.comp2,
-                    comp3: p.comp3,
-                    comp4: p.comp4,
-                    comp5: p.comp5,
+                    comp1: p.comp1?.toUpperCase() || '',
+                    comp2: p.comp2?.toUpperCase() || '',
+                    comp3: p.comp3?.toUpperCase() || '',
+                    comp4: p.comp4?.toUpperCase() || '',
+                    comp5: p.comp5?.toUpperCase() || '',
                     quantity: p.quantity,
                     timing: p.timing,
-                    dosage: p.dosage,
-                    additions: p.additions,
-                    procedure: p.procedure,
-                    presentation: p.presentation,
+                    dosage: p.dosage?.toUpperCase() || '',
+                    additions: p.additions?.toUpperCase() || '',
+                    procedure: p.procedure?.toUpperCase() || '',
+                    presentation: p.presentation?.toUpperCase() || '',
                     droppersToday: p.droppersToday ? parseInt(p.droppersToday) : null,
                     medicineQuantity: p.medicineQuantity ? parseInt(p.medicineQuantity) : null
                 }))
@@ -209,11 +251,34 @@ function EditTreatmentPage() {
                 const err = await res.text()
                 console.error('Update treatment failed:', err)
                 alert('Failed to update treatment')
+                setSaving(false)
                 return
             }
+            
+            // Show success modal after update
+            setSaving(false)
+            setShowSuccessModal(true)
+        } catch (error) {
+            console.error('Update error:', error)
+            alert('Failed to update treatment')
+            setSaving(false)
         }
-        
-        // Navigate back to treatments page after successful update
+    }
+
+    function handleAddAnotherPlan() {
+        setShowSuccessModal(false)
+        // Redirect to add page with basic information prefilled
+        const params = new URLSearchParams({
+            diagnosis: form.provDiagnosis,
+            speciality: form.speciality,
+            organ: form.organ,
+            diseaseAction: form.diseaseAction
+        })
+        router.push(`/treatments/new?${params.toString()}`)
+    }
+
+    function handleNoThanks() {
+        setShowSuccessModal(false)
         router.push('/treatments')
     }
 
@@ -221,6 +286,21 @@ function EditTreatmentPage() {
         <div>
             {/* Loading Modal */}
             <LoadingModal isOpen={loading} message="Loading treatment..." />
+            
+            {/* Saving Loading Modal */}
+            <LoadingModal isOpen={saving} message="Updating treatment plan..." />
+            
+            {/* Success Modal */}
+            <ConfirmationModal
+                isOpen={showSuccessModal}
+                title="Treatment Plan Updated Successfully!"
+                message="Would you like to add another plan for this diagnosis?"
+                confirmText="Add Another Plan"
+                cancelText="No Thanks"
+                onConfirm={handleAddAnotherPlan}
+                onCancel={handleNoThanks}
+                type="info"
+            />
             
             <div className="section-header">
                 <h2 className="section-title">Edit Treatment</h2>
@@ -235,363 +315,432 @@ function EditTreatmentPage() {
             <form onSubmit={update} className="space-y-6">
                 <div className="card">
                     <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 gap-3">
                         <div>
-                            <label className="block text-sm font-medium mb-1.5">Sr No</label>
-                            <input 
-                                placeholder="001" 
-                                value={form.srNo} 
-                                onChange={e => setForm({ ...form, srNo: e.target.value })} 
-                                className="p-2 border rounded w-full" 
+                            <label className="block text-sm font-medium mb-1.5">Provisional Diagnosis *</label>
+                            <CustomSelect
+                                value={form.provDiagnosis}
+                                onChange={(val) => updateProvDiagnosis(val)}
+                                options={[
+                                    { value: '', label: 'Select diagnosis' },
+                                    ...uniqueDiagnoses.map(d => ({
+                                        value: d,
+                                        label: d
+                                    }))
+                                ]}
+                                placeholder="Select diagnosis"
+                                allowCustom={true}
+                                className="w-full"
                             />
+                            <p className="text-xs text-muted mt-1">Select or enter the main diagnosis. Treatment plan names will be auto-generated.</p>
                         </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Speciality</label>
                             <input 
-                                placeholder="Cardiology" 
+                                placeholder="CARDIOLOGY" 
                                 value={form.speciality} 
-                                onChange={e => setForm({ ...form, speciality: e.target.value })} 
-                                className="p-2 border rounded w-full" 
+                                onChange={e => setForm({ ...form, speciality: e.target.value.toUpperCase() })} 
+                                className="p-2 border rounded w-full uppercase" 
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Organ</label>
                             <input 
-                                placeholder="Heart" 
+                                placeholder="HEART" 
                                 value={form.organ} 
-                                onChange={e => setForm({ ...form, organ: e.target.value })} 
-                                className="p-2 border rounded w-full" 
+                                onChange={e => setForm({ ...form, organ: e.target.value.toUpperCase() })} 
+                                className="p-2 border rounded w-full uppercase" 
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Disease Action</label>
                             <input 
-                                placeholder="Anti-inflammatory" 
+                                placeholder="ANTI-INFLAMMATORY" 
                                 value={form.diseaseAction} 
-                                onChange={e => setForm({ ...form, diseaseAction: e.target.value })} 
-                                className="p-2 border rounded w-full" 
+                                onChange={e => setForm({ ...form, diseaseAction: e.target.value.toUpperCase() })} 
+                                className="p-2 border rounded w-full uppercase" 
                             />
-                        </div>
-                        <div className="sm:col-span-2 lg:col-span-4">
-                            <label className="block text-sm font-medium mb-1.5">Provisional Diagnosis *</label>
-                            <input 
-                                required 
-                                placeholder="e.g., ABSCESS RENAL" 
-                                value={form.provDiagnosis} 
-                                onChange={e => updateProvDiagnosis(e.target.value)} 
-                                className="p-2 border rounded w-full" 
-                            />
-                            <p className="text-xs text-muted mt-1">Enter the main diagnosis, then add treatment plan variations below. Treatment plan names will be auto-generated.</p>
                         </div>
                     </div>
                 </div>
                 
-                {/* Treatment Plans Section */}
+                {/* Treatment Plan Section (Single Plan - Edit Mode) */}
                 <div className="card">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold">Treatment Plans</h3>
-                        <button type="button" onClick={addTreatmentPlan} className="btn btn-secondary">
-                            + Add Treatment Plan
-                        </button>
-                    </div>
-                    
-                    {treatmentPlans.length === 0 ? (
-                        <p className="text-sm text-muted">No treatment plans added yet. Click "Add Treatment Plan" to create variations.</p>
-                    ) : (
-                        <div className="space-y-4">
-                            {treatmentPlans.map((plan, planIndex) => (
-                                <div key={planIndex} className="border-2 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-                                    {/* Plan Header */}
-                                    <div className="flex items-center justify-between mb-4 pb-3 border-b">
-                                        <div className="flex items-center gap-3">
-                                            <label className="text-sm font-medium">Plan Number:</label>
-                                            <input 
-                                                type="text"
-                                                value={plan.planNumber} 
-                                                readOnly
-                                                disabled
-                                                className="p-1.5 border rounded w-20 text-sm font-semibold bg-gray-100 dark:bg-gray-700 cursor-not-allowed"
-                                            />
-                                        </div>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => removeTreatmentPlan(planIndex)}
-                                            className="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                                        >
-                                            × Remove Plan
-                                        </button>
-                                    </div>
+                    <div className="border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20">
+                        {/* Plan Header */}
+                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-blue-300 dark:border-blue-700">
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Plan Number:</span>
+                                <span className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-bold">
+                                    {planNumber}
+                                </span>
+                            </div>
+                        </div>
 
-                                    {/* Plan Details Form */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-                                        <div className="sm:col-span-2 lg:col-span-3">
-                                            <label className="block text-xs font-medium mb-1">Treatment Plan Details (Auto-generated)</label>
-                                            <input 
-                                                value={plan.treatmentPlan} 
-                                                readOnly
-                                                disabled
-                                                className="p-2 border rounded w-full text-sm bg-gray-100 dark:bg-gray-700 cursor-not-allowed font-semibold" 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium mb-1">Administration</label>
-                                            <input 
-                                                placeholder="Oral" 
-                                                value={plan.administration} 
-                                                onChange={e => updateTreatmentPlan(planIndex, 'administration', e.target.value)}
-                                                className="p-2 border rounded w-full text-sm" 
-                                            />
-                                        </div>
-                                        <div className="sm:col-span-2">
-                                            <label className="block text-xs font-medium mb-1">Notes</label>
-                                            <textarea 
-                                                rows={2} 
-                                                placeholder="Additional notes" 
-                                                value={plan.notes} 
-                                                onChange={e => updateTreatmentPlan(planIndex, 'notes', e.target.value)}
-                                                className="p-2 border rounded w-full text-sm" 
-                                            />
-                                        </div>
-                                    </div>
+                        {/* Plan Details Form */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+                            <div className="sm:col-span-2 lg:col-span-3">
+                                <label className="block text-sm font-medium mb-1.5">Treatment Plan Details</label>
+                                <input 
+                                    placeholder="TREATMENT PLAN DESCRIPTION"
+                                    value={form.treatmentPlan} 
+                                    onChange={e => setForm({ ...form, treatmentPlan: e.target.value.toUpperCase() })}
+                                    className="p-2 border rounded-lg w-full text-sm uppercase" 
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1.5">Administration</label>
+                                <CustomSelect
+                                    value={form.administration}
+                                    onChange={(val) => setForm({ ...form, administration: val.toUpperCase() })}
+                                    options={dropdownOptions.administration}
+                                    placeholder="Select administration"
+                                    allowCustom={true}
+                                    className="w-full"
+                                />
+                            </div>
+                            <div className="sm:col-span-2">
+                                <label className="block text-sm font-medium mb-1.5">Notes</label>
+                                <textarea 
+                                    rows={2} 
+                                    placeholder="ADDITIONAL NOTES" 
+                                    value={form.notes} 
+                                    onChange={e => setForm({ ...form, notes: e.target.value.toUpperCase() })}
+                                    className="p-2 border rounded-lg w-full text-sm uppercase" 
+                                />
+                            </div>
+                        </div>
 
-                                    {/* Medicines Section for this Plan */}
-                                    <div className="border-t pt-3 mt-3">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h5 className="text-sm font-semibold">Medicines for Plan {plan.planNumber}</h5>
+                        {/* Medicine Selection with List */}
+                        <div className="border-t border-blue-300 dark:border-blue-700 pt-4 mt-3">
+                            <h5 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">Select Medicines from Inventory</h5>
+                            
+                            {/* Medicine Dropdown */}
+                            <div className="mb-3">
+                                <CustomSelect
+                                    value={selectedProductId}
+                                    onChange={(value) => {
+                                        setSelectedProductId(value)
+                                        if (value && value !== '') {
+                                            // Check if already in selected medicines
+                                            if (!selectedMedicines.includes(value)) {
+                                                setSelectedMedicines([...selectedMedicines, value])
+                                            }
+                                            setSelectedProductId('')
+                                        }
+                                    }}
+                                    options={[
+                                        { value: '', label: '-- select medicine from inventory --' },
+                                        ...products.map(p => {
+                                            const rl = (p as any).reorderLevel ?? 0
+                                            const low = p.quantity <= rl
+                                            return {
+                                                value: String(p.id),
+                                                label: `${p.name} · Stock: ${p.quantity}${rl ? ' · Reorder: ' + rl : ''}${low ? ' · ⚠️ LOW' : ''}`
+                                            }
+                                        })
+                                    ]}
+                                    placeholder="-- select medicine from inventory --"
+                                    className="w-full"
+                                />
+                            </div>
+
+                            {/* Selected Medicines List */}
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                                        Selected Medicines ({selectedMedicines.length})
+                                    </span>
+                                    {selectedMedicines.length > 0 && (
+                                        <div className="flex gap-2">
                                             <button 
                                                 type="button" 
-                                                onClick={() => addMedicineToPlan(planIndex)}
-                                                className="btn btn-secondary text-xs"
+                                                onClick={removeAllSelectedMedicines}
+                                                className="btn btn-secondary text-xs py-1 px-2"
                                             >
-                                                + Add Medicine
+                                                Remove All
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                onClick={addAllSelectedMedicinesToTreatment}
+                                                className="btn btn-primary text-xs py-1 px-2"
+                                            >
+                                                Add All to Treatment
                                             </button>
                                         </div>
-                                        
-                                        {plan.medicines.length === 0 ? (
-                                            <p className="text-xs text-muted">No medicines in this plan. Click "Add Medicine" to add products.</p>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                {plan.medicines.map((medicine: any, medicineIndex: number) => (
-                                                    <div key={medicineIndex} className="border rounded p-3 bg-white dark:bg-gray-700">
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
-                                                            <div className="sm:col-span-2">
-                                                                <label className="block text-xs font-medium mb-1">Medicine</label>
-                                                                <CustomSelect
-                                                                    value={medicine.productId}
-                                                                    onChange={(value) => updateMedicineInPlan(planIndex, medicineIndex, 'productId', value)}
-                                                                    options={[
-                                                                        { value: '', label: 'Select medicine' },
-                                                                        ...products.map(p => ({
-                                                                            value: String(p.id),
-                                                                            label: `${p.name} · Stock: ${p.quantity}`
-                                                                        }))
-                                                                    ]}
-                                                                    placeholder="Select medicine"
-                                                                    className="w-full"
-                                                                />
-                                                            </div>
-                                                            
-                                                            {/* Components Section - All in one line */}
-                                                            <div className="lg:col-span-3">
-                                                                <label className="block text-xs font-medium mb-1">Components</label>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <input 
-                                                                        placeholder="Component 1" 
-                                                                        value={medicine.comp1 || ''} 
-                                                                        onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'comp1', e.target.value)}
-                                                                        className="flex-1 p-1.5 border rounded text-xs"
-                                                                    />
-                                                                    <input 
-                                                                        placeholder="Component 2" 
-                                                                        value={medicine.comp2 || ''} 
-                                                                        onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'comp2', e.target.value)}
-                                                                        className="flex-1 p-1.5 border rounded text-xs"
-                                                                    />
-                                                                    <input 
-                                                                        placeholder="Component 3" 
-                                                                        value={medicine.comp3 || ''} 
-                                                                        onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'comp3', e.target.value)}
-                                                                        className="flex-1 p-1.5 border rounded text-xs"
-                                                                    />
-                                                                    
-                                                                    {/* Show comp4 if it exists */}
-                                                                    {medicine.comp4 !== undefined && (
-                                                                        <div className="flex-1 flex items-center gap-1">
-                                                                            <input 
-                                                                                placeholder="Component 4" 
-                                                                                value={medicine.comp4 || ''} 
-                                                                                onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'comp4', e.target.value)}
-                                                                                className="flex-1 p-1.5 border rounded text-xs"
-                                                                            />
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    const updated = [...treatmentPlans]
-                                                                                    updated[planIndex].medicines[medicineIndex].comp4 = undefined
-                                                                                    updated[planIndex].medicines[medicineIndex].comp5 = undefined
-                                                                                    setTreatmentPlans(updated)
-                                                                                }}
-                                                                                className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 text-xs"
-                                                                                title="Remove component 4"
-                                                                            >
-                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                                                                </svg>
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                    
-                                                                    {/* Show comp5 if it exists */}
-                                                                    {medicine.comp5 !== undefined && (
-                                                                        <div className="flex-1 flex items-center gap-1">
-                                                                            <input 
-                                                                                placeholder="Component 5" 
-                                                                                value={medicine.comp5 || ''} 
-                                                                                onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'comp5', e.target.value)}
-                                                                                className="flex-1 p-1.5 border rounded text-xs"
-                                                                            />
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    const updated = [...treatmentPlans]
-                                                                                    updated[planIndex].medicines[medicineIndex].comp5 = undefined
-                                                                                    setTreatmentPlans(updated)
-                                                                                }}
-                                                                                className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 text-xs"
-                                                                                title="Remove component 5"
-                                                                            >
-                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                                                                </svg>
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                    
-                                                                    {/* Plus button */}
-                                                                    {medicine.comp5 === undefined && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                const updated = [...treatmentPlans]
-                                                                                if (medicine.comp4 === undefined) {
-                                                                                    updated[planIndex].medicines[medicineIndex].comp4 = ''
-                                                                                } else {
-                                                                                    updated[planIndex].medicines[medicineIndex].comp5 = ''
-                                                                                }
-                                                                                setTreatmentPlans(updated)
-                                                                            }}
-                                                                            className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-blue-500 text-white rounded hover:bg-blue-600"
-                                                                            title="Add component"
-                                                                        >
-                                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                                                            </svg>
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <div>
-                                                                <label className="block text-xs font-medium mb-1">Qty (Drops)</label>
-                                                                <input 
-                                                                    type="number" 
-                                                                    min="1"
-                                                                    placeholder="0"
-                                                                    value={medicine.quantity} 
-                                                                    onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'quantity', parseInt(e.target.value))}
-                                                                    className="p-1.5 border rounded w-full text-xs"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-xs font-medium mb-1">Timing</label>
-                                                                <select 
-                                                                    value={medicine.timing} 
-                                                                    onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'timing', e.target.value)}
-                                                                    className="p-1.5 border rounded w-full text-xs"
-                                                                >
-                                                                    <option value="">Select timing</option>
-                                                                    <option value="BM">Before Meal</option>
-                                                                    <option value="AM">After Meal</option>
-                                                                    <option value="WM">With Meal</option>
-                                                                    <option value="HS">At Bedtime</option>
-                                                                    <option value="EMPTY">Empty Stomach</option>
-                                                                </select>
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-xs font-medium mb-1">Dosage</label>
-                                                                <input 
-                                                                    placeholder="5 drops, 3x daily"
-                                                                    value={medicine.dosage} 
-                                                                    onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'dosage', e.target.value)}
-                                                                    className="p-1.5 border rounded w-full text-xs"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-xs font-medium mb-1">Additions</label>
-                                                                <input 
-                                                                    placeholder="Additional notes"
-                                                                    value={medicine.additions} 
-                                                                    onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'additions', e.target.value)}
-                                                                    className="p-1.5 border rounded w-full text-xs"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-xs font-medium mb-1">Procedure</label>
-                                                                <input 
-                                                                    placeholder="Procedure"
-                                                                    value={medicine.procedure} 
-                                                                    onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'procedure', e.target.value)}
-                                                                    className="p-1.5 border rounded w-full text-xs"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-xs font-medium mb-1">Presentation</label>
-                                                                <input 
-                                                                    placeholder="Tablet, Drops, etc."
-                                                                    value={medicine.presentation} 
-                                                                    onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'presentation', e.target.value)}
-                                                                    className="p-1.5 border rounded w-full text-xs"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-xs font-medium mb-1">Droppers Today</label>
-                                                                <input 
-                                                                    type="number"
-                                                                    placeholder="0"
-                                                                    value={medicine.droppersToday} 
-                                                                    onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'droppersToday', e.target.value)}
-                                                                    className="p-1.5 border rounded w-full text-xs"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-xs font-medium mb-1">Quantity</label>
-                                                                <input 
-                                                                    type="number"
-                                                                    placeholder="0"
-                                                                    value={medicine.medicineQuantity} 
-                                                                    onChange={e => updateMedicineInPlan(planIndex, medicineIndex, 'medicineQuantity', e.target.value)}
-                                                                    className="p-1.5 border rounded w-full text-xs"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex justify-end">
-                                                            <button 
-                                                                type="button" 
-                                                                onClick={() => removeMedicineFromPlan(planIndex, medicineIndex)}
-                                                                className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs"
-                                                            >
-                                                                × Remove Medicine
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                    )}
                                 </div>
-                            ))}
+                                {selectedMedicines.length === 0 ? (
+                                    <div className="text-center py-3 text-gray-500 dark:text-gray-400 text-xs">
+                                        No medicines selected yet. Select medicines from the dropdown above.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {selectedMedicines.map((productId) => {
+                                            const product = products.find(p => String(p.id) === productId)
+                                            if (!product) return null
+                                            return (
+                                                <div key={productId} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded p-2 text-xs">
+                                                    <span className="font-medium">{product.name}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeFromSelectedMedicines(productId)}
+                                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-semibold px-2"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Added Medicines in Treatment */}
+                            {medicines.length === 0 ? (
+                                <div className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs text-center">
+                                    <p className="text-muted">No medicines added to treatment yet. Select medicines and click "Add All to Treatment".</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {medicines.map((medicine: any, medicineIndex: number) => (
+                                        <div key={medicineIndex} className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-700 shadow-sm">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
+                                                <div>
+                                                    <label className="block text-xs font-medium mb-1">Medicine</label>
+                                                    <CustomSelect
+                                                        value={medicine.productId}
+                                                        onChange={(value) => updateMedicine(medicineIndex, 'productId', value)}
+                                                        options={[
+                                                            { value: '', label: '-- select medicine --' },
+                                                            ...products.map(p => ({
+                                                                value: String(p.id),
+                                                                label: `${p.name} · Stock: ${p.quantity}`
+                                                            }))
+                                                        ]}
+                                                        placeholder="-- select medicine --"
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                                
+                                                {/* Components Section */}
+                                                <div className="sm:col-span-2 lg:col-span-3">
+                                                    <label className="block text-xs font-medium mb-1">Components</label>
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        <CustomSelect
+                                                            value={medicine.comp1 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'comp1', val.toUpperCase())}
+                                                            options={dropdownOptions.components}
+                                                            placeholder="Component 1"
+                                                            allowCustom={true}
+                                                            className="flex-1 min-w-[100px]"
+                                                        />
+                                                        <CustomSelect
+                                                            value={medicine.comp2 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'comp2', val.toUpperCase())}
+                                                            options={dropdownOptions.components}
+                                                            placeholder="Component 2"
+                                                            allowCustom={true}
+                                                            className="flex-1 min-w-[100px]"
+                                                        />
+                                                        <CustomSelect
+                                                            value={medicine.comp3 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'comp3', val.toUpperCase())}
+                                                            options={dropdownOptions.components}
+                                                            placeholder="Component 3"
+                                                            allowCustom={true}
+                                                            className="flex-1 min-w-[100px]"
+                                                        />
+                                                        
+                                                        {/* Show comp4 if it exists */}
+                                                        {medicine.comp4 !== undefined && (
+                                                            <div className="flex-1 min-w-[100px] flex items-center gap-1">
+                                                                <CustomSelect
+                                                                    value={medicine.comp4 || ''}
+                                                                    onChange={(val) => updateMedicine(medicineIndex, 'comp4', val.toUpperCase())}
+                                                                    options={dropdownOptions.components}
+                                                                    placeholder="Component 4"
+                                                                    allowCustom={true}
+                                                                    className="flex-1"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const updated = [...medicines]
+                                                                        updated[medicineIndex].comp4 = undefined
+                                                                        updated[medicineIndex].comp5 = undefined
+                                                                        setMedicines(updated)
+                                                                    }}
+                                                                    className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 text-xs"
+                                                                    title="Remove component 4"
+                                                                >
+                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Show comp5 if it exists */}
+                                                        {medicine.comp5 !== undefined && (
+                                                            <div className="flex-1 min-w-[100px] flex items-center gap-1">
+                                                                <CustomSelect
+                                                                    value={medicine.comp5 || ''}
+                                                                    onChange={(val) => updateMedicine(medicineIndex, 'comp5', val.toUpperCase())}
+                                                                    options={dropdownOptions.components}
+                                                                    placeholder="Component 5"
+                                                                    allowCustom={true}
+                                                                    className="flex-1"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const updated = [...medicines]
+                                                                        updated[medicineIndex].comp5 = undefined
+                                                                        setMedicines(updated)
+                                                                    }}
+                                                                    className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 text-xs"
+                                                                    title="Remove component 5"
+                                                                >
+                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                                                    </svg>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Plus button */}
+                                                        {medicine.comp5 === undefined && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const updated = [...medicines]
+                                                                    if (medicine.comp4 === undefined) {
+                                                                        updated[medicineIndex].comp4 = ''
+                                                                    } else {
+                                                                        updated[medicineIndex].comp5 = ''
+                                                                    }
+                                                                    setMedicines(updated)
+                                                                }}
+                                                                className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                                title="Add component"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                                                </svg>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Additional Fields */}
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mt-2">
+                                                <div>
+                                                    <label className="block text-xs font-medium mb-1">Qty (Drops)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        min="1"
+                                                        placeholder="0"
+                                                        value={medicine.quantity} 
+                                                        onChange={e => updateMedicine(medicineIndex, 'quantity', parseInt(e.target.value))}
+                                                        className="p-1.5 border rounded w-full text-xs"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium mb-1">Timing</label>
+                                                    <CustomSelect
+                                                        value={medicine.timing}
+                                                        onChange={(val) => updateMedicine(medicineIndex, 'timing', val)}
+                                                        options={dropdownOptions.timing}
+                                                        placeholder="Select timing"
+                                                        allowCustom={true}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium mb-1">Dosage</label>
+                                                    <CustomSelect
+                                                        value={medicine.dosage}
+                                                        onChange={(val) => updateMedicine(medicineIndex, 'dosage', val.toUpperCase())}
+                                                        options={dropdownOptions.dosage}
+                                                        placeholder="Select dosage"
+                                                        allowCustom={true}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium mb-1">Additions</label>
+                                                    <CustomSelect
+                                                        value={medicine.additions}
+                                                        onChange={(val) => updateMedicine(medicineIndex, 'additions', val.toUpperCase())}
+                                                        options={dropdownOptions.additions}
+                                                        placeholder="Select addition"
+                                                        allowCustom={true}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium mb-1">Procedure</label>
+                                                    <CustomSelect
+                                                        value={medicine.procedure}
+                                                        onChange={(val) => updateMedicine(medicineIndex, 'procedure', val.toUpperCase())}
+                                                        options={dropdownOptions.procedure}
+                                                        placeholder="Select procedure"
+                                                        allowCustom={true}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium mb-1">Presentation</label>
+                                                    <CustomSelect
+                                                        value={medicine.presentation}
+                                                        onChange={(val) => updateMedicine(medicineIndex, 'presentation', val.toUpperCase())}
+                                                        options={dropdownOptions.presentation}
+                                                        placeholder="Select presentation"
+                                                        allowCustom={true}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium mb-1">Droppers Today</label>
+                                                    <input 
+                                                        type="number"
+                                                        placeholder="0"
+                                                        value={medicine.droppersToday} 
+                                                        onChange={e => updateMedicine(medicineIndex, 'droppersToday', e.target.value)}
+                                                        className="p-1.5 border rounded w-full text-xs"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium mb-1">Medicine Quantity</label>
+                                                    <input 
+                                                        type="number"
+                                                        placeholder="0"
+                                                        value={medicine.medicineQuantity} 
+                                                        onChange={e => updateMedicine(medicineIndex, 'medicineQuantity', e.target.value)}
+                                                        className="p-1.5 border rounded w-full text-xs"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-end mt-2">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => removeMedicine(medicineIndex)}
+                                                    className="btn btn-danger text-xs"
+                                                >
+                                                    × Remove
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
                 </div>
                 
                 <div className="flex justify-end gap-3">

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { requireDoctorOrAdmin } from '../lib/withAuth'
+import ConfirmationModal from '../components/ConfirmationModal'
+import LoadingModal from '../components/LoadingModal'
 
 function TreatmentsPage() {
     const router = useRouter()
@@ -10,6 +12,9 @@ function TreatmentsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [loading, setLoading] = useState(true)
     const [user, setUser] = useState<any>(null)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [deleteId, setDeleteId] = useState<number | null>(null)
+    const [deleting, setDeleting] = useState(false)
     
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
     useEffect(() => { 
@@ -28,13 +33,24 @@ function TreatmentsPage() {
             newExpanded.add(id)
         }
         setExpandedRows(newExpanded)
-    }    async function deleteTreatment(id: number) {
-        if (!confirm('Are you sure you want to delete this treatment?')) return
+    }
+
+    function openDeleteConfirmation(id: number) {
+        setDeleteId(id)
+        setShowDeleteConfirm(true)
+    }
+
+    async function confirmDelete() {
+        if (deleteId === null) return
+        
+        setShowDeleteConfirm(false)
+        setDeleting(true)
+        
         try {
             const response = await fetch('/api/treatments', { 
                 method: 'DELETE', 
                 headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ id }) 
+                body: JSON.stringify({ id: deleteId }) 
             })
             if (response.ok) {
                 setItems(await (await fetch('/api/treatments')).json())
@@ -45,11 +61,34 @@ function TreatmentsPage() {
         } catch (error) {
             console.error('Delete error:', error)
             alert('Failed to delete treatment')
+        } finally {
+            setDeleting(false)
+            setDeleteId(null)
         }
+    }
+
+    function cancelDelete() {
+        setShowDeleteConfirm(false)
+        setDeleteId(null)
     }
 
     return (
         <div>
+            {/* Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={showDeleteConfirm}
+                title="Delete Treatment Plan"
+                message="Are you sure you want to delete this treatment plan? This action will soft-delete the plan and renumber the remaining plans."
+                confirmText="Delete"
+                cancelText="Cancel"
+                onConfirm={confirmDelete}
+                onCancel={cancelDelete}
+                type="danger"
+            />
+
+            {/* Deleting Loading Modal */}
+            <LoadingModal isOpen={deleting} message="Deleting treatment plan..." />
+
             <div className="section-header flex justify-between items-center">
                 <h2 className="section-title">Treatment Management</h2>
                 <button 
@@ -181,6 +220,21 @@ function TreatmentsPage() {
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <button
+                                                    onClick={() => {
+                                                        const params = new URLSearchParams({
+                                                            diagnosis: firstTreatment.provDiagnosis || '',
+                                                            speciality: firstTreatment.speciality || '',
+                                                            organ: firstTreatment.organ || '',
+                                                            diseaseAction: firstTreatment.diseaseAction || ''
+                                                        })
+                                                        router.push(`/treatments/new?${params.toString()}`)
+                                                    }}
+                                                    className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded"
+                                                    title="Add Plan"
+                                                >
+                                                    + Add Plan
+                                                </button>
+                                                <button
                                                     onClick={() => toggleRowExpansion(groupKey as any)}
                                                     className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
                                                     title={isExpanded ? "Hide Details" : "View More"}
@@ -199,11 +253,7 @@ function TreatmentsPage() {
                                             return (
                                                 <div className="p-4 bg-white dark:bg-gray-900 space-y-4">
                                                     {/* Basic Info (common across all plans) */}
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pb-3 border-b border-gray-200 dark:border-gray-700">
-                                                        <div>
-                                                            <div className="text-xs text-muted mb-1">SR No</div>
-                                                            <div className="text-sm font-medium">{firstTreatment.srNo || '-'}</div>
-                                                        </div>
+                                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pb-3 border-b border-gray-200 dark:border-gray-700">
                                                         <div>
                                                             <div className="text-xs text-muted mb-1">Speciality</div>
                                                             <div className="text-sm font-medium">{firstTreatment.speciality || '-'}</div>
@@ -246,7 +296,7 @@ function TreatmentsPage() {
                                                             ✏️ Edit Plan
                                                         </button>
                                                         <button
-                                                            onClick={() => deleteTreatment(selectedTreatment.id)}
+                                                            onClick={() => openDeleteConfirmation(selectedTreatment.id)}
                                                             className="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
                                                             title="Delete"
                                                         >

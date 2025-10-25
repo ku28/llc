@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import LandingHeader from '../components/LandingHeader'
 import Footer from '../components/lastleaf/sections/footer'
@@ -6,46 +7,16 @@ interface GalleryProps {
     imageUrl: string;
 }
 
-const galleryList: GalleryProps[] = [
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164667/a2_nuuwo0.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164667/a3_v6ic6r.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_v6ic6r.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a1_u4i3jx.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_1_ebo8df.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_1_ebo8df.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_1_ebo8df.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_1_ebo8df.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_1_ebo8df.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_1_ebo8df.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_1_ebo8df.png",
-    },
-    {
-        imageUrl: "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_1_ebo8df.png",
-    },
-];
-
 export default function GalleryPage() {
+    const [galleryList, setGalleryList] = useState<GalleryProps[]>([])
+
+    useEffect(() => {
+        fetch('/api/gallery-content')
+            .then(r => r.json())
+            .then(data => setGalleryList(data))
+            .catch(err => console.error('Error loading gallery:', err))
+    }, [])
+
     return (
         <div className="min-h-screen bg-white dark:bg-[#0a0a0a]">
             <LandingHeader />

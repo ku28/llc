@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import CustomSelect from '../components/CustomSelect'
+import ConfirmModal from '../components/ConfirmModal'
+import LoadingModal from '../components/LoadingModal'
 import { requireStaffOrAbove } from '../lib/withAuth'
 
 function ProductsPage() {
@@ -8,6 +10,8 @@ function ProductsPage() {
     const [editingId, setEditingId] = useState<number | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [deleteId, setDeleteId] = useState<number | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
     const [loading, setLoading] = useState(true)
     
@@ -193,12 +197,17 @@ function ProductsPage() {
     }
 
     async function deleteProduct(id: number) {
-        if (!confirm('Are you sure you want to delete this product?')) return
+        setDeleteId(id)
+        setShowDeleteConfirm(true)
+    }
+
+    async function confirmDelete() {
+        if (deleteId === null) return
         try {
             const response = await fetch('/api/products', { 
                 method: 'DELETE', 
                 headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ id }) 
+                body: JSON.stringify({ id: deleteId }) 
             })
             if (response.ok) {
                 setItems(await (await fetch('/api/products')).json())
@@ -209,6 +218,9 @@ function ProductsPage() {
         } catch (error) {
             console.error('Delete error:', error)
             alert('Failed to delete product')
+        } finally {
+            setShowDeleteConfirm(false)
+            setDeleteId(null)
         }
     }
 
@@ -613,6 +625,20 @@ function ProductsPage() {
                         )
                     })()}
                 </div>
+
+            <ConfirmModal
+                isOpen={showDeleteConfirm}
+                title="Delete Product"
+                message="Are you sure you want to delete this product? This action cannot be undone."
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="danger"
+                onConfirm={confirmDelete}
+                onCancel={() => {
+                    setShowDeleteConfirm(false)
+                    setDeleteId(null)
+                }}
+            />
         </div>
     )
 }

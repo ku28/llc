@@ -2,43 +2,32 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
-interface TeamProps {
+interface GalleryImage {
   imageUrl: string;
+  order: number;
 }
-
-const teamList: TeamProps[] = [
-  {
-    imageUrl: 
-      "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164667/a2_nuuwo0.png",
-  },
-  {
-    imageUrl:
-      "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164667/a3_v6ic6r.png",
-  },
-  {
-    imageUrl:
-      "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_v6ic6r.png",
-  },
-  {
-    imageUrl:
-      "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a1_u4i3jx.png",
-  },
-  {
-    imageUrl:
-      "https://res.cloudinary.com/dwgsflt8h/image/upload/v1750164666/a3_1_ebo8df.png",
-  },
-];
 
 export default function TeamSection() {
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [images, setImages] = useState<GalleryImage[]>([]);
 
   useEffect(() => {
+    // Fetch images from gallery API
+    fetch('/api/gallery-content')
+      .then(res => res.json())
+      .then(data => setImages(data))
+      .catch(err => console.error('Error loading gallery images:', err));
+  }, []);
+
+  useEffect(() => {
+    if (images.length === 0) return;
+    
     const interval = setInterval(() => {
       setScrollPosition((prev) => prev + 1);
     }, 30);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [images]);
 
   return (
     <section id="team" className="w-full py-24 sm:py-32 px-4 sm:px-6 lg:px-8">
@@ -54,30 +43,36 @@ export default function TeamSection() {
         </div>
 
         <div className="relative overflow-hidden rounded-xl">
-          <div 
-            className="flex gap-12 w-fit"
-            style={{
-              transform: `translateX(-${scrollPosition}px)`,
-              animation: 'none'
-            }}
-          >
-          {[...teamList, ...teamList, ...teamList].map((item, index) => (
-            <div
-              key={index}
-              className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden group flex-shrink-0"
-            >
-              <div className="p-0">
-                <Image
-                  src={item.imageUrl}
-                  alt="achievement"
-                  width={300}
-                  height={300}
-                  className="w-[300px] h-auto"
-                />
-              </div>
+          {images.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+              No achievement images available. Add images in the Gallery section.
             </div>
-          ))}
-        </div>
+          ) : (
+            <div 
+              className="flex gap-12 w-fit"
+              style={{
+                transform: `translateX(-${scrollPosition}px)`,
+                animation: 'none'
+              }}
+            >
+              {[...images, ...images, ...images].map((item, index) => (
+                <div
+                  key={index}
+                  className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden group flex-shrink-0"
+                >
+                  <div className="p-0">
+                    <Image
+                      src={item.imageUrl}
+                      alt={`Achievement ${index + 1}`}
+                      width={300}
+                      height={300}
+                      className="w-[300px] h-auto"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>

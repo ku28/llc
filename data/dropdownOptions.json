@@ -5,10 +5,6 @@
             "label": "Select temperament"
         },
         {
-            "value": "TEMP",
-            "label": "TEMP"
-        },
-        {
             "value": "LYM-S1/JUN",
             "label": "LYM-S1/JUN"
         },
@@ -87,6 +83,196 @@
         {
             "value": "receptionist",
             "label": "Receptionist"
+        }
+    ],
+    "timing": [
+        {
+            "value": "",
+            "label": "Select timing"
+        },
+        {
+            "value": "BM",
+            "label": "Before Meal"
+        },
+        {
+            "value": "AM",
+            "label": "After Meal"
+        },
+        {
+            "value": "WM",
+            "label": "With Meal"
+        },
+        {
+            "value": "HS",
+            "label": "At Bedtime"
+        },
+        {
+            "value": "EMPTY",
+            "label": "Empty Stomach"
+        }
+    ],
+    "components": [
+        {
+            "value": "",
+            "label": "Select component"
+        },
+        {
+            "value": "F1",
+            "label": "F1"
+        },
+        {
+            "value": "BELLADONNA",
+            "label": "BELLADONNA"
+        },
+        {
+            "value": "BRYONIA",
+            "label": "BRYONIA"
+        },
+        {
+            "value": "CALCAREA CARBONICA",
+            "label": "CALCAREA CARBONICA"
+        },
+        {
+            "value": "NUX VOMICA",
+            "label": "NUX VOMICA"
+        },
+        {
+            "value": "PULSATILLA",
+            "label": "PULSATILLA"
+        },
+        {
+            "value": "RHUS TOX",
+            "label": "RHUS TOX"
+        },
+        {
+            "value": "SULPHUR",
+            "label": "SULPHUR"
+        }
+    ],
+    "dosage": [
+        {
+            "value": "",
+            "label": "Select dosage"
+        },
+        {
+            "value": "10/DRP/TDS/WTR",
+            "label": "10/DRP/TDS/WTR"
+        },
+        {
+            "value": "10 DROPS, 2X DAILY",
+            "label": "10 DROPS, 2X DAILY"
+        },
+        {
+            "value": "3 DROPS, 4X DAILY",
+            "label": "3 DROPS, 4X DAILY"
+        },
+        {
+            "value": "1 TABLET, 3X DAILY",
+            "label": "1 TABLET, 3X DAILY"
+        },
+        {
+            "value": "2 TABLETS, 2X DAILY",
+            "label": "2 TABLETS, 2X DAILY"
+        }
+    ],
+    "additions": [
+        {
+            "value": "",
+            "label": "Select addition"
+        },
+        {
+            "value": "IN WATER",
+            "label": "IN WATER"
+        },
+        {
+            "value": "WITH MILK",
+            "label": "WITH MILK"
+        },
+        {
+            "value": "WITH HONEY",
+            "label": "WITH HONEY"
+        },
+        {
+            "value": "UNDER TONGUE",
+            "label": "UNDER TONGUE"
+        }
+    ],
+    "procedure": [
+        {
+            "value": "",
+            "label": "Select procedure"
+        },
+        {
+            "value": "DILUTE IN WATER",
+            "label": "DILUTE IN WATER"
+        },
+        {
+            "value": "TAKE DIRECTLY",
+            "label": "TAKE DIRECTLY"
+        },
+        {
+            "value": "MIX WITH FOOD",
+            "label": "MIX WITH FOOD"
+        },
+        {
+            "value": "APPLY TOPICALLY",
+            "label": "APPLY TOPICALLY"
+        }
+    ],
+    "presentation": [
+        {
+            "value": "",
+            "label": "Select presentation"
+        },
+        {
+            "value": "DROPS",
+            "label": "DROPS"
+        },
+        {
+            "value": "TABLET",
+            "label": "TABLET"
+        },
+        {
+            "value": "CAPSULE",
+            "label": "CAPSULE"
+        },
+        {
+            "value": "LIQUID",
+            "label": "LIQUID"
+        },
+        {
+            "value": "POWDER",
+            "label": "POWDER"
+        },
+        {
+            "value": "CREAM",
+            "label": "CREAM"
+        },
+        {
+            "value": "OINTMENT",
+            "label": "OINTMENT"
+        }
+    ],
+    "administration": [
+        {
+            "value": "",
+            "label": "Select administration"
+        },
+        {
+            "value": "ORAL",
+            "label": "ORAL"
+        },
+        {
+            "value": "TOPICAL",
+            "label": "TOPICAL"
+        },
+        {
+            "value": "SUBLINGUAL",
+            "label": "SUBLINGUAL"
+        },
+        {
+            "value": "EXTERNAL",
+            "label": "EXTERNAL"
         }
     ]
 }

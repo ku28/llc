@@ -15,6 +15,10 @@ export default function App({ Component, pageProps }: AppProps) {
   // Pages that don't require authentication
   const publicPages = ['/login', '/signup', '/user-signup', '/', '/about', '/services', '/gallery', '/contact']
   const isPublicPage = publicPages.includes(router.pathname)
+  
+  // Edit pages that use their own EditLayout (no need for main Layout wrapper)
+  const editPages = ['/edit', '/edit-about', '/edit-services', '/edit-gallery', '/edit-contact']
+  const isEditPage = editPages.includes(router.pathname)
 
   useEffect(() => {
     // Check DB connection on every page load
@@ -92,19 +96,36 @@ export default function App({ Component, pageProps }: AppProps) {
         }}
       />
 
-      <Layout>
-        {/* Only render component after auth check (or if public page) */}
-        {(authChecked || isPublicPage) ? (
-          <Component {...pageProps} />
-        ) : (
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto mb-4"></div>
-              <p className="text-muted">Checking authentication...</p>
+      {/* Conditionally wrap with Layout - skip for edit pages that have their own EditLayout */}
+      {isEditPage ? (
+        <>
+          {/* Only render component after auth check (or if public page) */}
+          {(authChecked || isPublicPage) ? (
+            <Component {...pageProps} />
+          ) : (
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto mb-4"></div>
+                <p className="text-muted">Checking authentication...</p>
+              </div>
             </div>
-          </div>
-        )}
-      </Layout>
+          )}
+        </>
+      ) : (
+        <Layout>
+          {/* Only render component after auth check (or if public page) */}
+          {(authChecked || isPublicPage) ? (
+            <Component {...pageProps} />
+          ) : (
+            <div className="flex items-center justify-center min-h-screen">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto mb-4"></div>
+                <p className="text-muted">Checking authentication...</p>
+              </div>
+            </div>
+          )}
+        </Layout>
+      )}
     </>
   )
 }

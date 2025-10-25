@@ -1,5 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+interface ContactInfo {
+  address: string;
+  phone: string;
+  email: string;
+  hours: string;
+}
 
 export default function ContactSection() {
   const [formData, setFormData] = useState({
@@ -9,6 +16,20 @@ export default function ContactSection() {
     phoneNumber: "",
     message: "",
   });
+
+  const [contactInfo, setContactInfo] = useState<ContactInfo>({
+    address: "S-5, Royal Heights Royal City, Chahal Road, Faridkot 151203",
+    phone: "+91-9915066777/ 9357066777/ 9463220005",
+    email: "lastleafcare@gmail.com",
+    hours: "Monday - Saturday\n10AM - 8PM"
+  });
+
+  useEffect(() => {
+    fetch('/api/contact-info')
+      .then(r => r.json())
+      .then(data => setContactInfo(data))
+      .catch(err => console.error('Error loading contact info:', err))
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +71,7 @@ export default function ContactSection() {
                 <span>🏢</span>
                 <div>Find us</div>
               </div>
-              <div>S-5, Royal Heights Royal City, Chahal Road, Faridkot 151203</div>
+              <div className="whitespace-pre-line">{contactInfo.address}</div>
             </div>
 
             <div>
@@ -58,7 +79,7 @@ export default function ContactSection() {
                 <span>📞</span>
                 <div>Call us</div>
               </div>
-              <div>+91-9915066777/ 9357066777/ 9463220005</div>
+              <div>{contactInfo.phone}</div>
             </div>
 
             <div>
@@ -66,7 +87,7 @@ export default function ContactSection() {
                 <span>✉️</span>
                 <div>Mail US</div>
               </div>
-              <div>lastleafcare@gmail.com</div>
+              <div>{contactInfo.email}</div>
             </div>
 
             <div>
@@ -74,10 +95,7 @@ export default function ContactSection() {
                 <span>🕐</span>
                 <div>Visit us</div>
               </div>
-              <div>
-                <div>Monday - Saturday</div>
-                <div>10AM - 8PM</div>
-              </div>
+              <div className="whitespace-pre-line">{contactInfo.hours}</div>
             </div>
           </div>
         </div>

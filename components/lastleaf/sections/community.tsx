@@ -1,4 +1,25 @@
+import { useEffect, useState } from "react";
+
+interface SpecialitiesContent {
+  title: string;
+  description: string;
+  quote: string;
+}
+
 export default function CommunitySection() {
+  const [content, setContent] = useState<SpecialitiesContent>({
+    title: 'Our Specialities',
+    description: '',
+    quote: ''
+  });
+
+  useEffect(() => {
+    // Fetch specialities content from API
+    fetch('/api/landing/specialities')
+      .then(res => res.json())
+      .then(data => setContent(data))
+      .catch(err => console.error('Error loading specialities:', err));
+  }, []);
   return (
     <section id="community" className="w-full py-12">
       <hr className="border-gray-300 dark:border-gray-700" />
@@ -12,24 +33,16 @@ export default function CommunitySection() {
                 </h2>
 
                 <h2 className="text-3xl md:text-4xl text-center font-bold text-gray-900 dark:text-white">
-                  Our Specialities
+                  {content.title}
                 </h2>
               </div>
             </div>
             <div className="max-w-5xl text-lg md:text-xl text-brand px-6 leading-relaxed">
-              LAST LEAF CARE Electrohomeopathy Centre is one of the most prominent Electrohomeopathic Centres in area.
-              Since 1965 Electohomeopathy has treated patients with well-experienced expertise and advanced Electrohomeopathic Methodology.
-              We are offering our services to patients help them in the treatment of Kidney Diseases
-              (like Chronic Kidney Disease, UTI, Diabetic Kidney Disease, Nephrotic syndrome, Renal cyst, Renal stone etc.),
-              Neuralgias ( Trigeminal neuralgia, Glossopharyngeal neuralgia, Bell's Palsy etc.), Diabetes and other chronic diseases.
-              This Electrohomeopathy Centre runs by doctor aiming to provide help for the best treatment to patients. In our Electrohomeopathy Centre,
-              we provide help for customized treatment for each patient and follow up on their health conditions that can help cure them permanently.
-              As a result, It is the only Electrohomeopathy Centre in Area that has built a reputation for its practical impact and evidence-based
-              Electrohomeopathic Treatment guidance.
+              {content.description}
             </div>
 
             <div className="text-gray-600 dark:text-gray-400 mt-8">
-              "Drugs are not always necessary. Belief in recovery always is." - Norman Cousins
+              {content.quote}
             </div>
           </div>
         </div>

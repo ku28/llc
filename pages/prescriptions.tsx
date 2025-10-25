@@ -47,9 +47,14 @@ export default function PrescriptionsPage() {
 
     // Track treatment plan modifications
     const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | null>(null)
+    const [selectedTreatmentPlan, setSelectedTreatmentPlan] = useState<any>(null)
     const [originalTreatmentData, setOriginalTreatmentData] = useState<any[]>([])
     const [showSaveModal, setShowSaveModal] = useState(false)
     const [pendingSubmit, setPendingSubmit] = useState<any>(null)
+    const [showNavigationModal, setShowNavigationModal] = useState(false)
+    const [createdTreatmentId, setCreatedTreatmentId] = useState<string | null>(null)
+    const [savedVisitIdForNav, setSavedVisitIdForNav] = useState<string | null>(null)
+    const [creatingTreatment, setCreatingTreatment] = useState(false)
 
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
     useEffect(() => { fetch('/api/patients').then(r => r.json()).then(setPatients) }, [])
@@ -148,6 +153,12 @@ export default function PrescriptionsPage() {
     useEffect(() => {
         if (isEditMode && visitId) {
             setLoading(true)
+            // Fetch all treatments including deleted ones for edit mode
+            fetch('/api/treatments?includeDeleted=true')
+                .then(r => r.json())
+                .then(allTreatments => setTreatments(allTreatments))
+                .catch(err => console.error('Error loading treatments:', err))
+            
             fetch(`/api/visits?id=${visitId}`)
                 .then(r => r.json())
                 .then(visit => {
@@ -204,7 +215,7 @@ export default function PrescriptionsPage() {
 
                     // Pre-fill prescriptions
                     if (visit.prescriptions && visit.prescriptions.length > 0) {
-                        setPrescriptions(visit.prescriptions.map((p: any) => ({
+                        const loadedPrescriptions = visit.prescriptions.map((p: any) => ({
                             treatmentId: p.treatmentId ? String(p.treatmentId) : '',
                             productId: String(p.productId),
                             comp1: p.comp1 || '',
@@ -222,7 +233,28 @@ export default function PrescriptionsPage() {
                             medicineQuantity: p.medicineQuantity?.toString() || '',
                             administration: p.administration || '',
                             taken: p.taken || false
-                        })))
+                        }))
+                        
+                        setPrescriptions(loadedPrescriptions)
+                        
+                        // Check if prescriptions have a treatment plan attached
+                        const firstTreatmentId = visit.prescriptions[0]?.treatmentId
+                        if (firstTreatmentId) {
+                            // Set the selected treatment ID
+                            setSelectedTreatmentId(String(firstTreatmentId))
+                            // Fetch and store the full treatment plan object (including deleted ones)
+                            fetch(`/api/treatments?includeDeleted=true`)
+                                .then(r => r.json())
+                                .then(allTreatments => {
+                                    const treatment = allTreatments.find((t: any) => String(t.id) === String(firstTreatmentId))
+                                    if (treatment) {
+                                        setSelectedTreatmentPlan(treatment)
+                                    }
+                                })
+                                .catch(err => console.error('Error fetching treatment plan:', err))
+                            // Store original treatment data for comparison
+                            setOriginalTreatmentData(JSON.parse(JSON.stringify(loadedPrescriptions)))
+                        }
                     }
 
                     setLoading(false)
@@ -448,6 +480,7 @@ export default function PrescriptionsPage() {
 
         // Clear treatment plan tracking when adding individual medicine
         setSelectedTreatmentId(null)
+        setSelectedTreatmentPlan(null)
         setOriginalTreatmentData([])
 
         setPrescriptions([...prescriptions, {
@@ -482,13 +515,10 @@ export default function PrescriptionsPage() {
 
     function addAllSelectedMedicinesToPrescription() {
         if (selectedMedicines.length === 0) return alert('No medicines selected')
-        
-        // Clear treatment plan tracking when adding individual medicines
-        setSelectedTreatmentId(null)
-        setOriginalTreatmentData([])
 
         const newPrescriptions = selectedMedicines.map(productId => ({
-            treatmentId: '', productId: productId,
+            treatmentId: selectedTreatmentId || '', // Use selected treatment plan if any
+            productId: productId,
             comp1: '', comp2: '', comp3: '', comp4: undefined, comp5: undefined,
             quantity: 1, timing: '', dosage: '',
             additions: '', procedure: '', presentation: '',
@@ -561,6 +591,7 @@ export default function PrescriptionsPage() {
     function addEmptyPrescription() {
         // Clear treatment plan tracking when adding empty row
         setSelectedTreatmentId(null)
+        setSelectedTreatmentPlan(null)
         setOriginalTreatmentData([])
 
         setPrescriptions([...prescriptions, {
@@ -721,6 +752,8 @@ export default function PrescriptionsPage() {
         <div>
             {/* Loading Modal */}
             <LoadingModal isOpen={loading} message={isEditMode ? 'Loading visit data...' : 'Loading...'} />
+            {/* Creating Treatment Modal */}
+            <LoadingModal isOpen={creatingTreatment} message="Creating Treatment Plan and Saving Prescription..." />
             
             {isPatient ? (
                 // Patient view - Read-only prescription list
@@ -1178,20 +1211,50 @@ export default function PrescriptionsPage() {
                                                 }))
                                                 setPrescriptions(newPrescriptions) // Replace, not add
                                                 setSelectedTreatmentId(String(treatment.id))
+                                                setSelectedTreatmentPlan(treatment) // Store the full treatment plan object
                                                 setOriginalTreatmentData(JSON.parse(JSON.stringify(newPrescriptions))) // Deep copy
                                             }
                                         }}
                                         options={[
                                             { value: '', label: '-- select treatment plan to load medicines --' },
-                                            ...treatments.map(t => ({
-                                                value: String(t.id),
-                                                label: `${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`} (${t.treatmentProducts?.length || 0} medicines)`
-                                            }))
+                                            ...(Array.isArray(treatments) ? treatments : [])
+                                                .filter(t => !t.deleted) // Only show non-deleted treatments in dropdown
+                                                .map(t => ({
+                                                    value: String(t.id),
+                                                    label: `${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`} (${t.treatmentProducts?.length || 0} medicines)`
+                                                }))
                                         ]}
                                         placeholder="-- select treatment plan --"
                                         className="flex-1"
                                     />
                                 </div>
+                                {selectedTreatmentId && (
+                                    <div className="mt-2 flex items-center gap-2 text-sm">
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Selected Plan:</span>
+                                        <span className="text-gray-700 dark:text-gray-300">
+                                            {(() => {
+                                                const treatment = Array.isArray(treatments) ? treatments.find(t => String(t.id) === String(selectedTreatmentId)) : null
+                                                const planName = treatment?.treatmentPlan || treatment?.provDiagnosis || `Treatment #${selectedTreatmentId}`
+                                                return treatment?.deleted ? (
+                                                    <>
+                                                        <span className="text-red-600 dark:text-red-400 font-bold">(DELETED)</span> {planName}
+                                                    </>
+                                                ) : planName
+                                            })()}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedTreatmentId(null)
+                                                setSelectedTreatmentPlan(null)
+                                                setOriginalTreatmentData([])
+                                            }}
+                                            className="ml-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs font-semibold"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                )}
                                 <p className="text-xs text-muted mt-1">This will <strong>replace all medicines</strong> with the selected treatment plan. To add individual medicines, use the selector below.</p>
                             </div>
 
@@ -1299,29 +1362,46 @@ export default function PrescriptionsPage() {
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {prescriptions.map((pr, i) => (
-                                        <div key={i} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/30">
+                                    {prescriptions.map((pr, i) => {
+                                        const prescriptionTreatment = pr.treatmentId && Array.isArray(treatments) ? treatments.find(t => String(t.id) === String(pr.treatmentId)) : null
+                                        const isDeleted = prescriptionTreatment?.deleted === true
+                                        
+                                        return (
+                                        <div key={i} className={`p-4 border rounded-lg ${isDeleted ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30'}`}>
+                                            {isDeleted && (
+                                                <div className="mb-3 p-2 bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700 rounded text-sm">
+                                                    <span className="text-red-600 dark:text-red-400 font-bold">⚠ DELETED TREATMENT PLAN - Read Only</span>
+                                                </div>
+                                            )}
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Treatment Plan</label>
+                                                    {isDeleted ? (
+                                                        <div className="p-2 border rounded-lg bg-gray-100 dark:bg-gray-800 text-sm">
+                                                            <span className="text-red-600 dark:text-red-400 font-bold">(DELETED)</span> {prescriptionTreatment?.treatmentPlan || prescriptionTreatment?.provDiagnosis || `Treatment #${pr.treatmentId}`}
+                                                        </div>
+                                                    ) : (
                                                     <CustomSelect
                                                         value={pr.treatmentId}
                                                         onChange={(val) => updatePrescription(i, { treatmentId: val })}
                                                         options={[
                                                             { value: '', label: '-- select treatment plan --' },
-                                                            ...treatments.map(t => ({
-                                                                value: String(t.id),
-                                                                label: t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`
-                                                            }))
+                                                            ...(Array.isArray(treatments) ? treatments : [])
+                                                                .filter(t => !t.deleted)
+                                                                .map(t => ({
+                                                                    value: String(t.id),
+                                                                    label: t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`
+                                                                }))
                                                         ]}
                                                         placeholder="-- select treatment plan --"
                                                     />
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Medicine (from inventory)</label>
                                                     <CustomSelect
                                                         value={pr.productId}
-                                                        onChange={(val) => updatePrescription(i, { productId: val })}
+                                                        onChange={(val) => !isDeleted && updatePrescription(i, { productId: val })}
                                                         options={[
                                                             { value: '', label: '-- select medicine --' },
                                                             ...products.map(p => ({
@@ -1330,40 +1410,49 @@ export default function PrescriptionsPage() {
                                                             }))
                                                         ]}
                                                         placeholder="-- select medicine --"
+                                                        className={isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}
                                                     />
                                                 </div>
 
-                                                {/* Components Section - All in one line */}
+                                                {/* Components Section - Responsive grid */}
                                                 <div className="sm:col-span-2 lg:col-span-3">
                                                     <label className="block text-xs font-medium mb-1 text-muted">Components</label>
-                                                    <div className="flex items-center gap-2">
-                                                        <input
-                                                            placeholder="Component 1"
+                                                    <div className={`flex flex-wrap items-center gap-2 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
+                                                        <CustomSelect
                                                             value={pr.comp1 || ''}
-                                                            onChange={e => updatePrescription(i, { comp1: e.target.value })}
-                                                            className="flex-1 p-2 border rounded text-sm"
+                                                            onChange={(val) => updatePrescription(i, { comp1: val.toUpperCase() })}
+                                                            options={dropdownOptions.components}
+                                                            placeholder="Component 1"
+                                                            allowCustom={true}
+                                                            className="flex-1 min-w-[120px]"
                                                         />
-                                                        <input
-                                                            placeholder="Component 2"
+                                                        <CustomSelect
                                                             value={pr.comp2 || ''}
-                                                            onChange={e => updatePrescription(i, { comp2: e.target.value })}
-                                                            className="flex-1 p-2 border rounded text-sm"
+                                                            onChange={(val) => updatePrescription(i, { comp2: val.toUpperCase() })}
+                                                            options={dropdownOptions.components}
+                                                            placeholder="Component 2"
+                                                            allowCustom={true}
+                                                            className="flex-1 min-w-[120px]"
                                                         />
-                                                        <input
-                                                            placeholder="Component 3"
+                                                        <CustomSelect
                                                             value={pr.comp3 || ''}
-                                                            onChange={e => updatePrescription(i, { comp3: e.target.value })}
-                                                            className="flex-1 p-2 border rounded text-sm"
+                                                            onChange={(val) => updatePrescription(i, { comp3: val.toUpperCase() })}
+                                                            options={dropdownOptions.components}
+                                                            placeholder="Component 3"
+                                                            allowCustom={true}
+                                                            className="flex-1 min-w-[120px]"
                                                         />
 
                                                         {/* Show comp4 if it exists */}
                                                         {pr.comp4 !== undefined && (
-                                                            <div className="flex-1 flex items-center gap-1">
-                                                                <input
-                                                                    placeholder="Component 4"
+                                                            <div className="flex-1 min-w-[120px] flex items-center gap-1">
+                                                                <CustomSelect
                                                                     value={pr.comp4 || ''}
-                                                                    onChange={e => updatePrescription(i, { comp4: e.target.value })}
-                                                                    className="flex-1 p-2 border rounded text-sm"
+                                                                    onChange={(val) => updatePrescription(i, { comp4: val.toUpperCase() })}
+                                                                    options={dropdownOptions.components}
+                                                                    placeholder="Component 4"
+                                                                    allowCustom={true}
+                                                                    className="flex-1"
                                                                 />
                                                                 <button
                                                                     type="button"
@@ -1382,12 +1471,14 @@ export default function PrescriptionsPage() {
 
                                                         {/* Show comp5 if it exists */}
                                                         {pr.comp5 !== undefined && (
-                                                            <div className="flex-1 flex items-center gap-1">
-                                                                <input
-                                                                    placeholder="Component 5"
+                                                            <div className="flex-1 min-w-[120px] flex items-center gap-1">
+                                                                <CustomSelect
                                                                     value={pr.comp5 || ''}
-                                                                    onChange={e => updatePrescription(i, { comp5: e.target.value })}
-                                                                    className="flex-1 p-2 border rounded text-sm"
+                                                                    onChange={(val) => updatePrescription(i, { comp5: val.toUpperCase() })}
+                                                                    options={dropdownOptions.components}
+                                                                    placeholder="Component 5"
+                                                                    allowCustom={true}
+                                                                    className="flex-1"
                                                                 />
                                                                 <button
                                                                     type="button"
@@ -1428,38 +1519,57 @@ export default function PrescriptionsPage() {
 
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Qty (Drops)</label>
-                                                    <input type="number" min="1" placeholder="0" value={pr.quantity} onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} className="w-full p-2 border rounded text-sm" />
+                                                    <input type="number" placeholder="0" value={pr.quantity || ''} onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} className="w-full p-2 border rounded text-sm" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Timing</label>
-                                                    <select
+                                                    <CustomSelect
                                                         value={pr.timing || ''}
-                                                        onChange={e => updatePrescription(i, { timing: e.target.value })}
-                                                        className="w-full p-2 border rounded text-sm"
-                                                    >
-                                                        <option value="">Select timing</option>
-                                                        <option value="BM">Before Meal</option>
-                                                        <option value="AM">After Meal</option>
-                                                        <option value="WM">With Meal</option>
-                                                        <option value="HS">At Bedtime</option>
-                                                        <option value="EMPTY">Empty Stomach</option>
-                                                    </select>
+                                                        onChange={(val) => updatePrescription(i, { timing: val })}
+                                                        options={dropdownOptions.timing}
+                                                        placeholder="Select timing"
+                                                        allowCustom={true}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Dosage</label>
-                                                    <input placeholder="5 drops, 3x daily" value={pr.dosage || ''} onChange={e => updatePrescription(i, { dosage: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                                    <CustomSelect
+                                                        value={pr.dosage || ''}
+                                                        onChange={(val) => updatePrescription(i, { dosage: val.toUpperCase() })}
+                                                        options={dropdownOptions.dosage}
+                                                        placeholder="Select dosage"
+                                                        allowCustom={true}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Additions</label>
-                                                    <input placeholder="Additional notes" value={pr.additions || ''} onChange={e => updatePrescription(i, { additions: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                                    <CustomSelect
+                                                        value={pr.additions || ''}
+                                                        onChange={(val) => updatePrescription(i, { additions: val.toUpperCase() })}
+                                                        options={dropdownOptions.additions}
+                                                        placeholder="Select addition"
+                                                        allowCustom={true}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Procedure</label>
-                                                    <input placeholder="Procedure" value={pr.procedure || ''} onChange={e => updatePrescription(i, { procedure: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                                    <CustomSelect
+                                                        value={pr.procedure || ''}
+                                                        onChange={(val) => updatePrescription(i, { procedure: val.toUpperCase() })}
+                                                        options={dropdownOptions.procedure}
+                                                        placeholder="Select procedure"
+                                                        allowCustom={true}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Presentation</label>
-                                                    <input placeholder="Tablet, Drops, etc." value={pr.presentation || ''} onChange={e => updatePrescription(i, { presentation: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                                    <CustomSelect
+                                                        value={pr.presentation || ''}
+                                                        onChange={(val) => updatePrescription(i, { presentation: val.toUpperCase() })}
+                                                        options={dropdownOptions.presentation}
+                                                        placeholder="Select presentation"
+                                                        allowCustom={true}
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Droppers Today</label>
@@ -1471,20 +1581,29 @@ export default function PrescriptionsPage() {
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Administration</label>
-                                                    <input placeholder="Oral / Topical" value={pr.administration || ''} onChange={e => updatePrescription(i, { administration: e.target.value })} className="w-full p-2 border rounded text-sm" />
+                                                    <CustomSelect
+                                                        value={pr.administration || ''}
+                                                        onChange={(val) => updatePrescription(i, { administration: val.toUpperCase() })}
+                                                        options={dropdownOptions.administration}
+                                                        placeholder="Select administration"
+                                                        allowCustom={true}
+                                                    />
                                                 </div>
                                                 <div className="flex items-end gap-2">
                                                     <label className="flex items-center gap-2 flex-1 text-sm">
                                                         <input type="checkbox" checked={!!pr.taken} onChange={e => updatePrescription(i, { taken: e.target.checked })} className="w-4 h-4" />
                                                         <span>Taken</span>
                                                     </label>
+                                                    {!isDeleted && (
                                                     <button type="button" onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }} className="btn btn-danger text-sm">
                                                         × Remove
                                                     </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -1563,26 +1682,67 @@ export default function PrescriptionsPage() {
                                             }
                                             setShowSaveModal(false)
 
-                                            // Create new treatment plan with modified data
+                                            // Create new treatment plan with ALL data from this page
                                             try {
-                                                const originalTreatment = treatments.find(t => String(t.id) === String(selectedTreatmentId))
-                                                if (!originalTreatment) {
-                                                    showError('Original treatment plan not found')
-                                                    return
+                                                // Show loading modal instead of toasts
+                                                setCreatingTreatment(true)
+                                                
+                                                // First, save/update the prescription
+                                                const payload = { ...form, prescriptions }
+
+                                                // Combine date and time for nextVisit
+                                                if (form.nextVisitDate && form.nextVisitTime) {
+                                                    payload.nextVisit = `${form.nextVisitDate}T${form.nextVisitTime}`
                                                 }
 
-                                                // Prepare the new treatment plan data
+                                                // If editing, include the visit ID
+                                                if (isEditMode && visitId) {
+                                                    payload.id = visitId
+                                                }
+
+                                                const visitRes = await fetch('/api/visits', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify(payload)
+                                                })
+                                                
+                                                if (!visitRes.ok) {
+                                                    const error = await visitRes.json().catch(() => ({ error: visitRes.statusText }))
+                                                    setCreatingTreatment(false)
+                                                    showError(`${isEditMode ? 'Update' : 'Save'} failed: ` + (error?.error || visitRes.statusText))
+                                                    return
+                                                }
+                                                
+                                                const visitData = await visitRes.json()
+                                                const savedVisitId = visitData.id
+                                                setLastCreatedVisitId(savedVisitId)
+                                                setLastCreatedVisit(visitData)
+
+                                                // Fetch all existing treatments to determine the next plan number
+                                                const treatmentsRes = await fetch('/api/treatments')
+                                                const allTreatments = await treatmentsRes.json()
+                                                
+                                                // Calculate next plan number (e.g., if we have 02, next is 03)
+                                                const planNumbers = allTreatments
+                                                    .map((t: any) => t.planNumber)
+                                                    .filter((pn: string) => pn && /^\d+$/.test(pn))
+                                                    .map((pn: string) => parseInt(pn, 10))
+                                                
+                                                const maxPlanNumber = planNumbers.length > 0 ? Math.max(...planNumbers) : 0
+                                                const nextPlanNumber = String(maxPlanNumber + 1).padStart(2, '0')
+
+                                                // Get all the data from the selected treatment plan or form
                                                 const newTreatmentData = {
-                                                    srNo: originalTreatment.srNo || '',
-                                                    speciality: originalTreatment.speciality || '',
-                                                    organ: originalTreatment.organ || '',
-                                                    diseaseAction: originalTreatment.diseaseAction || '',
-                                                    provDiagnosis: originalTreatment.provDiagnosis || '',
-                                                    treatmentPlan: `${originalTreatment.provDiagnosis} - Variation ${Date.now()}`,
-                                                    planNumber: '', // Will be auto-generated
-                                                    administration: originalTreatment.administration || '',
-                                                    notes: `Modified from treatment plan #${originalTreatment.id}`,
-                                                    medicines: prescriptions.map(pr => ({
+                                                    // Use selected treatment plan data if available, otherwise use form data
+                                                    speciality: selectedTreatmentPlan?.speciality || form.temperament || '',
+                                                    organ: selectedTreatmentPlan?.organ || '',
+                                                    diseaseAction: selectedTreatmentPlan?.diseaseAction || '',
+                                                    provDiagnosis: selectedTreatmentPlan?.provDiagnosis || form.provisionalDiagnosis || '',
+                                                    treatmentPlan: selectedTreatmentPlan?.provDiagnosis || form.provisionalDiagnosis || 'Treatment',
+                                                    planNumber: nextPlanNumber,
+                                                    administration: prescriptions.length > 0 ? prescriptions[0].administration || '' : '',
+                                                    notes: `Created from ${isEditMode ? 'updated' : ''} visit - Patient: ${form.patientId ? patients.find(p => String(p.id) === form.patientId)?.firstName + ' ' + patients.find(p => String(p.id) === form.patientId)?.lastName : ''} - Date: ${new Date().toLocaleDateString()}`,
+                                                    products: prescriptions.map(pr => ({
                                                         productId: pr.productId,
                                                         comp1: pr.comp1 || '',
                                                         comp2: pr.comp2 || '',
@@ -1595,12 +1755,10 @@ export default function PrescriptionsPage() {
                                                         additions: pr.additions || '',
                                                         procedure: pr.procedure || '',
                                                         presentation: pr.presentation || '',
-                                                        droppersToday: pr.droppersToday || '',
-                                                        medicineQuantity: pr.medicineQuantity || ''
+                                                        droppersToday: pr.droppersToday ? parseInt(pr.droppersToday, 10) : null,
+                                                        medicineQuantity: pr.medicineQuantity ? parseInt(pr.medicineQuantity, 10) : null
                                                     }))
                                                 }
-
-                                                showInfo('Creating new treatment plan...')
 
                                                 // Create the new treatment plan
                                                 const res = await fetch('/api/treatments', {
@@ -1611,20 +1769,23 @@ export default function PrescriptionsPage() {
 
                                                 if (!res.ok) {
                                                     const error = await res.json().catch(() => ({ error: 'Failed to create treatment plan' }))
+                                                    setCreatingTreatment(false)
                                                     showError(error.error || 'Failed to create treatment plan')
                                                     return
                                                 }
 
                                                 const createdTreatment = await res.json()
-                                                showSuccess('Treatment plan created successfully!')
+                                                setCreatingTreatment(false)
 
-                                                // Redirect to edit page of the new treatment plan
-                                                setTimeout(() => {
-                                                    router.push(`/treatments/${createdTreatment.id}`)
-                                                }, 500)
+                                                // Show navigation modal (with slight delay to ensure loading modal is closed)
+                                                setCreatedTreatmentId(createdTreatment.id)
+                                                setSavedVisitIdForNav(savedVisitId)
+                                                await new Promise(resolve => setTimeout(resolve, 300))
+                                                setShowNavigationModal(true)
 
                                             } catch (error: any) {
                                                 console.error('Error creating treatment plan:', error)
+                                                setCreatingTreatment(false)
                                                 showError(error.message || 'Failed to create treatment plan')
                                             }
                                         }}
@@ -1642,6 +1803,7 @@ export default function PrescriptionsPage() {
                                             }
                                             setShowSaveModal(false)
                                             setSelectedTreatmentId(null)
+                                            setSelectedTreatmentPlan(null)
                                             setOriginalTreatmentData([])
                                             await performSubmit()
                                         }}
@@ -1673,139 +1835,77 @@ export default function PrescriptionsPage() {
                         </div>
                     )}
 
-                    {/* Prescription Preview Card */}
-                    {lastCreatedVisit && (
-                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-xl font-bold text-gray-800 dark:text-white">
-                                    Prescription Preview
-                                </h3>
-                                <button
-                                    onClick={() => {
-                                        if (lastCreatedVisitId) {
-                                            window.open(`/visits/${lastCreatedVisitId}`, '_blank')
-                                        }
-                                    }}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                    View Full Details
-                                </button>
-                            </div>
-
-                            {/* Patient Information */}
-                            <div className="border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Patient Name</p>
-                                        <p className="font-semibold text-gray-800 dark:text-white">
-                                            {lastCreatedVisit.patient?.firstName} {lastCreatedVisit.patient?.lastName}
-                                        </p>
+                    {/* Navigation Modal - After Treatment Plan Created */}
+                    {showNavigationModal && (
+                        <div
+                            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fadeIn"
+                            style={{
+                                animation: 'fadeIn 0.2s ease-in-out'
+                            }}
+                        >
+                            <div
+                                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 animate-scaleIn"
+                                style={{
+                                    animation: 'scaleIn 0.3s ease-out'
+                                }}
+                            >
+                                <div className="text-center mb-6">
+                                    <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900 mb-4">
+                                        <svg className="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                        </svg>
                                     </div>
-                                    <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">OPD No.</p>
-                                        <p className="font-semibold text-gray-800 dark:text-white">
-                                            {lastCreatedVisit.opdNo}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Date</p>
-                                        <p className="font-semibold text-gray-800 dark:text-white">
-                                            {new Date(lastCreatedVisit.date).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Phone</p>
-                                        <p className="font-semibold text-gray-800 dark:text-white">
-                                            {lastCreatedVisit.phone || lastCreatedVisit.patient?.phone}
-                                        </p>
-                                    </div>
+                                    <h3 className="text-lg font-semibold mb-2">Treatment Plan Created!</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        Where would you like to go next?
+                                    </p>
+                                </div>
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={async () => {
+                                            const modal = document.querySelector('.animate-fadeIn')
+                                            if (modal) {
+                                                modal.classList.add('animate-fadeOut')
+                                                await new Promise(resolve => setTimeout(resolve, 200))
+                                            }
+                                            setShowNavigationModal(false)
+                                            if (createdTreatmentId) {
+                                                router.push(`/treatments/${createdTreatmentId}`)
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Edit Treatment Plan
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            const modal = document.querySelector('.animate-fadeIn')
+                                            if (modal) {
+                                                modal.classList.add('animate-fadeOut')
+                                                await new Promise(resolve => setTimeout(resolve, 200))
+                                            }
+                                            setShowNavigationModal(false)
+                                            if (savedVisitIdForNav) {
+                                                router.push(`/visits/${savedVisitIdForNav}`)
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium flex items-center justify-center gap-2"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        View Visit Details
+                                    </button>
                                 </div>
                             </div>
-
-                            {/* Prescriptions */}
-                            {lastCreatedVisit.prescriptions && lastCreatedVisit.prescriptions.length > 0 && (
-                                <div className="mb-4">
-                                    <h4 className="font-semibold text-gray-800 dark:text-white mb-3">Prescriptions</h4>
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                            <thead className="bg-gray-50 dark:bg-gray-700">
-                                                <tr>
-                                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">#</th>
-                                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Medicine</th>
-                                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Dosage</th>
-                                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Frequency</th>
-                                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Duration</th>
-                                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Quantity</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                                {lastCreatedVisit.prescriptions.map((prescription: any, index: number) => (
-                                                    <tr key={index}>
-                                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{index + 1}</td>
-                                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                                            {prescription.product?.name || prescription.treatment?.treatmentPlan || 'N/A'}
-                                                        </td>
-                                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{prescription.dosage || '-'}</td>
-                                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{prescription.frequency || '-'}</td>
-                                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{prescription.duration || '-'}</td>
-                                                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">{prescription.quantity || '-'}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Diagnosis & Notes */}
-                            <div className="grid grid-cols-1 gap-4">
-                                {lastCreatedVisit.provisionalDiagnosis && (
-                                    <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Provisional Diagnosis</p>
-                                        <p className="text-gray-800 dark:text-white">{lastCreatedVisit.provisionalDiagnosis}</p>
-                                    </div>
-                                )}
-                                {lastCreatedVisit.majorComplaints && (
-                                    <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Chief Complaints</p>
-                                        <p className="text-gray-800 dark:text-white">{lastCreatedVisit.majorComplaints}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Financial Information */}
-                            {lastCreatedVisit.amount && (
-                                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                                    <div className="flex justify-end">
-                                        <div className="w-64">
-                                            <div className="flex justify-between mb-2">
-                                                <span className="text-gray-600 dark:text-gray-400">Total Amount:</span>
-                                                <span className="font-semibold text-gray-800 dark:text-white">₹{lastCreatedVisit.amount}</span>
-                                            </div>
-                                            {lastCreatedVisit.discount > 0 && (
-                                                <div className="flex justify-between mb-2">
-                                                    <span className="text-gray-600 dark:text-gray-400">Discount:</span>
-                                                    <span className="font-semibold text-gray-800 dark:text-white">₹{lastCreatedVisit.discount}</span>
-                                                </div>
-                                            )}
-                                            {lastCreatedVisit.payment > 0 && (
-                                                <div className="flex justify-between mb-2">
-                                                    <span className="text-gray-600 dark:text-gray-400">Payment:</span>
-                                                    <span className="font-semibold text-gray-800 dark:text-white">₹{lastCreatedVisit.payment}</span>
-                                                </div>
-                                            )}
-                                            {lastCreatedVisit.balance !== undefined && (
-                                                <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                                                    <span className="text-gray-800 dark:text-white font-bold">Balance:</span>
-                                                    <span className="font-bold text-gray-800 dark:text-white">₹{lastCreatedVisit.balance}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )}
+
+                    {/* Prescription Preview Card */}
+                    
                 </>
             )}
         </div>
