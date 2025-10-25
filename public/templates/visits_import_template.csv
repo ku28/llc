@@ -1,0 +1,3 @@
+patientIdentifier,opdNo,date,diagnoses,temperament,pulseDiagnosis,majorComplaints,provisionalDiagnosis,investigations,improvements,specialNote,initials,nextVisit,procedureAdopted,precautions,discussion,amount,discount,payment,balance,helper
+OPD001,OPD001,2025-01-15,Fever,Hot,Rapid,High temperature and body ache,Viral Fever,Blood test,Improving,Monitor temperature,Dr. Smith,2025-01-22,Rest and hydration,Avoid cold water,Follow-up needed,500,50,450,0,Nurse Jane
+john.doe@email.com,OPD001,2025-01-16,Cold,Cold,Slow,Cough and sore throat,Common Cold,None,Stable,Take rest,Dr. Brown,2025-01-20,Steam inhalation,Drink warm fluids,Continue medication,300,0,300,0,

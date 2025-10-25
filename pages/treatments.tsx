@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { requireDoctorOrAdmin } from '../lib/withAuth'
 import ConfirmationModal from '../components/ConfirmationModal'
 import LoadingModal from '../components/LoadingModal'
+import ImportTreatmentModal from '../components/ImportTreatmentModal'
 
 function TreatmentsPage() {
     const router = useRouter()
@@ -15,15 +16,30 @@ function TreatmentsPage() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [deleteId, setDeleteId] = useState<number | null>(null)
     const [deleting, setDeleting] = useState(false)
+    const [showImportModal, setShowImportModal] = useState(false)
+    const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false)
+    const [deleteAllDiagnosis, setDeleteAllDiagnosis] = useState<string>('')
+    const [deleteAllIds, setDeleteAllIds] = useState<number[]>([])
+    const [deleteAllProgress, setDeleteAllProgress] = useState({ current: 0, total: 0 })
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage] = useState(10)
     
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
     useEffect(() => { 
+        fetchTreatments()
+    }, [])
+
+    function fetchTreatments() {
         setLoading(true)
         fetch('/api/treatments').then(r => r.json()).then(treatmentsData => {
             setItems(Array.isArray(treatmentsData) ? treatmentsData : [])
             setLoading(false)
         }).catch(() => setLoading(false))
-    }, [])
+    }
+
+    function handleImportSuccess() {
+        fetchTreatments()
+    }
 
     function toggleRowExpansion(id: string) {
         const newExpanded = new Set(expandedRows)
@@ -72,8 +88,78 @@ function TreatmentsPage() {
         setDeleteId(null)
     }
 
+    function openDeleteAllConfirmation(diagnosis: string, treatmentIds: number[]) {
+        setDeleteAllDiagnosis(diagnosis)
+        setDeleteAllIds(treatmentIds)
+        setShowDeleteAllConfirm(true)
+    }
+
+    async function confirmDeleteAll() {
+        if (deleteAllIds.length === 0) return
+        
+        setShowDeleteAllConfirm(false)
+        setDeleting(true)
+        
+        const totalPlans = deleteAllIds.length
+        setDeleteAllProgress({ current: 0, total: totalPlans })
+        
+        try {
+            // Use bulk delete endpoint for much faster deletion
+            const response = await fetch('/api/treatments/bulk', { 
+                method: 'DELETE', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ ids: deleteAllIds }) 
+            })
+            
+            if (!response.ok) {
+                const error = await response.json()
+                throw new Error(`Failed to delete treatments: ${error.error || 'Unknown error'}`)
+            }
+
+            const result = await response.json()
+            
+            // Quick animation to show completion
+            const steps = Math.min(10, totalPlans)
+            for (let i = 1; i <= steps; i++) {
+                setDeleteAllProgress({ 
+                    current: Math.floor((i / steps) * totalPlans), 
+                    total: totalPlans 
+                })
+                await new Promise(resolve => setTimeout(resolve, 30))
+            }
+            setDeleteAllProgress({ current: totalPlans, total: totalPlans })
+            
+            // Small delay to show completion
+            await new Promise(resolve => setTimeout(resolve, 300))
+            
+            // Refresh the list
+            await fetchTreatments()
+        } catch (error: any) {
+            console.error('Delete all error:', error)
+            alert('Failed to delete all treatments: ' + error.message)
+        } finally {
+            setDeleting(false)
+            setDeleteAllDiagnosis('')
+            setDeleteAllIds([])
+            setDeleteAllProgress({ current: 0, total: 0 })
+        }
+    }
+
+    function cancelDeleteAll() {
+        setShowDeleteAllConfirm(false)
+        setDeleteAllDiagnosis('')
+        setDeleteAllIds([])
+    }
+
     return (
         <div>
+            {/* Import Modal */}
+            <ImportTreatmentModal
+                isOpen={showImportModal}
+                onClose={() => setShowImportModal(false)}
+                onImportSuccess={handleImportSuccess}
+            />
+
             {/* Confirmation Modal */}
             <ConfirmationModal
                 isOpen={showDeleteConfirm}
@@ -86,17 +172,82 @@ function TreatmentsPage() {
                 type="danger"
             />
 
+            {/* Delete All Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={showDeleteAllConfirm}
+                title="Delete All Plans"
+                message={`Are you sure you want to delete ALL ${deleteAllIds.length} treatment plan${deleteAllIds.length > 1 ? 's' : ''} for "${deleteAllDiagnosis}"? This action will soft-delete all plans in this diagnosis group.`}
+                confirmText={`Delete All ${deleteAllIds.length} Plans`}
+                cancelText="Cancel"
+                onConfirm={confirmDeleteAll}
+                onCancel={cancelDeleteAll}
+                type="danger"
+            />
+
             {/* Deleting Loading Modal */}
-            <LoadingModal isOpen={deleting} message="Deleting treatment plan..." />
+            {deleting && deleteAllProgress.total > 0 ? (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
+                        <div className="text-center">
+                            <div className="mb-6">
+                                <svg className="w-16 h-16 mx-auto text-red-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                                Deleting Treatment Plans
+                            </h3>
+                            
+                            <div className="text-3xl font-bold text-red-600 dark:text-red-400 mb-2">
+                                {deleteAllProgress.current} / {deleteAllProgress.total}
+                            </div>
+                            
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                                {Math.round((deleteAllProgress.current / deleteAllProgress.total) * 100)}% Complete
+                            </p>
+                            
+                            {/* Progress Bar */}
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+                                <div 
+                                    className="bg-red-600 h-4 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-2"
+                                    style={{ width: `${(deleteAllProgress.current / deleteAllProgress.total) * 100}%` }}
+                                >
+                                    <span className="text-xs text-white font-medium">
+                                        {deleteAllProgress.current > 0 && `${Math.round((deleteAllProgress.current / deleteAllProgress.total) * 100)}%`}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-4">
+                                Please wait, deleting plan {deleteAllProgress.current} of {deleteAllProgress.total}...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <LoadingModal isOpen={deleting} message="Deleting treatment plan..." />
+            )}
 
             <div className="section-header flex justify-between items-center">
                 <h2 className="section-title">Treatment Management</h2>
-                <button 
-                    onClick={() => router.push('/treatments/new')}
-                    className="btn btn-primary"
-                >
-                    + Add New Treatment
-                </button>
+                <div className="flex gap-3">
+                    <button 
+                        onClick={() => setShowImportModal(true)}
+                        className="btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        Import Treatment Plans
+                    </button>
+                    <button 
+                        onClick={() => router.push('/treatments/new')}
+                        className="btn btn-primary"
+                    >
+                        + Add New Treatment
+                    </button>
+                </div>
             </div>
 
             {/* Search Bar */}
@@ -200,7 +351,12 @@ function TreatmentsPage() {
                                 })
                             })
 
-                            return Object.entries(groupedByDiagnosis).map(([diagnosis, treatments]: [string, any]) => {
+                            const groupedEntries = Object.entries(groupedByDiagnosis)
+                            const paginatedEntries = groupedEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+                            return (
+                                <>
+                                {paginatedEntries.map(([diagnosis, treatments]: [string, any]) => {
                                 const firstTreatment = treatments[0]
                                 const groupKey = `diagnosis-${diagnosis}`
                                 const isExpanded = expandedRows.has(groupKey as any)
@@ -233,6 +389,16 @@ function TreatmentsPage() {
                                                     title="Add Plan"
                                                 >
                                                     + Add Plan
+                                                </button>
+                                                <button
+                                                    onClick={() => openDeleteAllConfirmation(diagnosis, treatments.map((t: any) => t.id))}
+                                                    className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded flex items-center gap-1"
+                                                    title="Delete All Plans"
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                    Delete All
                                                 </button>
                                                 <button
                                                     onClick={() => toggleRowExpansion(groupKey as any)}
@@ -416,8 +582,39 @@ function TreatmentsPage() {
                                         })()}
                                     </div>
                                 )
-                            })
-                        })()}
+                            })}
+
+                            {/* Pagination Controls */}
+                            {groupedEntries.length > itemsPerPage && (
+                                <div className="mt-6 flex items-center justify-center gap-4">
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                        </svg>
+                                        Previous
+                                    </button>
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                                        Page {currentPage} of {Math.ceil(groupedEntries.length / itemsPerPage)}
+                                    </span>
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(groupedEntries.length / itemsPerPage), prev + 1))}
+                                        disabled={currentPage === Math.ceil(groupedEntries.length / itemsPerPage)}
+                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        Next
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
+                            </>
+                            )
+                            })()}
                         </div>
                     )
                 })()}

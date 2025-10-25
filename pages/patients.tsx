@@ -4,6 +4,7 @@ import DateInput from '../components/DateInput'
 import ToastNotification from '../components/ToastNotification'
 import { useToast } from '../hooks/useToast'
 import CustomSelect from '../components/CustomSelect'
+import ImportPatientsModal from '../components/ImportPatientsModal'
 import genderOptions from '../data/gender.json'
 
 export default function PatientsPage() {
@@ -14,6 +15,7 @@ export default function PatientsPage() {
     const [editingId, setEditingId] = useState<number | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
+    const [showImportModal, setShowImportModal] = useState(false)
     const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
     const [searchQuery, setSearchQuery] = useState('')
     const [imagePreview, setImagePreview] = useState<string>('')
@@ -25,6 +27,8 @@ export default function PatientsPage() {
     const [deleting, setDeleting] = useState(false)
     const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; message?: string }>({ open: false })
     const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage] = useState(10)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     
     const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', occupation: '', pendingPaymentCents: '', height: '', weight: '', imageUrl: '', fatherHusbandGuardianName: '' }
@@ -465,9 +469,20 @@ export default function PatientsPage() {
             <div className="section-header flex justify-between items-center">
                 <h2 className="section-title">Patient Management</h2>
                 {user && (
-                    <button onClick={openModal} className="btn btn-primary">
-                        + Register New Patient
-                    </button>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setShowImportModal(true)} 
+                            className="btn bg-green-600 hover:bg-green-700 text-white"
+                        >
+                            <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            Import Patients
+                        </button>
+                        <button onClick={openModal} className="btn btn-primary">
+                            + Register New Patient
+                        </button>
+                    </div>
                 )}
             </div>
             {!userLoading && !user && (
@@ -820,12 +835,15 @@ export default function PatientsPage() {
                         <p className="text-sm">Try a different search term</p>
                     </div>
                 ) : (
+                    <>
                     <div className="space-y-2">
                         {patients.filter(p => {
                             if (!searchQuery) return true
                             const fullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase()
                             return fullName.includes(searchQuery.toLowerCase())
-                        }).map(p => {
+                        })
+                        .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                        .map(p => {
                             const isExpanded = expandedRows.has(p.id)
                             const fullName = `${p.firstName || ''} ${p.lastName || ''}`.trim()
                             
@@ -967,8 +985,60 @@ export default function PatientsPage() {
                             )
                         })}
                     </div>
+
+                    {/* Pagination Controls */}
+                    {(() => {
+                        const filteredPatients = patients.filter(p => {
+                            if (!searchQuery) return true
+                            const fullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase()
+                            return fullName.includes(searchQuery.toLowerCase())
+                        })
+                        const totalPages = Math.ceil(filteredPatients.length / itemsPerPage)
+                        
+                        if (totalPages <= 1) return null
+                        
+                        return (
+                            <div className="flex items-center justify-between mt-4 px-4">
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                    Previous
+                                </button>
+                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                    Page {currentPage} of {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    Next
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )
+                    })()}
+                    </>
                 )}
             </div>
+
+            <ImportPatientsModal 
+                isOpen={showImportModal}
+                onClose={() => setShowImportModal(false)}
+                onImportSuccess={() => {
+                    fetch('/api/patients')
+                        .then(r => r.json())
+                        .then(data => setPatients(data))
+                    showSuccess('Patients imported successfully!')
+                }}
+            />
         </div>
     )
 }

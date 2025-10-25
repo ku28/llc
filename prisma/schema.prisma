@@ -145,11 +145,9 @@ model Treatment {
   createdAt         DateTime           @default(now())
   additions         String?
   diseaseAction     String?
-  droppersToday     Int?
   organ             String?
   presentation      String?
   provDiagnosis     String?
-  quantity          Int?
   speciality        String?
   srNo              String?
   timing            String?
@@ -158,6 +156,8 @@ model Treatment {
   deleted           Boolean?           @default(false)
   prescriptions     Prescription[]
   treatmentProducts TreatmentProduct[]
+
+  @@unique([provDiagnosis, planNumber])
 }
 
 model TreatmentProduct {
@@ -167,12 +167,9 @@ model TreatmentProduct {
   comp1            String?
   comp2            String?
   comp3            String?
-  quantity         Int       @default(1)
   createdAt        DateTime  @default(now())
   additions        String?
   dosage           String?
-  droppersToday    Int?
-  medicineQuantity Int?
   presentation     String?
   procedure        String?
   timing           String?

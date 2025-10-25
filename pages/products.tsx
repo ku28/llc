@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import CustomSelect from '../components/CustomSelect'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingModal from '../components/LoadingModal'
+import ImportProductsModal from '../components/ImportProductsModal'
 import { requireStaffOrAbove } from '../lib/withAuth'
 
 function ProductsPage() {
@@ -14,6 +15,9 @@ function ProductsPage() {
     const [deleteId, setDeleteId] = useState<number | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
     const [loading, setLoading] = useState(true)
+    const [showImportModal, setShowImportModal] = useState(false)
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage] = useState(10)
     
     // Filter states
     const [filterCategory, setFilterCategory] = useState<string>('')
@@ -228,16 +232,27 @@ function ProductsPage() {
         <div>
             <div className="section-header flex justify-between items-center">
                 <h2 className="section-title">Inventory Management</h2>
-                <button 
-                    onClick={() => {
-                        setIsModalOpen(true)
-                        setIsAnimating(false)
-                        setTimeout(() => setIsAnimating(true), 10)
-                    }}
-                    className="btn btn-primary"
-                >
-                    + Add New Product
-                </button>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => setShowImportModal(true)} 
+                        className="btn bg-green-600 hover:bg-green-700 text-white"
+                    >
+                        <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        Import Products
+                    </button>
+                    <button 
+                        onClick={() => {
+                            setIsModalOpen(true)
+                            setIsAnimating(false)
+                            setTimeout(() => setIsAnimating(true), 10)
+                        }}
+                        className="btn btn-primary"
+                    >
+                        + Add New Product
+                    </button>
+                </div>
             </div>
 
             {/* Search Bar */}
@@ -552,6 +567,7 @@ function ProductsPage() {
                         }
                         
                         return (
+                        <>
                         <div className="overflow-x-auto">
                             <table className="w-full text-xs">
                                 <thead className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
@@ -573,7 +589,7 @@ function ProductsPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                    {filteredItems.map(p => (
+                                    {filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(p => (
                                         <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                             <td className="px-2 py-1.5">
                                                 <div className="font-medium text-xs leading-tight">{p.name}</div>
@@ -622,7 +638,37 @@ function ProductsPage() {
                                 </tbody>
                             </table>
                         </div>
-                        )
+
+                        {/* Pagination Controls */}
+                        {filteredItems.length > itemsPerPage && (
+                            <div className="mt-4 flex items-center justify-center gap-4">
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                    Previous
+                                </button>
+                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                    Page {currentPage} of {Math.ceil(filteredItems.length / itemsPerPage)}
+                                </span>
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredItems.length / itemsPerPage), prev + 1))}
+                                    disabled={currentPage === Math.ceil(filteredItems.length / itemsPerPage)}
+                                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                >
+                                    Next
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )}
+                        </>
+)
                     })()}
                 </div>
 
@@ -637,6 +683,18 @@ function ProductsPage() {
                 onCancel={() => {
                     setShowDeleteConfirm(false)
                     setDeleteId(null)
+                }}
+            />
+
+            <ImportProductsModal 
+                isOpen={showImportModal}
+                onClose={() => setShowImportModal(false)}
+                onImportSuccess={() => {
+                    setLoading(true)
+                    fetch('/api/products').then(r => r.json()).then(productsData => {
+                        setItems(Array.isArray(productsData) ? productsData : [])
+                        setLoading(false)
+                    }).catch(() => setLoading(false))
                 }}
             />
         </div>

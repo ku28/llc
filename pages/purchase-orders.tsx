@@ -17,6 +17,8 @@ export default function PurchaseOrdersPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [filterStatus, setFilterStatus] = useState('')
     const [filterSupplier, setFilterSupplier] = useState('')
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage] = useState(10)
     
     const emptyForm = {
         supplierId: '',
@@ -696,7 +698,7 @@ export default function PurchaseOrdersPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                    {filteredPOs.map(po => (
+                                    {filteredPOs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(po => (
                                         <tr key={po.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                             <td className="px-4 py-3 font-mono font-semibold">{po.poNumber}</td>
                                             <td className="px-4 py-3">{po.supplier?.name || 'Unknown'}</td>
@@ -755,6 +757,35 @@ export default function PurchaseOrdersPage() {
                                     ))}
                                 </tbody>
                             </table>
+
+                            {/* Pagination Controls */}
+                            {filteredPOs.length > itemsPerPage && (
+                                <div className="mt-6 flex items-center justify-center gap-4">
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                        </svg>
+                                        Previous
+                                    </button>
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                                        Page {currentPage} of {Math.ceil(filteredPOs.length / itemsPerPage)}
+                                    </span>
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredPOs.length / itemsPerPage), prev + 1))}
+                                        disabled={currentPage === Math.ceil(filteredPOs.length / itemsPerPage)}
+                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        Next
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

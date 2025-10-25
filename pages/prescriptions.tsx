@@ -65,6 +65,7 @@ export default function PrescriptionsPage() {
     const [createdTreatmentId, setCreatedTreatmentId] = useState<string | null>(null)
     const [savedVisitIdForNav, setSavedVisitIdForNav] = useState<string | null>(null)
     const [creatingTreatment, setCreatingTreatment] = useState(false)
+    const [treatmentModalMessage, setTreatmentModalMessage] = useState('Creating Treatment Plan and Saving Prescription...')
 
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
     useEffect(() => { fetch('/api/patients').then(r => r.json()).then(setPatients) }, [])
@@ -763,7 +764,7 @@ export default function PrescriptionsPage() {
             {/* Loading Modal */}
             <LoadingModal isOpen={loading} message={isEditMode ? 'Loading visit data...' : 'Loading...'} />
             {/* Creating Treatment Modal */}
-            <LoadingModal isOpen={creatingTreatment} message="Creating Treatment Plan and Saving Prescription..." />
+            <LoadingModal isOpen={creatingTreatment} message={treatmentModalMessage} />
             
             {isPatient ? (
                 // Patient view - Read-only prescription list
@@ -1231,7 +1232,7 @@ export default function PrescriptionsPage() {
                                                 .filter(t => !t.deleted) // Only show non-deleted treatments in dropdown
                                                 .map(t => ({
                                                     value: String(t.id),
-                                                    label: `${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`} (${t.treatmentProducts?.length || 0} medicines)`
+                                                    label: `${t.planNumber ? `Plan ${t.planNumber} - ` : ''}${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`} (${t.treatmentProducts?.length || 0} medicines)`
                                                 }))
                                         ]}
                                         placeholder="-- select treatment plan --"
@@ -1400,7 +1401,7 @@ export default function PrescriptionsPage() {
                                                                 .filter(t => !t.deleted)
                                                                 .map(t => ({
                                                                     value: String(t.id),
-                                                                    label: t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`
+                                                                    label: `${t.planNumber ? `Plan ${t.planNumber} - ` : ''}${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`}`
                                                                 }))
                                                         ]}
                                                         placeholder="-- select treatment plan --"
@@ -1682,6 +1683,89 @@ export default function PrescriptionsPage() {
                                     You've modified the treatment plan data. Would you like to save these changes as a new treatment plan, or use them just for this prescription?
                                 </p>
                                 <div className="space-y-3">
+                                {selectedTreatmentId && (
+                                    <button
+                                        onClick={async () => {
+                                            const modal = document.querySelector('.animate-fadeIn')
+                                            if (modal) {
+                                                modal.classList.add('animate-fadeOut')
+                                                await new Promise(resolve => setTimeout(resolve, 200))
+                                            }
+                                            setShowSaveModal(false)
+                                            
+                                            try {
+                                                // Show loading modal with update message
+                                                setTreatmentModalMessage('Updating Treatment Plan and Saving Prescription...')
+                                                setCreatingTreatment(true)                                                    // Get the current treatment plan data
+                                                    const currentPlan = treatments.find(t => String(t.id) === String(selectedTreatmentId))
+                                                    
+                                                    // Update the existing treatment plan with modified data
+                                                    const updateData = {
+                                                        id: selectedTreatmentId,
+                                                        speciality: currentPlan?.speciality || form.temperament || '',
+                                                        organ: currentPlan?.organ || '',
+                                                        diseaseAction: currentPlan?.diseaseAction || '',
+                                                        provDiagnosis: currentPlan?.provDiagnosis || form.provisionalDiagnosis || '',
+                                                        treatmentPlan: currentPlan?.treatmentPlan || currentPlan?.provDiagnosis || form.provisionalDiagnosis || 'Treatment',
+                                                        planNumber: currentPlan?.planNumber || '',
+                                                        administration: prescriptions.length > 0 ? prescriptions[0].administration || '' : currentPlan?.administration || '',
+                                                        notes: currentPlan?.notes || '',
+                                                        products: prescriptions.map(pr => ({
+                                                            productId: pr.productId,
+                                                            comp1: pr.comp1 || '',
+                                                            comp2: pr.comp2 || '',
+                                                            comp3: pr.comp3 || '',
+                                                            comp4: pr.comp4 || '',
+                                                            comp5: pr.comp5 || '',
+                                                            timing: pr.timing || '',
+                                                            dosage: pr.dosage || '',
+                                                            additions: pr.additions || '',
+                                                            procedure: pr.procedure || '',
+                                                            presentation: pr.presentation || ''
+                                                        }))
+                                                    }
+                                                    
+                                                    // Update the treatment plan
+                                                    const res = await fetch('/api/treatments', {
+                                                        method: 'PUT',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify(updateData)
+                                                    })
+                                                    
+                                                    if (!res.ok) {
+                                                        const error = await res.json().catch(() => ({ error: 'Failed to update treatment plan' }))
+                                                        setCreatingTreatment(false)
+                                                        showError(error.error || 'Failed to update treatment plan')
+                                                        return
+                                                    }
+                                                    
+                                                    // Refresh treatments list
+                                                    const updatedTreatments = await fetch('/api/treatments').then(r => r.json())
+                                                    setTreatments(updatedTreatments)
+                                                    
+                                                    setCreatingTreatment(false)
+                                                    showSuccess('Treatment plan updated successfully!')
+                                                    
+                                                    // Continue with the prescription submission
+                                                    await performSubmit()
+                                                    
+                                                } catch (error: any) {
+                                                    console.error('Error updating treatment plan:', error)
+                                                    setCreatingTreatment(false)
+                                                    showError(error.message || 'Failed to update treatment plan')
+                                                }
+                                            }}
+                                            className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center justify-center gap-2"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                            Update Current Plan ({(() => {
+                                                const plan = treatments.find(t => String(t.id) === String(selectedTreatmentId))
+                                                return plan?.planNumber ? `Plan ${plan.planNumber}` : 'Source'
+                                            })()})
+                                        </button>
+                                    )}
                                     <button
                                         onClick={async () => {
                                             // Fade out animation
@@ -1759,14 +1843,11 @@ export default function PrescriptionsPage() {
                                                         comp3: pr.comp3 || '',
                                                         comp4: pr.comp4 || '',
                                                         comp5: pr.comp5 || '',
-                                                        quantity: pr.quantity || 1,
                                                         timing: pr.timing || '',
                                                         dosage: pr.dosage || '',
                                                         additions: pr.additions || '',
                                                         procedure: pr.procedure || '',
-                                                        presentation: pr.presentation || '',
-                                                        droppersToday: pr.droppersToday ? parseInt(pr.droppersToday, 10) : null,
-                                                        medicineQuantity: pr.medicineQuantity ? parseInt(pr.medicineQuantity, 10) : null
+                                                        presentation: pr.presentation || ''
                                                     }))
                                                 }
 
@@ -1871,6 +1952,28 @@ export default function PrescriptionsPage() {
                                     </p>
                                 </div>
                                 <div className="space-y-3">
+                                    {selectedTreatmentId && selectedTreatmentId !== createdTreatmentId && (
+                                        <button
+                                            onClick={async () => {
+                                                const modal = document.querySelector('.animate-fadeIn')
+                                                if (modal) {
+                                                    modal.classList.add('animate-fadeOut')
+                                                    await new Promise(resolve => setTimeout(resolve, 200))
+                                                }
+                                                setShowNavigationModal(false)
+                                                router.push(`/treatments/${selectedTreatmentId}`)
+                                            }}
+                                            className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center justify-center gap-2"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                            Edit Source Plan ({(() => {
+                                                const plan = treatments.find(t => String(t.id) === String(selectedTreatmentId))
+                                                return plan?.planNumber ? `Plan ${plan.planNumber}` : 'Original'
+                                            })()})
+                                        </button>
+                                    )}
                                     <button
                                         onClick={async () => {
                                             const modal = document.querySelector('.animate-fadeIn')

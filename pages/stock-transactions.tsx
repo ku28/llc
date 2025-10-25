@@ -8,6 +8,8 @@ export default function StockTransactionsPage() {
     const [filterType, setFilterType] = useState('')
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage] = useState(10)
     
     const [form, setForm] = useState({
         productId: '',
@@ -343,7 +345,7 @@ export default function StockTransactionsPage() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {transactions.map(txn => (
+                            {transactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(txn => (
                                 <div key={txn.id} className="border dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                     <div className="flex items-start gap-4">
                                         {/* Icon */}
@@ -415,6 +417,35 @@ export default function StockTransactionsPage() {
                                     </div>
                                 </div>
                             ))}
+
+                            {/* Pagination Controls */}
+                            {transactions.length > itemsPerPage && (
+                                <div className="mt-6 flex items-center justify-center gap-4">
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                        </svg>
+                                        Previous
+                                    </button>
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                                        Page {currentPage} of {Math.ceil(transactions.length / itemsPerPage)}
+                                    </span>
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(transactions.length / itemsPerPage), prev + 1))}
+                                        disabled={currentPage === Math.ceil(transactions.length / itemsPerPage)}
+                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        Next
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

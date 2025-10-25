@@ -61,14 +61,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             comp1: p.comp1 || null,
                             comp2: p.comp2 || null,
                             comp3: p.comp3 || null,
-                            quantity: p.quantity || 1,
                             timing: p.timing || null,
                             dosage: p.dosage || null,
                             additions: p.additions || null,
                             procedure: p.procedure || null,
-                            presentation: p.presentation || null,
-                            droppersToday: p.droppersToday || null,
-                            medicineQuantity: p.medicineQuantity || null
+                            presentation: p.presentation || null
                         }))
                     }
                 },
@@ -97,14 +94,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } = req.body
         
         try {
+            const treatmentId = parseInt(id)
+            
             // Delete existing products and create new ones
             await prisma.treatmentProduct.deleteMany({
-                where: { treatmentId: id }
+                where: { treatmentId: treatmentId }
             })
             
             // Update treatment with new products
             const t = await prisma.treatment.update({ 
-                where: { id },
+                where: { id: treatmentId },
                 data: { 
                     provDiagnosis,
                     planNumber,
@@ -121,14 +120,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             comp1: p.comp1 || null,
                             comp2: p.comp2 || null,
                             comp3: p.comp3 || null,
-                            quantity: p.quantity || 1,
                             timing: p.timing || null,
                             dosage: p.dosage || null,
                             additions: p.additions || null,
                             procedure: p.procedure || null,
-                            presentation: p.presentation || null,
-                            droppersToday: p.droppersToday || null,
-                            medicineQuantity: p.medicineQuantity || null
+                            presentation: p.presentation || null
                         }))
                     }
                 },
