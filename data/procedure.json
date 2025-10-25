@@ -1,0 +1,258 @@
+[
+    {
+        "value": "",
+        "label": "Select procedure"
+    },
+    {
+        "value": "APL/LOCAL",
+        "label": "APL/LOCAL"
+    },
+    {
+        "value": "APL/CORN",
+        "label": "APL/CORN"
+    },
+    {
+        "value": "APL/BOILS",
+        "label": "APL/BOILS"
+    },
+    {
+        "value": "APL/MOUTH",
+        "label": "APL/MOUTH"
+    },
+    {
+        "value": "APL/NAVAL",
+        "label": "APL/NAVAL"
+    },
+    {
+        "value": "APL/TONGUE",
+        "label": "APL/TONGUE"
+    },
+    {
+        "value": "APL/TOOTH",
+        "label": "APL/TOOTH"
+    },
+    {
+        "value": "APL/UP THROAT",
+        "label": "APL/UP THROAT"
+    },
+    {
+        "value": "APLY/FACE",
+        "label": "APLY/FACE"
+    },
+    {
+        "value": "DOUCH",
+        "label": "DOUCH"
+    },
+    {
+        "value": "GARGLES/200 ML",
+        "label": "GARGLES/200 ML"
+    },
+    {
+        "value": "HOT COMP/1000 ML",
+        "label": "HOT COMP/1000 ML"
+    },
+    {
+        "value": "WARM COMP/1000 ML",
+        "label": "WARM COMP/1000 ML"
+    },
+    {
+        "value": "COLD COMP/1000 ML",
+        "label": "COLD COMP/1000 ML"
+    },
+    {
+        "value": "HOT COMP/FACE/100 ML",
+        "label": "HOT COMP/FACE/100 ML"
+    },
+    {
+        "value": "IF FEVER",
+        "label": "IF FEVER"
+    },
+    {
+        "value": "LOT/EXT",
+        "label": "LOT/EXT"
+    },
+    {
+        "value": "MSG",
+        "label": "MSG"
+    },
+    {
+        "value": "MSG/ BACK OF EAR",
+        "label": "MSG/ BACK OF EAR"
+    },
+    {
+        "value": "MSG/ALL ABD",
+        "label": "MSG/ALL ABD"
+    },
+    {
+        "value": "MSG/ALL SPINE",
+        "label": "MSG/ALL SPINE"
+    },
+    {
+        "value": "MSG/ALL/ABD/SPINE",
+        "label": "MSG/ALL/ABD/SPINE"
+    },
+    {
+        "value": "MSG/ALL/THROAT",
+        "label": "MSG/ALL/THROAT"
+    },
+    {
+        "value": "MSG/BREAST",
+        "label": "MSG/BREAST"
+    },
+    {
+        "value": "MSG/CENTRE ABD",
+        "label": "MSG/CENTRE ABD"
+    },
+    {
+        "value": "MSG/CHEST/UPPER BACK/SINUS",
+        "label": "MSG/CHEST/UPPER BACK/SINUS"
+    },
+    {
+        "value": "MSG/GROIN",
+        "label": "MSG/GROIN"
+    },
+    {
+        "value": "MSG/FACE",
+        "label": "MSG/FACE"
+    },
+    {
+        "value": "MSG/HEAD",
+        "label": "MSG/HEAD"
+    },
+    {
+        "value": "MSG/SCALP",
+        "label": "MSG/SCALP"
+    },
+    {
+        "value": "MSG/HEART",
+        "label": "MSG/HEART"
+    },
+    {
+        "value": "MSG/JNT",
+        "label": "MSG/JNT"
+    },
+    {
+        "value": "MSG/LO ABD",
+        "label": "MSG/LO ABD"
+    },
+    {
+        "value": "MSG/LOCAL",
+        "label": "MSG/LOCAL"
+    },
+    {
+        "value": "MSG/MUSCLES",
+        "label": "MSG/MUSCLES"
+    },
+    {
+        "value": "MSG/PAROTID",
+        "label": "MSG/PAROTID"
+    },
+    {
+        "value": "MSG/PLVC",
+        "label": "MSG/PLVC"
+    },
+    {
+        "value": "MSG/PPH",
+        "label": "MSG/PPH"
+    },
+    {
+        "value": "MSG/UP ABD",
+        "label": "MSG/UP ABD"
+    },
+    {
+        "value": "MSG/UP THROAT",
+        "label": "MSG/UP THROAT"
+    },
+    {
+        "value": "SOS",
+        "label": "SOS"
+    },
+    {
+        "value": "SPONGE /ALL BODY",
+        "label": "SPONGE /ALL BODY"
+    },
+    {
+        "value": "SPR/LOCAL",
+        "label": "SPR/LOCAL"
+    },
+    {
+        "value": "STEAM/200 ML",
+        "label": "STEAM/200 ML"
+    },
+    {
+        "value": "WASH/EYE/50 ML",
+        "label": "WASH/EYE/50 ML"
+    },
+    {
+        "value": "WASH/WOUND/50 ML",
+        "label": "WASH/WOUND/50 ML"
+    },
+    {
+        "value": "1 LT",
+        "label": "1 LT"
+    },
+    {
+        "value": "50 ML",
+        "label": "50 ML"
+    },
+    {
+        "value": "100 ML",
+        "label": "100 ML"
+    },
+    {
+        "value": "250 ML",
+        "label": "250 ML"
+    },
+    {
+        "value": "1000 ML",
+        "label": "1000 ML"
+    },
+    {
+        "value": "RAPID/1000 ML",
+        "label": "RAPID/1000 ML"
+    },
+    {
+        "value": "HOT MILK/TEA/COF/50 ML",
+        "label": "HOT MILK/TEA/COF/50 ML"
+    },
+    {
+        "value": "ALT",
+        "label": "ALT"
+    },
+    {
+        "value": "HOT BATH",
+        "label": "HOT BATH"
+    },
+    {
+        "value": "COLD BATH",
+        "label": "COLD BATH"
+    },
+    {
+        "value": "WARM BATH",
+        "label": "WARM BATH"
+    },
+    {
+        "value": "OR",
+        "label": "OR"
+    },
+    {
+        "value": "LIGHTER",
+        "label": "LIGHTER"
+    },
+    {
+        "value": "STRONGER",
+        "label": "STRONGER"
+    },
+    {
+        "value": "01/TSF",
+        "label": "01/TSF"
+    },
+    {
+        "value": "SITZ BATH",
+        "label": "SITZ BATH"
+    },
+    {
+        "value": "FOOT BATH/FOREHEAD SPONGE",
+        "label": "FOOT BATH/FOREHEAD SPONGE"
+    }
+]

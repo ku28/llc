@@ -1,0 +1,54 @@
+[
+    {
+        "value": "",
+        "label": "Select addition"
+    },
+    {
+        "value": "LOT/SESAM OIL/",
+        "label": "LOT/SESAM OIL/"
+    },
+    {
+        "value": "LOT/EU OIL/",
+        "label": "LOT/EU OIL/"
+    },
+    {
+        "value": "LOT/OCO OIL/",
+        "label": "LOT/OCO OIL/"
+    },
+    {
+        "value": "LOT/FLX OIL/",
+        "label": "LOT/FLX OIL/"
+    },
+    {
+        "value": "LOT/RS/",
+        "label": "LOT/RS/"
+    },
+    {
+        "value": "GP/GLY/",
+        "label": "GP/GLY/"
+    },
+    {
+        "value": "OIL/",
+        "label": "OIL/"
+    },
+    {
+        "value": "DRP/",
+        "label": "DRP/"
+    },
+    {
+        "value": "SPR/",
+        "label": "SPR/"
+    },
+    {
+        "value": "GRG",
+        "label": "GRG"
+    },
+    {
+        "value": "DUOSE",
+        "label": "DUOSE"
+    },
+    {
+        "value": "STEAM/",
+        "label": "STEAM/"
+    }
+]

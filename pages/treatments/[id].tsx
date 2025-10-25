@@ -4,7 +4,13 @@ import CustomSelect from '../../components/CustomSelect'
 import LoadingModal from '../../components/LoadingModal'
 import ConfirmationModal from '../../components/ConfirmationModal'
 import { requireDoctorOrAdmin } from '../../lib/withAuth'
-import dropdownOptions from '../../data/dropdownOptions.json'
+import components from '../../data/components.json'
+import timing from '../../data/timing.json'
+import dosage from '../../data/dosage.json'
+import additions from '../../data/additions.json'
+import procedure from '../../data/procedure.json'
+import presentation from '../../data/presentation.json'
+import administration from '../../data/administration.json'
 
 function EditTreatmentPage() {
     const router = useRouter()
@@ -395,7 +401,7 @@ function EditTreatmentPage() {
                                 <CustomSelect
                                     value={form.administration}
                                     onChange={(val) => setForm({ ...form, administration: val.toUpperCase() })}
-                                    options={dropdownOptions.administration}
+                                    options={administration}
                                     placeholder="Select administration"
                                     allowCustom={true}
                                     className="w-full"
@@ -532,7 +538,7 @@ function EditTreatmentPage() {
                                                         <CustomSelect
                                                             value={medicine.comp1 || ''}
                                                             onChange={(val) => updateMedicine(medicineIndex, 'comp1', val.toUpperCase())}
-                                                            options={dropdownOptions.components}
+                                                            options={components}
                                                             placeholder="Component 1"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[100px]"
@@ -540,7 +546,7 @@ function EditTreatmentPage() {
                                                         <CustomSelect
                                                             value={medicine.comp2 || ''}
                                                             onChange={(val) => updateMedicine(medicineIndex, 'comp2', val.toUpperCase())}
-                                                            options={dropdownOptions.components}
+                                                            options={components}
                                                             placeholder="Component 2"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[100px]"
@@ -548,7 +554,7 @@ function EditTreatmentPage() {
                                                         <CustomSelect
                                                             value={medicine.comp3 || ''}
                                                             onChange={(val) => updateMedicine(medicineIndex, 'comp3', val.toUpperCase())}
-                                                            options={dropdownOptions.components}
+                                                            options={components}
                                                             placeholder="Component 3"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[100px]"
@@ -560,7 +566,7 @@ function EditTreatmentPage() {
                                                                 <CustomSelect
                                                                     value={medicine.comp4 || ''}
                                                                     onChange={(val) => updateMedicine(medicineIndex, 'comp4', val.toUpperCase())}
-                                                                    options={dropdownOptions.components}
+                                                                    options={components}
                                                                     placeholder="Component 4"
                                                                     allowCustom={true}
                                                                     className="flex-1"
@@ -589,7 +595,7 @@ function EditTreatmentPage() {
                                                                 <CustomSelect
                                                                     value={medicine.comp5 || ''}
                                                                     onChange={(val) => updateMedicine(medicineIndex, 'comp5', val.toUpperCase())}
-                                                                    options={dropdownOptions.components}
+                                                                    options={components}
                                                                     placeholder="Component 5"
                                                                     allowCustom={true}
                                                                     className="flex-1"
@@ -654,7 +660,7 @@ function EditTreatmentPage() {
                                                     <CustomSelect
                                                         value={medicine.timing}
                                                         onChange={(val) => updateMedicine(medicineIndex, 'timing', val)}
-                                                        options={dropdownOptions.timing}
+                                                        options={timing}
                                                         placeholder="Select timing"
                                                         allowCustom={true}
                                                         className="w-full"
@@ -665,7 +671,7 @@ function EditTreatmentPage() {
                                                     <CustomSelect
                                                         value={medicine.dosage}
                                                         onChange={(val) => updateMedicine(medicineIndex, 'dosage', val.toUpperCase())}
-                                                        options={dropdownOptions.dosage}
+                                                        options={dosage}
                                                         placeholder="Select dosage"
                                                         allowCustom={true}
                                                         className="w-full"
@@ -676,7 +682,7 @@ function EditTreatmentPage() {
                                                     <CustomSelect
                                                         value={medicine.additions}
                                                         onChange={(val) => updateMedicine(medicineIndex, 'additions', val.toUpperCase())}
-                                                        options={dropdownOptions.additions}
+                                                        options={additions}
                                                         placeholder="Select addition"
                                                         allowCustom={true}
                                                         className="w-full"
@@ -687,7 +693,7 @@ function EditTreatmentPage() {
                                                     <CustomSelect
                                                         value={medicine.procedure}
                                                         onChange={(val) => updateMedicine(medicineIndex, 'procedure', val.toUpperCase())}
-                                                        options={dropdownOptions.procedure}
+                                                        options={procedure}
                                                         placeholder="Select procedure"
                                                         allowCustom={true}
                                                         className="w-full"
@@ -698,7 +704,7 @@ function EditTreatmentPage() {
                                                     <CustomSelect
                                                         value={medicine.presentation}
                                                         onChange={(val) => updateMedicine(medicineIndex, 'presentation', val.toUpperCase())}
-                                                        options={dropdownOptions.presentation}
+                                                        options={presentation}
                                                         placeholder="Select presentation"
                                                         allowCustom={true}
                                                         className="w-full"

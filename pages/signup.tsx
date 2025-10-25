@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/router'
 import CustomSelect from '../components/CustomSelect'
-import dropdownOptions from '../data/dropdownOptions.json'
+import roleOptions from '../data/role.json'
 import ToastNotification from '../components/ToastNotification'
 import { useToast } from '../hooks/useToast'
 
@@ -122,7 +122,7 @@ export default function SignupPage() {
                     <CustomSelect
                         value={role}
                         onChange={(val) => setRole(val)}
-                        options={dropdownOptions.role}
+                        options={roleOptions}
                         placeholder="Select your role"
                         allowCustom={false}
                     />

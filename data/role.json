@@ -1,0 +1,14 @@
+[
+    {
+        "value": "",
+        "label": "Select role"
+    },
+    {
+        "value": "admin",
+        "label": "Admin"
+    },
+    {
+        "value": "receptionist",
+        "label": "Receptionist"
+    }
+]

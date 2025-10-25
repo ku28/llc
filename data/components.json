@@ -1,0 +1,38 @@
+[
+    {
+        "value": "",
+        "label": "Select component"
+    },
+    {
+        "value": "F1",
+        "label": "F1"
+    },
+    {
+        "value": "BELLADONNA",
+        "label": "BELLADONNA"
+    },
+    {
+        "value": "BRYONIA",
+        "label": "BRYONIA"
+    },
+    {
+        "value": "CALCAREA CARBONICA",
+        "label": "CALCAREA CARBONICA"
+    },
+    {
+        "value": "NUX VOMICA",
+        "label": "NUX VOMICA"
+    },
+    {
+        "value": "PULSATILLA",
+        "label": "PULSATILLA"
+    },
+    {
+        "value": "RHUS TOX",
+        "label": "RHUS TOX"
+    },
+    {
+        "value": "SULPHUR",
+        "label": "SULPHUR"
+    }
+]

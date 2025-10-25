@@ -4,7 +4,17 @@ import Link from 'next/link'
 import CustomSelect from '../components/CustomSelect'
 import DateInput from '../components/DateInput'
 import LoadingModal from '../components/LoadingModal'
-import dropdownOptions from '../data/dropdownOptions.json'
+import genderOptions from '../data/gender.json'
+import temperamentOptions from '../data/temperament.json'
+import pulseDiagnosisOptions from '../data/pulseDiagnosis.json'
+import pulseDiagnosis2Options from '../data/pulseDiagnosis2.json'
+import components from '../data/components.json'
+import timing from '../data/timing.json'
+import dosage from '../data/dosage.json'
+import additions from '../data/additions.json'
+import procedure from '../data/procedure.json'
+import presentation from '../data/presentation.json'
+import administration from '../data/administration.json'
 import { useToast } from '../hooks/useToast'
 
 // Prescriptions Page - Create and manage patient visits with prescriptions
@@ -901,7 +911,7 @@ export default function PrescriptionsPage() {
                                         <CustomSelect
                                             value={form.gender}
                                             onChange={(val) => setForm({ ...form, gender: val })}
-                                            options={dropdownOptions.gender}
+                                            options={genderOptions}
                                             placeholder="Select gender"
                                             allowCustom={true}
                                         />
@@ -977,7 +987,7 @@ export default function PrescriptionsPage() {
                                     <CustomSelect
                                         value={form.temperament}
                                         onChange={(val) => setForm({ ...form, temperament: val })}
-                                        options={dropdownOptions.temperament}
+                                        options={temperamentOptions}
                                         placeholder="Select temperament"
                                         allowCustom={true}
                                     />
@@ -987,7 +997,7 @@ export default function PrescriptionsPage() {
                                     <CustomSelect
                                         value={form.pulseDiagnosis}
                                         onChange={(val) => setForm({ ...form, pulseDiagnosis: val })}
-                                        options={dropdownOptions.pulseDiagnosis}
+                                        options={pulseDiagnosisOptions}
                                         placeholder="Select pulse diagnosis"
                                         allowCustom={true}
                                     />
@@ -997,7 +1007,7 @@ export default function PrescriptionsPage() {
                                     <CustomSelect
                                         value={form.pulseDiagnosis2}
                                         onChange={(val) => setForm({ ...form, pulseDiagnosis2: val })}
-                                        options={dropdownOptions.pulseDiagnosis2}
+                                        options={pulseDiagnosis2Options}
                                         placeholder="Select pulse diagnosis 2"
                                         allowCustom={true}
                                     />
@@ -1421,7 +1431,7 @@ export default function PrescriptionsPage() {
                                                         <CustomSelect
                                                             value={pr.comp1 || ''}
                                                             onChange={(val) => updatePrescription(i, { comp1: val.toUpperCase() })}
-                                                            options={dropdownOptions.components}
+                                                            options={components}
                                                             placeholder="Component 1"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[120px]"
@@ -1429,7 +1439,7 @@ export default function PrescriptionsPage() {
                                                         <CustomSelect
                                                             value={pr.comp2 || ''}
                                                             onChange={(val) => updatePrescription(i, { comp2: val.toUpperCase() })}
-                                                            options={dropdownOptions.components}
+                                                            options={components}
                                                             placeholder="Component 2"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[120px]"
@@ -1437,7 +1447,7 @@ export default function PrescriptionsPage() {
                                                         <CustomSelect
                                                             value={pr.comp3 || ''}
                                                             onChange={(val) => updatePrescription(i, { comp3: val.toUpperCase() })}
-                                                            options={dropdownOptions.components}
+                                                            options={components}
                                                             placeholder="Component 3"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[120px]"
@@ -1449,7 +1459,7 @@ export default function PrescriptionsPage() {
                                                                 <CustomSelect
                                                                     value={pr.comp4 || ''}
                                                                     onChange={(val) => updatePrescription(i, { comp4: val.toUpperCase() })}
-                                                                    options={dropdownOptions.components}
+                                                                    options={components}
                                                                     placeholder="Component 4"
                                                                     allowCustom={true}
                                                                     className="flex-1"
@@ -1475,7 +1485,7 @@ export default function PrescriptionsPage() {
                                                                 <CustomSelect
                                                                     value={pr.comp5 || ''}
                                                                     onChange={(val) => updatePrescription(i, { comp5: val.toUpperCase() })}
-                                                                    options={dropdownOptions.components}
+                                                                    options={components}
                                                                     placeholder="Component 5"
                                                                     allowCustom={true}
                                                                     className="flex-1"
@@ -1526,7 +1536,7 @@ export default function PrescriptionsPage() {
                                                     <CustomSelect
                                                         value={pr.timing || ''}
                                                         onChange={(val) => updatePrescription(i, { timing: val })}
-                                                        options={dropdownOptions.timing}
+                                                        options={timing}
                                                         placeholder="Select timing"
                                                         allowCustom={true}
                                                     />
@@ -1536,7 +1546,7 @@ export default function PrescriptionsPage() {
                                                     <CustomSelect
                                                         value={pr.dosage || ''}
                                                         onChange={(val) => updatePrescription(i, { dosage: val.toUpperCase() })}
-                                                        options={dropdownOptions.dosage}
+                                                        options={dosage}
                                                         placeholder="Select dosage"
                                                         allowCustom={true}
                                                     />
@@ -1546,7 +1556,7 @@ export default function PrescriptionsPage() {
                                                     <CustomSelect
                                                         value={pr.additions || ''}
                                                         onChange={(val) => updatePrescription(i, { additions: val.toUpperCase() })}
-                                                        options={dropdownOptions.additions}
+                                                        options={additions}
                                                         placeholder="Select addition"
                                                         allowCustom={true}
                                                     />
@@ -1556,7 +1566,7 @@ export default function PrescriptionsPage() {
                                                     <CustomSelect
                                                         value={pr.procedure || ''}
                                                         onChange={(val) => updatePrescription(i, { procedure: val.toUpperCase() })}
-                                                        options={dropdownOptions.procedure}
+                                                        options={procedure}
                                                         placeholder="Select procedure"
                                                         allowCustom={true}
                                                     />
@@ -1566,7 +1576,7 @@ export default function PrescriptionsPage() {
                                                     <CustomSelect
                                                         value={pr.presentation || ''}
                                                         onChange={(val) => updatePrescription(i, { presentation: val.toUpperCase() })}
-                                                        options={dropdownOptions.presentation}
+                                                        options={presentation}
                                                         placeholder="Select presentation"
                                                         allowCustom={true}
                                                     />
@@ -1584,7 +1594,7 @@ export default function PrescriptionsPage() {
                                                     <CustomSelect
                                                         value={pr.administration || ''}
                                                         onChange={(val) => updatePrescription(i, { administration: val.toUpperCase() })}
-                                                        options={dropdownOptions.administration}
+                                                        options={administration}
                                                         placeholder="Select administration"
                                                         allowCustom={true}
                                                     />

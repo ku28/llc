@@ -1,0 +1,34 @@
+[
+    {
+        "value": "",
+        "label": "Select presentation"
+    },
+    {
+        "value": "DROPS",
+        "label": "DROPS"
+    },
+    {
+        "value": "TABLET",
+        "label": "TABLET"
+    },
+    {
+        "value": "CAPSULE",
+        "label": "CAPSULE"
+    },
+    {
+        "value": "LIQUID",
+        "label": "LIQUID"
+    },
+    {
+        "value": "POWDER",
+        "label": "POWDER"
+    },
+    {
+        "value": "CREAM",
+        "label": "CREAM"
+    },
+    {
+        "value": "OINTMENT",
+        "label": "OINTMENT"
+    }
+]

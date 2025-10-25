@@ -1,0 +1,22 @@
+[
+    {
+        "value": "",
+        "label": "Select administration"
+    },
+    {
+        "value": "ORAL",
+        "label": "ORAL"
+    },
+    {
+        "value": "TOPICAL",
+        "label": "TOPICAL"
+    },
+    {
+        "value": "SUBLINGUAL",
+        "label": "SUBLINGUAL"
+    },
+    {
+        "value": "EXTERNAL",
+        "label": "EXTERNAL"
+    }
+]

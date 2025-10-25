@@ -155,6 +155,7 @@ model Treatment {
   timing            String?
   treatmentPlan     String?
   planNumber        String?
+  deleted           Boolean?           @default(false)
   prescriptions     Prescription[]
   treatmentProducts TreatmentProduct[]
 }

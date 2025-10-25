@@ -4,7 +4,7 @@ import DateInput from '../components/DateInput'
 import ToastNotification from '../components/ToastNotification'
 import { useToast } from '../hooks/useToast'
 import CustomSelect from '../components/CustomSelect'
-import dropdownOptions from '../data/dropdownOptions.json'
+import genderOptions from '../data/gender.json'
 
 export default function PatientsPage() {
     const router = useRouter()
@@ -630,7 +630,7 @@ export default function PatientsPage() {
                                             <CustomSelect
                                                 value={(form as any).gender || ''}
                                                 onChange={(val) => setForm({ ...form, gender: val })}
-                                                options={dropdownOptions.gender}
+                                                options={genderOptions}
                                                 placeholder="Select gender"
                                                 allowCustom={true}
                                             />

@@ -1,0 +1,22 @@
+[
+    {
+        "value": "",
+        "label": "Select temperament"
+    },
+    {
+        "value": "LYM-S1/JUN",
+        "label": "LYM-S1/JUN"
+    },
+    {
+        "value": "SANG-A3/DEC",
+        "label": "SANG-A3/DEC"
+    },
+    {
+        "value": "BIL-S5/SUM",
+        "label": "BIL-S5/SUM"
+    },
+    {
+        "value": "NER-F1/WIN",
+        "label": "NER-F1/WIN"
+    }
+]

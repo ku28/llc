@@ -1,0 +1,46 @@
+[
+    {
+        "value": "",
+        "label": "Select timing"
+    },
+    {
+        "value": "BM",
+        "label": "BM"
+    },
+    {
+        "value": "AM",
+        "label": "AM"
+    },
+    {
+        "value": "RAP",
+        "label": "RAP"
+    },
+    {
+        "value": "MOR",
+        "label": "MOR"
+    },
+    {
+        "value": "AFN",
+        "label": "AFN"
+    },
+    {
+        "value": "EVE",
+        "label": "EVE"
+    },
+    {
+        "value": "HS",
+        "label": "HS"
+    },
+    {
+        "value": "SOS",
+        "label": "SOS"
+    },
+    {
+        "value": "ALT",
+        "label": "ALT"
+    },
+    {
+        "value": "OR",
+        "label": "OR"
+    }
+]
