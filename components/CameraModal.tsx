@@ -1,0 +1,152 @@
+import { useRef, useState, useEffect } from 'react'
+
+interface CameraModalProps {
+    isOpen: boolean
+    onClose: () => void
+    onCapture: (imageData: string) => void
+    title?: string
+}
+
+export default function CameraModal({ isOpen, onClose, onCapture, title = 'Capture Document' }: CameraModalProps) {
+    const videoRef = useRef<HTMLVideoElement>(null)
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+    const [stream, setStream] = useState<MediaStream | null>(null)
+    const [isCameraReady, setIsCameraReady] = useState(false)
+
+    // Start camera when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            startCamera()
+        } else {
+            stopCamera()
+        }
+        return () => stopCamera()
+    }, [isOpen])
+
+    const startCamera = async () => {
+        try {
+            const mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment', // Use back camera on mobile
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                }
+            })
+            setStream(mediaStream)
+            if (videoRef.current) {
+                videoRef.current.srcObject = mediaStream
+                videoRef.current.onloadedmetadata = () => {
+                    setIsCameraReady(true)
+                }
+            }
+        } catch (err) {
+            console.error('Error accessing camera:', err)
+            alert('Unable to access camera. Please check permissions.')
+        }
+    }
+
+    const stopCamera = () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop())
+            setStream(null)
+        }
+        setIsCameraReady(false)
+    }
+
+    const captureImage = () => {
+        if (!videoRef.current || !canvasRef.current) return
+
+        const video = videoRef.current
+        const canvas = canvasRef.current
+        
+        // Set canvas size to match video dimensions
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+
+        // Draw video frame to canvas
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+            
+            // Convert to base64
+            const imageData = canvas.toDataURL('image/jpeg', 0.9)
+            onCapture(imageData)
+            handleClose()
+        }
+    }
+
+    const handleClose = () => {
+        stopCamera()
+        onClose()
+    }
+
+    if (!isOpen) return null
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
+            <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between p-3 border-b dark:border-gray-700 flex-shrink-0">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h3>
+                    <button
+                        onClick={handleClose}
+                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Camera View - A4 aspect ratio (1:1.414) */}
+                <div className="relative bg-black flex-shrink-0" style={{ aspectRatio: '1 / 1.414', maxHeight: 'calc(90vh - 140px)' }}>
+                    <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover"
+                    />
+                    
+                    {/* Overlay guide for document alignment */}
+                    <div className="absolute inset-0 pointer-events-none">
+                        <div className="absolute inset-4 border-2 border-dashed border-white opacity-50 rounded"></div>
+                    </div>
+
+                    {!isCameraReady && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+                            <div className="text-white text-center">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                                <p>Loading camera...</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Controls */}
+                <div className="flex items-center justify-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 flex-shrink-0">
+                    <button
+                        onClick={handleClose}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={captureImage}
+                        disabled={!isCameraReady}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Capture
+                    </button>
+                </div>
+
+                {/* Hidden canvas for image capture */}
+                <canvas ref={canvasRef} className="hidden" />
+            </div>
+        </div>
+    )
+}

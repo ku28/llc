@@ -4,6 +4,7 @@ import Link from 'next/link'
 import CustomSelect from '../components/CustomSelect'
 import DateInput from '../components/DateInput'
 import LoadingModal from '../components/LoadingModal'
+import CameraModal from '../components/CameraModal'
 import genderOptions from '../data/gender.json'
 import temperamentOptions from '../data/temperament.json'
 import pulseDiagnosisOptions from '../data/pulseDiagnosis.json'
@@ -11,6 +12,9 @@ import pulseDiagnosis2Options from '../data/pulseDiagnosis2.json'
 import components from '../data/components.json'
 import timing from '../data/timing.json'
 import dosage from '../data/dosage.json'
+import doseQuantity from '../data/doseQuantity.json'
+import doseTiming from '../data/doseTiming.json'
+import dilution from '../data/dilution.json'
 import additions from '../data/additions.json'
 import procedure from '../data/procedure.json'
 import presentation from '../data/presentation.json'
@@ -31,11 +35,13 @@ export default function PrescriptionsPage() {
     const [selectedProductId, setSelectedProductId] = useState<string>('')
     const [selectedMedicines, setSelectedMedicines] = useState<string[]>([])
     const [attachments, setAttachments] = useState<Array<{ url: string, name: string, type: string }>>([])
-    const [historyAttachments, setHistoryAttachments] = useState<Array<{ url: string, name: string, type: string }>>([])
     const [reportsAttachments, setReportsAttachments] = useState<Array<{ url: string, name: string, type: string }>>([])
     const [uploadingAttachment, setUploadingAttachment] = useState(false)
-    const [uploadingHistory, setUploadingHistory] = useState(false)
     const [uploadingReports, setUploadingReports] = useState(false)
+    const [showCamera, setShowCamera] = useState(false)
+    const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('environment')
+    const videoRef = useRef<HTMLVideoElement>(null)
+    const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
     const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({})
     const [form, setForm] = useState<any>({
         patientId: '', opdNo: '', temperament: '', pulseDiagnosis: '', pulseDiagnosis2: '',
@@ -46,12 +52,13 @@ export default function PrescriptionsPage() {
         // New financial fields
         amount: '', discount: '', payment: '', balance: '',
         // New tracking fields
-        visitNumber: '', followUpCount: '', helper: ''
+        visitNumber: '', followUpCount: ''
     })
     const [prescriptions, setPrescriptions] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [lastCreatedVisitId, setLastCreatedVisitId] = useState<number | null>(null)
     const [lastCreatedVisit, setLastCreatedVisit] = useState<any | null>(null)
+    const [previousWeight, setPreviousWeight] = useState<string>('')
     const previewRef = useRef<HTMLDivElement | null>(null)
     const isPatient = user?.role?.toLowerCase() === 'user'
 
@@ -71,6 +78,27 @@ export default function PrescriptionsPage() {
     useEffect(() => { fetch('/api/patients').then(r => r.json()).then(setPatients) }, [])
     useEffect(() => { fetch('/api/treatments').then(r => r.json()).then(setTreatments) }, [])
     useEffect(() => { fetch('/api/products').then(r => r.json()).then(setProducts) }, [])
+
+    // Fetch previous weight when patient is selected
+    useEffect(() => {
+        if (form.patientId && !isEditMode) {
+            fetch(`/api/visits?patientId=${form.patientId}`)
+                .then(r => r.json())
+                .then(visits => {
+                    if (visits && visits.length > 0) {
+                        // Sort by date descending and get the most recent visit
+                        const sortedVisits = visits.sort((a: any, b: any) => 
+                            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                        )
+                        const lastVisit = sortedVisits[0]
+                        if (lastVisit.patient?.weight) {
+                            setPreviousWeight(lastVisit.patient.weight)
+                        }
+                    }
+                })
+                .catch(err => console.error('Error fetching previous weight:', err))
+        }
+    }, [form.patientId, isEditMode])
 
     // Auto-calculate amount from prescriptions
     useEffect(() => {
@@ -220,8 +248,7 @@ export default function PrescriptionsPage() {
                         payment: visit.payment ?? '',
                         balance: visit.balance ?? '',
                         visitNumber: visit.visitNumber ?? '',
-                        followUpCount: visit.followUpCount ?? '',
-                        helper: visit.helper || ''
+                        followUpCount: visit.followUpCount ?? ''
                     })
 
                     // Pre-fill prescriptions
@@ -243,7 +270,8 @@ export default function PrescriptionsPage() {
                             droppersToday: p.droppersToday?.toString() || '',
                             medicineQuantity: p.medicineQuantity?.toString() || '',
                             administration: p.administration || '',
-                            taken: p.taken || false
+                            taken: p.taken || false,
+                            patientHasMedicine: p.patientHasMedicine || false
                         }))
                         
                         setPrescriptions(loadedPrescriptions)
@@ -277,6 +305,88 @@ export default function PrescriptionsPage() {
                 })
         }
     }, [isEditMode, visitId, router])
+
+    // Handle copying data from previous visit
+    useEffect(() => {
+        const { copyFromVisitId } = router.query
+        if (copyFromVisitId && !isEditMode) {
+            setLoading(true)
+            fetch(`/api/visits?id=${copyFromVisitId}`)
+                .then(r => r.json())
+                .then(visit => {
+                    if (!visit) {
+                        showError('Previous visit not found')
+                        setLoading(false)
+                        return
+                    }
+
+                    // Pre-fill form with previous visit data (but keep patientId if already set)
+                    setForm((prevForm: any) => ({
+                        ...prevForm,
+                        temperament: visit.temperament || '',
+                        pulseDiagnosis: visit.pulseDiagnosis || '',
+                        pulseDiagnosis2: visit.pulseDiagnosis2 || '',
+                        majorComplaints: visit.majorComplaints || '',
+                        historyReports: visit.historyReports || '',
+                        investigations: visit.investigations || '',
+                        reports: visit.reports || '',
+                        provisionalDiagnosis: visit.provisionalDiagnosis || '',
+                        improvements: visit.improvements || '',
+                        specialNote: visit.specialNote || ''
+                    }))
+
+                    // Pre-fill prescriptions from previous visit
+                    if (visit.prescriptions && visit.prescriptions.length > 0) {
+                        const copiedPrescriptions = visit.prescriptions.map((p: any) => ({
+                            treatmentId: p.treatmentId ? String(p.treatmentId) : '',
+                            productId: String(p.productId),
+                            comp1: p.comp1 || '',
+                            comp2: p.comp2 || '',
+                            comp3: p.comp3 || '',
+                            comp4: (p.comp4 && p.comp4.trim()) ? p.comp4 : undefined,
+                            comp5: (p.comp5 && p.comp5.trim()) ? p.comp5 : undefined,
+                            quantity: p.quantity || 1,
+                            timing: p.timing || '',
+                            dosage: p.dosage || '',
+                            additions: p.additions || '',
+                            procedure: p.procedure || '',
+                            presentation: p.presentation || '',
+                            droppersToday: p.droppersToday?.toString() || '',
+                            medicineQuantity: p.medicineQuantity?.toString() || '',
+                            administration: p.administration || '',
+                            taken: false, // Reset taken status for new visit
+                            patientHasMedicine: false // Reset for new visit
+                        }))
+                        
+                        setPrescriptions(copiedPrescriptions)
+                        
+                        // Check if prescriptions have a treatment plan attached
+                        const firstTreatmentId = visit.prescriptions[0]?.treatmentId
+                        if (firstTreatmentId) {
+                            setSelectedTreatmentId(String(firstTreatmentId))
+                            fetch(`/api/treatments?includeDeleted=true`)
+                                .then(r => r.json())
+                                .then(allTreatments => {
+                                    const treatment = allTreatments.find((t: any) => String(t.id) === String(firstTreatmentId))
+                                    if (treatment) {
+                                        setSelectedTreatmentPlan(treatment)
+                                    }
+                                })
+                                .catch(err => console.error('Error fetching treatment plan:', err))
+                        }
+                        
+                        showInfo('Previous visit data has been loaded. You can modify it before saving.')
+                    }
+
+                    setLoading(false)
+                })
+                .catch(err => {
+                    console.error(err)
+                    showError('Failed to load previous visit data')
+                    setLoading(false)
+                })
+        }
+    }, [router.query, isEditMode, showError, showInfo])
 
     async function handleAttachmentUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const files = e.target.files
@@ -352,72 +462,6 @@ export default function PrescriptionsPage() {
         setAttachments(attachments.filter((_, i) => i !== index))
     }
 
-    async function handleHistoryAttachmentUpload(e: React.ChangeEvent<HTMLInputElement>) {
-        const files = e.target.files
-        if (!files || files.length === 0) return
-
-        if (historyAttachments.length + files.length > 10) {
-            alert('You can upload a maximum of 10 files')
-            return
-        }
-
-        setUploadingHistory(true)
-        try {
-            const uploadedFiles: Array<{ url: string, name: string, type: string }> = []
-            const selectedPatient = patients.find(p => String(p.id) === String(form.patientId))
-            const patientName = selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : 'Unknown Patient'
-
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i]
-                if (file.size > 10 * 1024 * 1024) {
-                    alert(`File "${file.name}" is too large. Maximum size is 10MB.`)
-                    continue
-                }
-
-                const reader = new FileReader()
-                const base64 = await new Promise<string>((resolve, reject) => {
-                    reader.onloadend = () => resolve(reader.result as string)
-                    reader.onerror = reject
-                    reader.readAsDataURL(file)
-                })
-
-                const res = await fetch('/api/upload-to-drive', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        file: base64,
-                        fileName: file.name,
-                        mimeType: file.type,
-                        patientName: `${patientName}/History`
-                    })
-                })
-
-                const data = await res.json()
-                if (res.ok) {
-                    uploadedFiles.push({
-                        url: data.webViewLink,
-                        name: file.name,
-                        type: file.type
-                    })
-                } else {
-                    throw new Error(data.error || `Failed to upload ${file.name}`)
-                }
-            }
-
-            setHistoryAttachments([...historyAttachments, ...uploadedFiles])
-        } catch (error: any) {
-            console.error('History attachment upload error:', error)
-            alert(`Failed to upload attachments: ${error.message || 'Unknown error'}`)
-        } finally {
-            setUploadingHistory(false)
-            e.target.value = ''
-        }
-    }
-
-    function removeHistoryAttachment(index: number) {
-        setHistoryAttachments(historyAttachments.filter((_, i) => i !== index))
-    }
-
     async function handleReportsAttachmentUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const files = e.target.files
         if (!files || files.length === 0) return
@@ -454,7 +498,7 @@ export default function PrescriptionsPage() {
                         file: base64,
                         fileName: file.name,
                         mimeType: file.type,
-                        patientName: `${patientName}/Reports`
+                        patientName: `${patientName}/reports`
                     })
                 })
 
@@ -480,8 +524,171 @@ export default function PrescriptionsPage() {
         }
     }
 
+    // Handle captured image from camera modal
+    async function handleCameraCapture(imageData: string) {
+        if (reportsAttachments.length >= 10) {
+            alert('You can upload a maximum of 10 files')
+            return
+        }
+
+        setUploadingReports(true)
+        try {
+            const selectedPatient = patients.find(p => String(p.id) === String(form.patientId))
+            const patientName = selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : 'Unknown Patient'
+            const fileName = `document_${Date.now()}.jpg`
+
+            const res = await fetch('/api/upload-to-drive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    file: imageData,
+                    fileName: fileName,
+                    mimeType: 'image/jpeg',
+                    patientName: `${patientName}/reports`
+                })
+            })
+
+            const data = await res.json()
+            if (res.ok) {
+                setReportsAttachments([...reportsAttachments, {
+                    url: data.webViewLink,
+                    name: fileName,
+                    type: 'image/jpeg'
+                }])
+            } else {
+                throw new Error(data.error || 'Failed to upload captured image')
+            }
+        } catch (error: any) {
+            console.error('Camera capture upload error:', error)
+            alert(`Failed to upload image: ${error.message || 'Unknown error'}`)
+        } finally {
+            setUploadingReports(false)
+        }
+    }
+
     function removeReportsAttachment(index: number) {
         setReportsAttachments(reportsAttachments.filter((_, i) => i !== index))
+    }
+
+    // Camera functions
+    async function startCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: cameraFacingMode }
+            })
+            setCameraStream(stream)
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream
+            }
+            setShowCamera(true)
+        } catch (error) {
+            console.error('Camera access error:', error)
+            alert('Unable to access camera. Please check permissions.')
+        }
+    }
+
+    function stopCamera() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop())
+            setCameraStream(null)
+        }
+        setShowCamera(false)
+    }
+
+    function toggleCameraFacing() {
+        const newFacingMode = cameraFacingMode === 'user' ? 'environment' : 'user'
+        setCameraFacingMode(newFacingMode)
+        if (cameraStream) {
+            stopCamera()
+            setTimeout(() => startCamera(), 100)
+        }
+    }
+
+    async function capturePhoto() {
+        if (!videoRef.current || !form.patientId) {
+            alert('Please select a patient first')
+            return
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = videoRef.current.videoWidth
+        canvas.height = videoRef.current.videoHeight
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        ctx.drawImage(videoRef.current, 0, 0)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+
+        setUploadingReports(true)
+        try {
+            const selectedPatient = patients.find(p => String(p.id) === String(form.patientId))
+            const patientName = selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : 'Unknown Patient'
+            const fileName = `capture_${Date.now()}.jpg`
+
+            const res = await fetch('/api/upload-to-drive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    file: dataUrl,
+                    fileName: fileName,
+                    mimeType: 'image/jpeg',
+                    patientName: `${patientName}/reports`
+                })
+            })
+
+            const data = await res.json()
+            if (res.ok) {
+                setReportsAttachments([...reportsAttachments, {
+                    url: data.webViewLink,
+                    name: fileName,
+                    type: 'image/jpeg'
+                }])
+                stopCamera()
+                showSuccess('Photo captured and uploaded successfully!')
+            } else {
+                throw new Error(data.error || 'Upload failed')
+            }
+        } catch (error: any) {
+            console.error('Photo capture error:', error)
+            alert(`Failed to upload photo: ${error.message || 'Unknown error'}`)
+        } finally {
+            setUploadingReports(false)
+        }
+    }
+
+    // Helper functions for component and dosage parsing
+    function parseComponent(compValue: string): { name: string; volume: string } {
+        if (!compValue) return { name: '', volume: '' }
+        const parts = compValue.split('|')
+        return { name: parts[0] || '', volume: parts[1] || '' }
+    }
+
+    function formatComponent(name: string, volume: string): string {
+        if (!name && !volume) return ''
+        return `${name}|${volume}`
+    }
+
+    function parseDosage(dosageValue: string): { quantity: string; timing: string; dilution: string } {
+        if (!dosageValue) return { quantity: '', timing: '', dilution: '' }
+        const parts = dosageValue.split('|')
+        if (parts.length >= 3) {
+            return { quantity: parts[0] || '', timing: parts[1] || '', dilution: parts[2] || '' }
+        }
+        // Try to parse old format (e.g., "10/DRP/TDS/WTR")
+        const oldParts = dosageValue.split('/')
+        if (oldParts.length >= 3) {
+            return { 
+                quantity: oldParts[0] || '', 
+                timing: oldParts[2] || '', 
+                dilution: oldParts[3] || '' 
+            }
+        }
+        return { quantity: '', timing: '', dilution: '' }
+    }
+
+    function formatDosage(quantity: string, timing: string, dilution: string): string {
+        if (!quantity && !timing && !dilution) return ''
+        return `${quantity}|${timing}|${dilution}`
     }
 
     function addSelectedProductToPrescription() {
@@ -500,7 +707,7 @@ export default function PrescriptionsPage() {
             quantity: 1, timing: '', dosage: '',
             additions: '', procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', taken: false
+            administration: '', taken: false, patientHasMedicine: false
         }])
     }
 
@@ -534,7 +741,7 @@ export default function PrescriptionsPage() {
             quantity: 1, timing: '', dosage: '',
             additions: '', procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', taken: false
+            administration: '', taken: false, patientHasMedicine: false
         }))
 
         setPrescriptions([...prescriptions, ...newPrescriptions])
@@ -765,6 +972,13 @@ export default function PrescriptionsPage() {
             <LoadingModal isOpen={loading} message={isEditMode ? 'Loading visit data...' : 'Loading...'} />
             {/* Creating Treatment Modal */}
             <LoadingModal isOpen={creatingTreatment} message={treatmentModalMessage} />
+            {/* Camera Modal for Reports */}
+            <CameraModal 
+                isOpen={showCamera} 
+                onClose={() => setShowCamera(false)} 
+                onCapture={handleCameraCapture}
+                title="Capture Report Document"
+            />
             
             {isPatient ? (
                 // Patient view - Read-only prescription list
@@ -897,7 +1111,9 @@ export default function PrescriptionsPage() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                     <div>
                                         <label className="block text-sm font-medium mb-1.5">OPD Number</label>
-                                        <input placeholder="OPD-001" value={form.opdNo} onChange={e => setForm({ ...form, opdNo: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
+                                        <div className="p-2 text-base font-medium text-gray-900 dark:text-gray-100">
+                                            {form.opdNo || 'Not assigned'}
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium mb-1.5">Date of Birth</label>
@@ -935,38 +1151,52 @@ export default function PrescriptionsPage() {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium mb-1.5">Height</label>
-                                        <div className="flex items-center border rounded overflow-hidden">
-                                            <input 
-                                                type="number" 
-                                                placeholder="175" 
-                                                value={form.height} 
-                                                onChange={e => setForm({ ...form, height: e.target.value })} 
-                                                className="flex-1 p-2 border-0 focus:outline-none focus:ring-0" 
-                                            />
-                                            <span className="px-2 text-xs text-gray-500">cm</span>
-                                            <div className="border-l border-dashed border-gray-300 dark:border-gray-600 h-8"></div>
-                                            <input 
-                                                type="number" 
-                                                placeholder="5" 
-                                                value={form.heightFeet} 
-                                                onChange={e => setForm({ ...form, heightFeet: e.target.value })} 
-                                                className="w-16 p-2 border-0 text-center focus:outline-none focus:ring-0" 
-                                                title="Feet"
-                                            />
-                                            <span className="text-xs text-gray-500">'</span>
-                                            <input 
-                                                type="number" 
-                                                placeholder="9" 
-                                                value={form.heightInches} 
-                                                onChange={e => setForm({ ...form, heightInches: e.target.value })} 
-                                                className="w-16 p-2 border-0 text-center focus:outline-none focus:ring-0" 
-                                                title="Inches"
-                                            />
-                                            <span className="px-2 text-xs text-gray-500">"</span>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {/* CM Input */}
+                                            <div className="flex items-center border rounded overflow-hidden bg-white dark:bg-gray-800 w-32">
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="175" 
+                                                    value={form.height} 
+                                                    onChange={e => setForm({ ...form, height: e.target.value })} 
+                                                    className="w-20 p-2 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                />
+                                                <span className="px-3 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700">cm</span>
+                                            </div>
+                                            
+                                            {/* Feet/Inches Input */}
+                                            <div className="flex items-center gap-1 border rounded overflow-hidden bg-white dark:bg-gray-800 w-40">
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="5" 
+                                                    value={form.heightFeet} 
+                                                    onChange={e => setForm({ ...form, heightFeet: e.target.value })} 
+                                                    className="w-12 p-2 border-0 text-center focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                    title="Feet"
+                                                />
+                                                <span className="text-sm font-medium text-gray-600">ft</span>
+                                                <div className="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="9" 
+                                                    value={form.heightInches} 
+                                                    onChange={e => setForm({ ...form, heightInches: e.target.value })} 
+                                                    className="w-12 p-2 border-0 text-center focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                    title="Inches"
+                                                />
+                                                <span className="px-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700">in</span>
+                                            </div>
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium mb-1.5">Weight (kg)</label>
+                                        <label className="block text-sm font-medium mb-1.5">
+                                            Weight (kg)
+                                            {previousWeight && (
+                                                <span className="ml-2 text-xs text-gray-500 font-normal">
+                                                    (Previous: {previousWeight} kg)
+                                                </span>
+                                            )}
+                                        </label>
                                         <input type="number" placeholder="70" value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} className="w-full p-2 border rounded" />
                                     </div>
                                     <div>
@@ -1038,7 +1268,7 @@ export default function PrescriptionsPage() {
                                     <input placeholder="Follow-up in 7 days" value={form.specialNote} onChange={e => setForm({ ...form, specialNote: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
                                 </div>
 
-                                {/* History / Reports - Split into two columns with separate attachments */}
+                                {/* History / Reports - Split into two columns */}
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">History</label>
                                     <textarea 
@@ -1048,51 +1278,6 @@ export default function PrescriptionsPage() {
                                         rows={4}
                                         className="w-full p-2 border rounded resize-none mb-2"
                                     />
-                                    
-                                    {/* History Attachments */}
-                                    <div className="p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-                                        <div className="flex items-center gap-3">
-                                            <label className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                                </svg>
-                                                <span className="text-xs font-medium">
-                                                    {uploadingHistory ? 'Uploading...' : 'Attach'}
-                                                </span>
-                                                <input
-                                                    type="file"
-                                                    multiple
-                                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
-                                                    onChange={handleHistoryAttachmentUpload}
-                                                    disabled={uploadingHistory || historyAttachments.length >= 10}
-                                                    className="hidden"
-                                                />
-                                            </label>
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                ({historyAttachments.length}/10)
-                                            </span>
-                                        </div>
-                                        {historyAttachments.length > 0 && (
-                                            <div className="mt-2 space-y-1">
-                                                {historyAttachments.map((attachment, index) => (
-                                                    <div key={index} className="flex items-center gap-2 p-1.5 border border-gray-300 dark:border-gray-600 rounded text-xs">
-                                                        <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate hover:text-blue-600">
-                                                            {attachment.name}
-                                                        </a>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeHistoryAttachment(index)}
-                                                            className="text-gray-400 hover:text-red-600 p-0.5"
-                                                        >
-                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Reports</label>
@@ -1104,33 +1289,46 @@ export default function PrescriptionsPage() {
                                         className="w-full p-2 border rounded resize-none mb-2"
                                     />
                                     
-                                    {/* Reports Attachments */}
-                                    <div className="p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-                                        <div className="flex items-center gap-3">
-                                            <label className="cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                    {/* Minimalistic Reports Attachments with Camera */}
+                                    <div className="space-y-2">
+                                        {/* File Upload & Camera Controls */}
+                                        <div className="flex items-center gap-2">
+                                            <label className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-xs">
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                                 </svg>
-                                                <span className="text-xs font-medium">
-                                                    {uploadingReports ? 'Uploading...' : 'Attach'}
-                                                </span>
+                                                <span>File</span>
                                                 <input
                                                     type="file"
                                                     multiple
-                                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
+                                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,image/*"
                                                     onChange={handleReportsAttachmentUpload}
                                                     disabled={uploadingReports || reportsAttachments.length >= 10}
                                                     className="hidden"
                                                 />
                                             </label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowCamera(true)}
+                                                disabled={uploadingReports}
+                                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors text-xs"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                </svg>
+                                                <span>Camera</span>
+                                            </button>
                                             <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                ({reportsAttachments.length}/10)
+                                                {reportsAttachments.length}/10
                                             </span>
                                         </div>
+
+                                        {/* Uploaded Files List */}
                                         {reportsAttachments.length > 0 && (
-                                            <div className="mt-2 space-y-1">
+                                            <div className="space-y-1">
                                                 {reportsAttachments.map((attachment, index) => (
-                                                    <div key={index} className="flex items-center gap-2 p-1.5 border border-gray-300 dark:border-gray-600 rounded text-xs">
+                                                    <div key={index} className="flex items-center gap-2 p-1.5 bg-gray-50 dark:bg-gray-800 rounded text-xs">
                                                         <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate hover:text-blue-600">
                                                             {attachment.name}
                                                         </a>
@@ -1152,29 +1350,10 @@ export default function PrescriptionsPage() {
                             </div>
                         </div>
 
-                        {/* Visit Tracking Card */}
+                        {/* Next Visit & Tracking - Consolidated in single line */}
                         <div className="card">
-                            <h3 className="text-lg font-semibold mb-4">Visit Tracking</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1.5">Visit Number (V)</label>
-                                    <input type="number" placeholder="1" value={form.visitNumber} onChange={e => setForm({ ...form, visitNumber: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1.5">Follow-Up Count (FU)</label>
-                                    <input type="number" placeholder="0" value={form.followUpCount} onChange={e => setForm({ ...form, followUpCount: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1.5">Helper/Staff ID</label>
-                                    <input placeholder="Staff001" value={form.helper} onChange={e => setForm({ ...form, helper: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Next Visit Card */}
-                        <div className="card">
-                            <h3 className="text-lg font-semibold mb-4">Next Visit</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <h3 className="text-lg font-semibold mb-4">Next Visit & Tracking</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Next Visit Date</label>
                                     <DateInput type="date" placeholder="Select visit date" value={form.nextVisitDate} onChange={e => setForm({ ...form, nextVisitDate: e.target.value })} className="w-full p-2 border rounded" />
@@ -1182,6 +1361,14 @@ export default function PrescriptionsPage() {
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Next Visit Time</label>
                                     <input type="time" placeholder="Select time" value={form.nextVisitTime} onChange={e => setForm({ ...form, nextVisitTime: e.target.value })} className="w-full p-2 border rounded" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1.5">Visit Number (V)</label>
+                                    <input type="number" placeholder="1" value={form.visitNumber} onChange={e => setForm({ ...form, visitNumber: e.target.value })} className="w-full p-2 border rounded" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1.5">Follow-Up Count (FU)</label>
+                                    <input type="number" placeholder="0" value={form.followUpCount} onChange={e => setForm({ ...form, followUpCount: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                             </div>
                         </div>
@@ -1193,11 +1380,15 @@ export default function PrescriptionsPage() {
 
                             {/* Add from Treatment Plan */}
                             <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                                <label className="block text-sm font-medium mb-2">Quick Add from Treatment Plan</label>
+                                <label className="block text-sm font-medium mb-2">
+                                    Quick Add from Treatment Plan
+                                    {selectedTreatmentId && <span className="ml-2 text-xs text-gray-600">🔒 Locked</span>}
+                                </label>
                                 <div className="flex gap-2">
                                     <CustomSelect
                                         value={selectedTreatmentId || ""}
                                         onChange={(treatmentId) => {
+                                            if (selectedTreatmentId) return; // Prevent changing once selected
                                             const treatment = treatments.find(t => String(t.id) === String(treatmentId))
                                             if (treatment && treatment.treatmentProducts && treatment.treatmentProducts.length > 0) {
                                                 // Replace all medicines with the treatment plan (not add)
@@ -1218,7 +1409,8 @@ export default function PrescriptionsPage() {
                                                     droppersToday: tp.droppersToday?.toString() || '',
                                                     medicineQuantity: tp.medicineQuantity?.toString() || '',
                                                     administration: treatment.administration || '',
-                                                    taken: false
+                                                    taken: false,
+                                                    patientHasMedicine: false
                                                 }))
                                                 setPrescriptions(newPrescriptions) // Replace, not add
                                                 setSelectedTreatmentId(String(treatment.id))
@@ -1236,7 +1428,7 @@ export default function PrescriptionsPage() {
                                                 }))
                                         ]}
                                         placeholder="-- select treatment plan --"
-                                        className="flex-1"
+                                        className={`flex-1 ${selectedTreatmentId ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}
                                     />
                                 </div>
                                 {selectedTreatmentId && (
@@ -1394,7 +1586,7 @@ export default function PrescriptionsPage() {
                                                     ) : (
                                                     <CustomSelect
                                                         value={pr.treatmentId}
-                                                        onChange={(val) => updatePrescription(i, { treatmentId: val })}
+                                                        onChange={(val) => !isDeleted && updatePrescription(i, { treatmentId: val })}
                                                         options={[
                                                             { value: '', label: '-- select treatment plan --' },
                                                             ...(Array.isArray(treatments) ? treatments : [])
@@ -1409,10 +1601,13 @@ export default function PrescriptionsPage() {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Medicine (from inventory)</label>
+                                                    <label className="block text-xs font-medium mb-1 text-muted">
+                                                        Medicine (from inventory)
+                                                        {pr.productId && <span className="ml-2 text-xs text-gray-500">🔒 Locked</span>}
+                                                    </label>
                                                     <CustomSelect
                                                         value={pr.productId}
-                                                        onChange={(val) => !isDeleted && updatePrescription(i, { productId: val })}
+                                                        onChange={(val) => !isDeleted && !pr.productId && updatePrescription(i, { productId: val })}
                                                         options={[
                                                             { value: '', label: '-- select medicine --' },
                                                             ...products.map(p => ({
@@ -1421,87 +1616,159 @@ export default function PrescriptionsPage() {
                                                             }))
                                                         ]}
                                                         placeholder="-- select medicine --"
-                                                        className={isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}
+                                                        className={`${isDeleted || pr.productId ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}
                                                     />
                                                 </div>
 
-                                                {/* Components Section - Responsive grid */}
+                                                {/* Spagyrics Section - All in single line */}
                                                 <div className="sm:col-span-2 lg:col-span-3">
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Components</label>
-                                                    <div className={`flex flex-wrap items-center gap-2 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
-                                                        <CustomSelect
-                                                            value={pr.comp1 || ''}
-                                                            onChange={(val) => updatePrescription(i, { comp1: val.toUpperCase() })}
-                                                            options={components}
-                                                            placeholder="Component 1"
-                                                            allowCustom={true}
-                                                            className="flex-1 min-w-[120px]"
-                                                        />
-                                                        <CustomSelect
-                                                            value={pr.comp2 || ''}
-                                                            onChange={(val) => updatePrescription(i, { comp2: val.toUpperCase() })}
-                                                            options={components}
-                                                            placeholder="Component 2"
-                                                            allowCustom={true}
-                                                            className="flex-1 min-w-[120px]"
-                                                        />
-                                                        <CustomSelect
-                                                            value={pr.comp3 || ''}
-                                                            onChange={(val) => updatePrescription(i, { comp3: val.toUpperCase() })}
-                                                            options={components}
-                                                            placeholder="Component 3"
-                                                            allowCustom={true}
-                                                            className="flex-1 min-w-[120px]"
-                                                        />
+                                                    <label className="block text-xs font-medium mb-1 text-muted">Spagyrics (Name | Volume)</label>
+                                                    <div className={`flex flex-wrap gap-1 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
+                                                        {/* Spagyric 1 */}
+                                                        <div className="flex gap-0.5">
+                                                            <CustomSelect
+                                                                value={parseComponent(pr.comp1 || '').name}
+                                                                onChange={(val) => {
+                                                                    const parsed = parseComponent(pr.comp1 || '')
+                                                                    updatePrescription(i, { comp1: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                }}
+                                                                options={components}
+                                                                placeholder="S1"
+                                                                allowCustom={true}
+                                                                className="w-28"
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                value={parseComponent(pr.comp1 || '').volume}
+                                                                onChange={(e) => {
+                                                                    const parsed = parseComponent(pr.comp1 || '')
+                                                                    updatePrescription(i, { comp1: formatComponent(parsed.name, e.target.value) })
+                                                                }}
+                                                                placeholder="Vol"
+                                                                className="w-12 p-1.5 border rounded text-xs"
+                                                            />
+                                                        </div>
+                                                        
+                                                        {/* Spagyric 2 */}
+                                                        <div className="flex gap-0.5">
+                                                            <CustomSelect
+                                                                value={parseComponent(pr.comp2 || '').name}
+                                                                onChange={(val) => {
+                                                                    const parsed = parseComponent(pr.comp2 || '')
+                                                                    updatePrescription(i, { comp2: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                }}
+                                                                options={components}
+                                                                placeholder="S2"
+                                                                allowCustom={true}
+                                                                className="w-28"
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                value={parseComponent(pr.comp2 || '').volume}
+                                                                onChange={(e) => {
+                                                                    const parsed = parseComponent(pr.comp2 || '')
+                                                                    updatePrescription(i, { comp2: formatComponent(parsed.name, e.target.value) })
+                                                                }}
+                                                                placeholder="Vol"
+                                                                className="w-12 p-1.5 border rounded text-xs"
+                                                            />
+                                                        </div>
+                                                        
+                                                        {/* Spagyric 3 */}
+                                                        <div className="flex gap-0.5">
+                                                            <CustomSelect
+                                                                value={parseComponent(pr.comp3 || '').name}
+                                                                onChange={(val) => {
+                                                                    const parsed = parseComponent(pr.comp3 || '')
+                                                                    updatePrescription(i, { comp3: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                }}
+                                                                options={components}
+                                                                placeholder="S3"
+                                                                allowCustom={true}
+                                                                className="w-28"
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                value={parseComponent(pr.comp3 || '').volume}
+                                                                onChange={(e) => {
+                                                                    const parsed = parseComponent(pr.comp3 || '')
+                                                                    updatePrescription(i, { comp3: formatComponent(parsed.name, e.target.value) })
+                                                                }}
+                                                                placeholder="Vol"
+                                                                className="w-12 p-1.5 border rounded text-xs"
+                                                            />
+                                                        </div>
 
-                                                        {/* Show comp4 if it exists */}
+                                                        {/* Show spagyric 4 if it exists */}
                                                         {pr.comp4 !== undefined && (
-                                                            <div className="flex-1 min-w-[120px] flex items-center gap-1">
+                                                            <div className="flex gap-0.5">
                                                                 <CustomSelect
-                                                                    value={pr.comp4 || ''}
-                                                                    onChange={(val) => updatePrescription(i, { comp4: val.toUpperCase() })}
+                                                                    value={parseComponent(pr.comp4 || '').name}
+                                                                    onChange={(val) => {
+                                                                        const parsed = parseComponent(pr.comp4 || '')
+                                                                        updatePrescription(i, { comp4: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                    }}
                                                                     options={components}
-                                                                    placeholder="Component 4"
+                                                                    placeholder="S4"
                                                                     allowCustom={true}
-                                                                    className="flex-1"
+                                                                    className="w-28"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={parseComponent(pr.comp4 || '').volume}
+                                                                    onChange={(e) => {
+                                                                        const parsed = parseComponent(pr.comp4 || '')
+                                                                        updatePrescription(i, { comp4: formatComponent(parsed.name, e.target.value) })
+                                                                    }}
+                                                                    placeholder="Vol"
+                                                                    className="w-12 p-1.5 border rounded text-xs"
                                                                 />
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => {
                                                                         updatePrescription(i, { comp4: undefined, comp5: undefined })
                                                                     }}
-                                                                    className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-                                                                    title="Remove component 4"
+                                                                    className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-xs"
+                                                                    title="Remove spagyric 4"
                                                                 >
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                                                    </svg>
+                                                                    ×
                                                                 </button>
                                                             </div>
                                                         )}
 
-                                                        {/* Show comp5 if it exists */}
+                                                        {/* Show spagyric 5 if it exists */}
                                                         {pr.comp5 !== undefined && (
-                                                            <div className="flex-1 min-w-[120px] flex items-center gap-1">
+                                                            <div className="flex gap-0.5">
                                                                 <CustomSelect
-                                                                    value={pr.comp5 || ''}
-                                                                    onChange={(val) => updatePrescription(i, { comp5: val.toUpperCase() })}
+                                                                    value={parseComponent(pr.comp5 || '').name}
+                                                                    onChange={(val) => {
+                                                                        const parsed = parseComponent(pr.comp5 || '')
+                                                                        updatePrescription(i, { comp5: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                    }}
                                                                     options={components}
-                                                                    placeholder="Component 5"
+                                                                    placeholder="S5"
                                                                     allowCustom={true}
-                                                                    className="flex-1"
+                                                                    className="w-28"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={parseComponent(pr.comp5 || '').volume}
+                                                                    onChange={(e) => {
+                                                                        const parsed = parseComponent(pr.comp5 || '')
+                                                                        updatePrescription(i, { comp5: formatComponent(parsed.name, e.target.value) })
+                                                                    }}
+                                                                    placeholder="Vol"
+                                                                    className="w-12 p-1.5 border rounded text-xs"
                                                                 />
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => {
                                                                         updatePrescription(i, { comp5: undefined })
                                                                     }}
-                                                                    className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-                                                                    title="Remove component 5"
+                                                                    className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-xs"
+                                                                    title="Remove spagyric 5"
                                                                 >
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                                                    </svg>
+                                                                    ×
                                                                 </button>
                                                             </div>
                                                         )}
@@ -1517,33 +1784,88 @@ export default function PrescriptionsPage() {
                                                                         updatePrescription(i, { comp5: '' })
                                                                     }
                                                                 }}
-                                                                className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                                                                title="Add component"
+                                                                className="w-6 h-6 flex items-center justify-center bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
+                                                                title="Add spagyric"
                                                             >
-                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                                                </svg>
+                                                                +
                                                             </button>
                                                         )}
                                                     </div>
                                                 </div>
 
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Qty (Drops)</label>
-                                                    <input type="number" placeholder="0" value={pr.quantity || ''} onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} className="w-full p-2 border rounded text-sm" />
+                                                {/* Qty, Timing, and Dosage in single line with separate sections */}
+                                                <div className="sm:col-span-2 lg:col-span-3">
+                                                    <div className="flex gap-4">
+                                                        {/* Qty Section */}
+                                                        <div>
+                                                            <label className="block text-xs font-medium mb-1 text-muted">Qty (Drops)</label>
+                                                            <input 
+                                                                type="number" 
+                                                                placeholder="0" 
+                                                                value={pr.quantity || ''} 
+                                                                onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} 
+                                                                className="w-16 p-2 border rounded text-sm" 
+                                                            />
+                                                        </div>
+                                                        
+                                                        {/* Timing Section */}
+                                                        <div>
+                                                            <label className="block text-xs font-medium mb-1 text-muted">Timing</label>
+                                                            <CustomSelect
+                                                                value={pr.timing || ''}
+                                                                onChange={(val) => updatePrescription(i, { timing: val })}
+                                                                options={timing}
+                                                                placeholder="Select"
+                                                                allowCustom={true}
+                                                                className="w-28"
+                                                            />
+                                                        </div>
+                                                        
+                                                        {/* Dosage Section */}
+                                                        <div className="flex-1">
+                                                            <label className="block text-xs font-medium mb-1 text-muted">Dosage (Dose | Timing | Dilution)</label>
+                                                            <div className="flex gap-2">
+                                                                <CustomSelect
+                                                                    value={parseDosage(pr.dosage || '').quantity}
+                                                                    onChange={(val) => {
+                                                                        const parsed = parseDosage(pr.dosage || '')
+                                                                        updatePrescription(i, { dosage: formatDosage(val, parsed.timing, parsed.dilution) })
+                                                                    }}
+                                                                    options={doseQuantity}
+                                                                    placeholder="Dose"
+                                                                    allowCustom={true}
+                                                                    className="w-20"
+                                                                />
+                                                                <CustomSelect
+                                                                    value={parseDosage(pr.dosage || '').timing}
+                                                                    onChange={(val) => {
+                                                                        const parsed = parseDosage(pr.dosage || '')
+                                                                        updatePrescription(i, { dosage: formatDosage(parsed.quantity, val, parsed.dilution) })
+                                                                    }}
+                                                                    options={doseTiming}
+                                                                    placeholder="Timing"
+                                                                    allowCustom={true}
+                                                                    className="w-24"
+                                                                />
+                                                                <CustomSelect
+                                                                    value={parseDosage(pr.dosage || '').dilution}
+                                                                    onChange={(val) => {
+                                                                        const parsed = parseDosage(pr.dosage || '')
+                                                                        updatePrescription(i, { dosage: formatDosage(parsed.quantity, parsed.timing, val) })
+                                                                    }}
+                                                                    options={dilution}
+                                                                    placeholder="Dilution"
+                                                                    allowCustom={true}
+                                                                    className="w-24"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Timing</label>
-                                                    <CustomSelect
-                                                        value={pr.timing || ''}
-                                                        onChange={(val) => updatePrescription(i, { timing: val })}
-                                                        options={timing}
-                                                        placeholder="Select timing"
-                                                        allowCustom={true}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Dosage</label>
+                                                
+                                                {/* Remove old single dosage field */}
+                                                <div className="hidden">
+                                                    <label className="block text-xs font-medium mb-1 text-muted">Dosage (Old)</label>
                                                     <CustomSelect
                                                         value={pr.dosage || ''}
                                                         onChange={(val) => updatePrescription(i, { dosage: val.toUpperCase() })}
@@ -1582,14 +1904,7 @@ export default function PrescriptionsPage() {
                                                         allowCustom={true}
                                                     />
                                                 </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Droppers Today</label>
-                                                    <input type="number" placeholder="0" value={pr.droppersToday || ''} onChange={e => updatePrescription(i, { droppersToday: e.target.value })} className="w-full p-2 border rounded text-sm" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Medicine Quantity</label>
-                                                    <input type="number" placeholder="0" value={pr.medicineQuantity || ''} onChange={e => updatePrescription(i, { medicineQuantity: e.target.value })} className="w-full p-2 border rounded text-sm" />
-                                                </div>
+                                                {/* Removed Droppers Today and Medicine Quantity fields */}
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">Administration</label>
                                                     <CustomSelect
@@ -1600,11 +1915,30 @@ export default function PrescriptionsPage() {
                                                         allowCustom={true}
                                                     />
                                                 </div>
-                                                <div className="flex items-end gap-2">
-                                                    <label className="flex items-center gap-2 flex-1 text-sm">
-                                                        <input type="checkbox" checked={!!pr.taken} onChange={e => updatePrescription(i, { taken: e.target.checked })} className="w-4 h-4" />
-                                                        <span>Taken</span>
-                                                    </label>
+                                                
+                                                {/* Patient Already Has Medicine Checkbox */}
+                                                {/* Checkboxes in single line */}
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <div className="flex items-center gap-4">
+                                                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={pr.patientHasMedicine || false}
+                                                                onChange={(e) => updatePrescription(i, { patientHasMedicine: e.target.checked })}
+                                                                className="w-4 h-4 rounded"
+                                                            />
+                                                            <span className="text-xs">Patient has this medicine</span>
+                                                        </label>
+                                                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={!!pr.taken} 
+                                                                onChange={e => updatePrescription(i, { taken: e.target.checked })} 
+                                                                className="w-4 h-4 rounded" 
+                                                            />
+                                                            <span className="text-xs">Taken</span>
+                                                        </label>
+                                                    </div>
                                                     {!isDeleted && (
                                                     <button type="button" onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }} className="btn btn-danger text-sm">
                                                         × Remove
@@ -1618,6 +1952,30 @@ export default function PrescriptionsPage() {
                                 </div>
                             )}
                         </div>
+                        
+                        {/* Next Visit & Tracking - Consolidated in single line */}
+                        <div className="card">
+                            <h3 className="text-lg font-semibold mb-4">Next Visit & Tracking</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1.5">Next Visit Date</label>
+                                    <DateInput type="date" placeholder="Select visit date" value={form.nextVisitDate} onChange={e => setForm({ ...form, nextVisitDate: e.target.value })} className="w-full p-2 border rounded" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1.5">Next Visit Time</label>
+                                    <input type="time" placeholder="Select time" value={form.nextVisitTime} onChange={e => setForm({ ...form, nextVisitTime: e.target.value })} className="w-full p-2 border rounded" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1.5">Visit Number (V)</label>
+                                    <input type="number" placeholder="1" value={form.visitNumber} onChange={e => setForm({ ...form, visitNumber: e.target.value })} className="w-full p-2 border rounded" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1.5">Follow-Up Count (FU)</label>
+                                    <input type="number" placeholder="0" value={form.followUpCount} onChange={e => setForm({ ...form, followUpCount: e.target.value })} className="w-full p-2 border rounded" />
+                                </div>
+                            </div>
+                        </div>
+                        
                         {/* Financial Information Card */}
                         <div className="card">
                             <h3 className="text-lg font-semibold mb-4">Financial Information</h3>

@@ -1,8 +1,0 @@
-planNumber,provDiagnosis,speciality,organ,diseaseAction,treatmentPlan,administration,notes,productName,comp1,comp2,comp3,timing,dosage,additions,procedure,presentation
-1,Fever,General Medicine,Lungs,Anti-inflammatory,Primary Treatment,Oral,Take after meals,Paracetamol 500mg,,,,Morning,,,
-2,Fever,General Medicine,Lungs,Anti-inflammatory,Secondary Treatment,Oral,Take with water,Ibuprofen 400mg,,,,Evening,,,
-3,Fever,General Medicine,Lungs,Antipyretic,Supplementary,Oral,As needed,Aspirin 75mg,,,,Afternoon,,,
-1,Cold,Respiratory,Nose,Decongestant,Primary Treatment,Nasal,Use twice daily,Nasal Spray,,,,Morning,,,
-2,Cold,Respiratory,Throat,Soothing,Secondary Treatment,Oral,Dissolve in mouth,Throat Lozenges,,,,As needed,,,
-1,Headache,Neurology,Head,Analgesic,Primary Treatment,Oral,Take with food,Paracetamol 500mg,,,,Morning,,,
-2,Headache,Neurology,Head,Muscle Relaxant,Secondary Treatment,Oral,Before bed,Muscle Relaxer,,,,Night,,,

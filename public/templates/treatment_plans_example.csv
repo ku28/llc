@@ -1,14 +1,22 @@
 planNumber,provDiagnosis,speciality,organ,diseaseAction,treatmentPlan,administration,notes,productName,comp1,comp2,comp3,timing,dosage,additions,procedure,presentation
-1,Fever,General Medicine,Lungs,Anti-inflammatory,Primary Treatment,Oral,Take after meals,Paracetamol 500mg,F1,BELLADONNA,,Morning,5 DROPS,,,DROPS
-2,Fever,General Medicine,Lungs,Antipyretic,Secondary Treatment,Oral,Take with water,Ibuprofen 400mg,F2,BRYONIA,,Evening,10ML,,,SYRUP
-3,Fever,General Medicine,Body,Rest,Supplementary,Topical,Apply locally,Cooling Gel,,,,As needed,50MG,LOT/SESAM OIL/,APL/LOCAL,LOTION
-1,Cold,Respiratory,Nose,Decongestant,Primary Treatment,Nasal,Use twice daily,Nasal Spray,,,,Morning,2 SPRAY,,,SPRAY
-2,Cold,Respiratory,Throat,Soothing,Secondary Treatment,Oral,Dissolve slowly,Throat Lozenges,,,,As needed,1 LOZENGE,,,TABLET
-3,Cold,Respiratory,Chest,Expectorant,Supplementary,Oral,Take before bed,Cough Syrup,F1,IPECACUANHA,,Night,10ML,,,SYRUP
-1,Headache,Neurology,Head,Analgesic,Primary Treatment,Oral,Take with food,Paracetamol 500mg,,,,Morning,500MG,,,TABLET
-2,Headache,Neurology,Head,Muscle Relaxant,Secondary Treatment,Oral,Before sleep,Muscle Relaxer,F3,NUX VOMICA,,HS,5 DROPS,,,DROPS
-1,Hypertension,Cardiology,Heart,Reduce BP,Primary Treatment,Oral,Daily morning,BP Medicine,,,,Morning,10MG,,,TABLET
-2,Hypertension,Cardiology,Heart,Diuretic,Secondary Treatment,Oral,With breakfast,Water Pill,,,,Morning,5MG,,,CAPSULE
-3,Hypertension,Cardiology,Body,Lifestyle,Supplementary,Oral,After dinner,Omega-3,,,,Evening,1000MG,,,CAPSULE
-1,Diabetes,Endocrinology,Pancreas,Lower Sugar,Primary Treatment,Oral,Before meals,Metformin,,,,BM,500MG,,,TABLET
-2,Diabetes,Endocrinology,Body,Insulin Support,Secondary Treatment,Subcutaneous,Evening dose,Insulin,,,,Evening,10 UNITS,,,INJECTION
+1,ACUTE FEVER WITH INFLAMMATION,General Medicine,WHOLE BODY,ANTI-PYRETIC & ANTI-INFLAMMATORY,Fever Management Protocol,ORAL,Take with lukewarm water. Avoid cold drinks.,BELLADONNA 30C,F1,BELLADONNA,,BID,5 DROPS,,DILUTE IN WATER,DROPS
+1,ACUTE FEVER WITH INFLAMMATION,General Medicine,WHOLE BODY,ANTI-PYRETIC & ANTI-INFLAMMATORY,Fever Management Protocol,ORAL,Take 30 minutes before meals,BRYONIA 200C,F1,BRYONIA,,TID,10 DROPS,,DILUTE IN WATER,DROPS
+1,ACUTE FEVER WITH INFLAMMATION,General Medicine,WHOLE BODY,ANTI-PYRETIC & ANTI-INFLAMMATORY,Fever Management Protocol,ORAL,Take at bedtime for rest,NUX VOMICA 30C,F1,NUX VOMICA,,HS,5 DROPS,,DILUTE IN WATER,DROPS
+2,CHRONIC MIGRAINE,Neurology,HEAD & NERVOUS SYSTEM,ANALGESIC & NERVE CALMING,Headache Relief Treatment,ORAL,Take when headache starts. Can repeat after 4 hours.,PULSATILLA 30C,F2,PULSATILLA,,SOS,7 DROPS,,SUBLINGUAL,DROPS
+2,CHRONIC MIGRAINE,Neurology,HEAD & NERVOUS SYSTEM,ANALGESIC & NERVE CALMING,Headache Relief Treatment,ORAL,Take morning and evening,NUX VOMICA 200C,F2,NUX VOMICA,,BID,5 DROPS,,DILUTE IN WATER,DROPS
+2,CHRONIC MIGRAINE,Neurology,HEAD & NERVOUS SYSTEM,ANALGESIC & NERVE CALMING,Headache Relief Treatment,TOPICAL,Apply gently on temples and forehead,PAIN RELIEF OIL,,,,AS NEEDED,5ML,SESAME OIL BASE,MASSAGE/LOCAL,OIL
+3,RESPIRATORY INFECTION,Respiratory,LUNGS & THROAT,EXPECTORANT & ANTIMICROBIAL,Cold & Cough Protocol,ORAL,Take with honey if needed. Avoid dairy.,BRYONIA 30C,F1,BRYONIA,,TID,10 DROPS,,DILUTE IN WATER,DROPS
+3,RESPIRATORY INFECTION,Respiratory,LUNGS & THROAT,EXPECTORANT & ANTIMICROBIAL,Cold & Cough Protocol,ORAL,For dry cough relief,BELLADONNA 30C,F1,BELLADONNA,,BID,5 DROPS,,SUBLINGUAL,DROPS
+3,RESPIRATORY INFECTION,Respiratory,LUNGS & THROAT,EXPECTORANT & ANTIMICROBIAL,Cold & Cough Protocol,ORAL,For mucus clearance,CALCAREA CARBONICA 200C,F3,CALCAREA CARBONICA,,TID,7 DROPS,,DILUTE IN WATER,DROPS
+4,JOINT PAIN & ARTHRITIS,Orthopedics,JOINTS & MUSCLES,ANTI-INFLAMMATORY & ANALGESIC,Arthritis Management,ORAL,Take after meals with warm water,RHUS TOX 200C,F2,RHUS TOX,,TID,10 DROPS,,DILUTE IN WATER,DROPS
+4,JOINT PAIN & ARTHRITIS,Orthopedics,JOINTS & MUSCLES,ANTI-INFLAMMATORY & ANALGESIC,Arthritis Management,ORAL,For morning stiffness,BRYONIA 30C,F1,BRYONIA,,BID,5 DROPS,,DILUTE IN WATER,DROPS
+4,JOINT PAIN & ARTHRITIS,Orthopedics,JOINTS & MUSCLES,ANTI-INFLAMMATORY & ANALGESIC,Arthritis Management,TOPICAL,Massage affected joints twice daily,ARTHRITIS RELIEF GEL,,,,BID,10ML,MENTHOL BASE,MASSAGE/LOCAL,GEL
+5,SKIN DISORDERS,Dermatology,SKIN,DETOXIFICATION & HEALING,Eczema Treatment Protocol,ORAL,Take on empty stomach in morning,SULPHUR 200C,F3,SULPHUR,,OD,10 DROPS,,DILUTE IN WATER,DROPS
+5,SKIN DISORDERS,Dermatology,SKIN,DETOXIFICATION & HEALING,Eczema Treatment Protocol,ORAL,For itching relief,PULSATILLA 30C,F2,PULSATILLA,,BID,7 DROPS,,SUBLINGUAL,DROPS
+5,SKIN DISORDERS,Dermatology,SKIN,DETOXIFICATION & HEALING,Eczema Treatment Protocol,TOPICAL,Apply thin layer on affected areas,CALENDULA OINTMENT,,,,TID,5GM,PETROLEUM JELLY BASE,APPLY/LOCAL,OINTMENT
+6,DIGESTIVE DISORDERS,Gastroenterology,STOMACH & INTESTINES,DIGESTIVE AID & ANTACID,Acidity & Indigestion Relief,ORAL,Take 15 minutes before meals,NUX VOMICA 30C,F1,NUX VOMICA,,AC,5 DROPS,,DILUTE IN WATER,DROPS
+6,DIGESTIVE DISORDERS,Gastroenterology,STOMACH & INTESTINES,DIGESTIVE AID & ANTACID,Acidity & Indigestion Relief,ORAL,For bloating and gas,BRYONIA 200C,F1,BRYONIA,,BID,10 DROPS,,DILUTE IN WATER,DROPS
+6,DIGESTIVE DISORDERS,Gastroenterology,STOMACH & INTESTINES,DIGESTIVE AID & ANTACID,Acidity & Indigestion Relief,ORAL,For nausea relief,PULSATILLA 30C,F2,PULSATILLA,,SOS,7 DROPS,,SUBLINGUAL,DROPS
+7,ANXIETY & STRESS,Psychiatry,NERVOUS SYSTEM,ANXIOLYTIC & SEDATIVE,Stress Management Protocol,ORAL,Take morning and evening before meals,CALCAREA CARBONICA 30C,F3,CALCAREA CARBONICA,,BID,5 DROPS,,DILUTE IN WATER,DROPS
+7,ANXIETY & STRESS,Psychiatry,NERVOUS SYSTEM,ANXIOLYTIC & SEDATIVE,Stress Management Protocol,ORAL,For sleep improvement,NUX VOMICA 200C,F1,NUX VOMICA,,HS,7 DROPS,,SUBLINGUAL,DROPS
+7,ANXIETY & STRESS,Psychiatry,NERVOUS SYSTEM,ANXIOLYTIC & SEDATIVE,Stress Management Protocol,ORAL,For mood stabilization,PULSATILLA 30C,F2,PULSATILLA,,TID,5 DROPS,,DILUTE IN WATER,DROPS

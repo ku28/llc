@@ -23,6 +23,7 @@ function TreatmentsPage() {
     const [deleteAllProgress, setDeleteAllProgress] = useState({ current: 0, total: 0 })
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage] = useState(10)
+    const [selectedTreatmentIds, setSelectedTreatmentIds] = useState<Set<number>>(new Set())
     
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
     useEffect(() => { 
@@ -39,6 +40,40 @@ function TreatmentsPage() {
 
     function handleImportSuccess() {
         fetchTreatments()
+    }
+
+    function toggleTreatmentSelection(id: number) {
+        const newSelected = new Set(selectedTreatmentIds)
+        if (newSelected.has(id)) {
+            newSelected.delete(id)
+        } else {
+            newSelected.add(id)
+        }
+        setSelectedTreatmentIds(newSelected)
+    }
+
+    function toggleSelectAll(treatments: any[]) {
+        const treatmentIds = treatments.map((t: any) => t.id)
+        const allSelected = treatmentIds.every((id: number) => selectedTreatmentIds.has(id))
+        
+        const newSelected = new Set(selectedTreatmentIds)
+        if (allSelected) {
+            // Deselect all from this page
+            treatmentIds.forEach((id: number) => newSelected.delete(id))
+        } else {
+            // Select all from this page
+            treatmentIds.forEach((id: number) => newSelected.add(id))
+        }
+        setSelectedTreatmentIds(newSelected)
+    }
+
+    async function deleteSelectedTreatments() {
+        if (selectedTreatmentIds.size === 0) return
+        
+        const idsArray = Array.from(selectedTreatmentIds)
+        setDeleteAllIds(idsArray)
+        setDeleteAllDiagnosis(`${idsArray.length} selected treatment${idsArray.length > 1 ? 's' : ''}`)
+        setShowDeleteAllConfirm(true)
     }
 
     function toggleRowExpansion(id: string) {
@@ -134,6 +169,9 @@ function TreatmentsPage() {
             
             // Refresh the list
             await fetchTreatments()
+            
+            // Clear selections
+            setSelectedTreatmentIds(new Set())
         } catch (error: any) {
             console.error('Delete all error:', error)
             alert('Failed to delete all treatments: ' + error.message)
@@ -278,21 +316,36 @@ function TreatmentsPage() {
 
             {/* Treatments Table */}
             <div className="card">
-                <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
-                    <span>Treatment Plans</span>
-                    <span className="badge">
-                        {(() => {
-                            const filtered = items.filter((t: any) => {
-                                if (!searchQuery) return true
-                                const diagnosis = (t.provDiagnosis || '').toLowerCase()
-                                const treatmentPlan = (t.treatmentPlan || '').toLowerCase()
-                                const search = searchQuery.toLowerCase()
-                                return diagnosis.includes(search) || treatmentPlan.includes(search)
-                            })
-                            return filtered.length
-                        })()} treatments
-                    </span>
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-3">
+                        <span>Treatment Plans</span>
+                        <span className="badge">
+                            {(() => {
+                                const filtered = items.filter((t: any) => {
+                                    if (!searchQuery) return true
+                                    const diagnosis = (t.provDiagnosis || '').toLowerCase()
+                                    const treatmentPlan = (t.treatmentPlan || '').toLowerCase()
+                                    const search = searchQuery.toLowerCase()
+                                    return diagnosis.includes(search) || treatmentPlan.includes(search)
+                                })
+                                return filtered.length
+                            })()} treatments
+                        </span>
+                    </h3>
+                    
+                    {/* Selection Actions */}
+                    {selectedTreatmentIds.size > 0 && (
+                        <button
+                            onClick={deleteSelectedTreatments}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete Selected ({selectedTreatmentIds.size})
+                        </button>
+                    )}
+                </div>
                 {(() => {
                     const filteredItems = items.filter((t: any) => {
                         if (!searchQuery) return true
@@ -331,6 +384,24 @@ function TreatmentsPage() {
                     
                     return (
                         <div className="space-y-2">
+                            {/* Select All Checkbox */}
+                            <div className="flex items-center gap-2 px-1 py-2">
+                                <input
+                                    type="checkbox"
+                                    checked={filteredItems.length > 0 && filteredItems.every((t: any) => selectedTreatmentIds.has(t.id))}
+                                    onChange={() => toggleSelectAll(filteredItems)}
+                                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                                />
+                                <label className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none" onClick={() => toggleSelectAll(filteredItems)}>
+                                    Select all
+                                </label>
+                                {selectedTreatmentIds.size > 0 && (
+                                    <span className="ml-auto text-xs text-gray-500 dark:text-gray-400 font-medium">
+                                        {selectedTreatmentIds.size} selected
+                                    </span>
+                                )}
+                            </div>
+                            
                             {(() => {
                                 // Group treatments by provDiagnosis
                                 const groupedByDiagnosis = filteredItems.reduce((acc: any, t: any) => {
@@ -364,7 +435,29 @@ function TreatmentsPage() {
                                 return (
                                     <div key={groupKey} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                                         {/* Summary Row */}
-                                        <div className="bg-gray-50 dark:bg-gray-800 p-3 flex items-center justify-between">
+                                        <div className="bg-gray-50 dark:bg-gray-800 p-3 flex items-center gap-3">
+                                            {/* Checkbox for selecting all plans in this diagnosis */}
+                                            <input
+                                                type="checkbox"
+                                                checked={treatments.every((t: any) => selectedTreatmentIds.has(t.id))}
+                                                onChange={() => {
+                                                    const allSelected = treatments.every((t: any) => selectedTreatmentIds.has(t.id))
+                                                    const newSelected = new Set(selectedTreatmentIds)
+                                                    
+                                                    treatments.forEach((t: any) => {
+                                                        if (allSelected) {
+                                                            newSelected.delete(t.id)
+                                                        } else {
+                                                            newSelected.add(t.id)
+                                                        }
+                                                    })
+                                                    
+                                                    setSelectedTreatmentIds(newSelected)
+                                                }}
+                                                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer flex-shrink-0"
+                                                title="Select all plans in this diagnosis"
+                                            />
+                                            
                                             <div className="flex-1">
                                                 <div className="font-semibold text-sm">{diagnosis}</div>
                                                 <div className="text-xs text-muted mt-0.5">
@@ -434,40 +527,68 @@ function TreatmentsPage() {
                                                         </div>
                                                     </div>
 
-                                                    {/* Plan Selector Dropdown */}
-                                                    <div className="flex items-center gap-3 pb-3 border-b border-gray-200 dark:border-gray-700">
-                                                        <label className="text-sm font-semibold">Select Plan:</label>
-                                                        <select
-                                                            value={selectedIndex}
-                                                            onChange={(e) => {
-                                                                setSelectedPlanByDiagnosis({
-                                                                    ...selectedPlanByDiagnosis,
-                                                                    [groupKey]: parseInt(e.target.value)
-                                                                })
-                                                            }}
-                                                            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                        >
-                                                            {treatments.map((t: any, idx: number) => (
-                                                                <option key={t.id} value={idx}>
-                                                                    Plan {t.planNumber || (idx + 1).toString().padStart(2, '0')} - {t.treatmentPlan || diagnosis}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        <div className="flex-1"></div>
-                                                        <button
-                                                            onClick={() => router.push(`/treatments/${selectedTreatment.id}`)}
-                                                            className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
-                                                            title="Edit"
-                                                        >
-                                                            ✏️ Edit Plan
-                                                        </button>
-                                                        <button
-                                                            onClick={() => openDeleteConfirmation(selectedTreatment.id)}
-                                                            className="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
-                                                            title="Delete"
-                                                        >
-                                                            🗑️ Delete Plan
-                                                        </button>
+                                                    {/* Plan Selector with Checkboxes */}
+                                                    <div className="space-y-1.5 pb-3 border-b border-gray-200 dark:border-gray-700">
+                                                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">Plans</label>
+                                                        {treatments.map((t: any, idx: number) => {
+                                                            const isSelected = selectedTreatmentIds.has(t.id)
+                                                            const isCurrentPlan = idx === selectedIndex
+                                                            
+                                                            return (
+                                                                <div 
+                                                                    key={t.id} 
+                                                                    className={`flex items-center gap-2 p-2 rounded transition-colors ${
+                                                                        isCurrentPlan 
+                                                                            ? 'bg-blue-50 dark:bg-blue-900/10' 
+                                                                            : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                                                                    }`}
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isSelected}
+                                                                        onChange={() => toggleTreatmentSelection(t.id)}
+                                                                        className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                                                                    />
+                                                                    <div 
+                                                                        className="flex-1 cursor-pointer select-none"
+                                                                        onClick={() => {
+                                                                            setSelectedPlanByDiagnosis({
+                                                                                ...selectedPlanByDiagnosis,
+                                                                                [groupKey]: idx
+                                                                            })
+                                                                        }}
+                                                                    >
+                                                                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                                                                            Plan {t.planNumber || (idx + 1).toString().padStart(2, '0')}
+                                                                        </span>
+                                                                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                                                                            {t.treatmentPlan || diagnosis}
+                                                                        </span>
+                                                                        {isCurrentPlan && (
+                                                                            <span className="ml-2 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded">Viewing</span>
+                                                                        )}
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => router.push(`/treatments/${t.id}`)}
+                                                                        className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                                                                        title="Edit"
+                                                                    >
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                        </svg>
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => openDeleteConfirmation(t.id)}
+                                                                        className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                                                        title="Delete"
+                                                                    >
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                        </svg>
+                                                                    </button>
+                                                                </div>
+                                                            )
+                                                        })}
                                                     </div>
 
                                                     {/* Selected Treatment Plan Details */}

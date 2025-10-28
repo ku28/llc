@@ -52,6 +52,9 @@ export default function VisitDetail() {
             console.error('Failed to fetch products:', error)
         }
 
+        // Function to generate a single page (will be called twice for patient and office copy)
+        const generatePage = async (copyType: 'PATIENT' | 'OFFICE') => {
+
         // Add header image - full width, no margins (reduced size)
         let yPos = 0
         try {
@@ -775,6 +778,28 @@ export default function VisitDetail() {
         doc.setFontSize(6)
         doc.setTextColor(150, 150, 150)
         doc.text('Designed by DrugBase', pageWidth - 40, pageHeight - 10)
+
+        // Add copy label watermark in corner
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        if (copyType === 'PATIENT') {
+            doc.setTextColor(0, 128, 255) // Blue for patient copy
+            doc.text('PATIENT COPY', pageWidth / 2, 10, { align: 'center' })
+        } else {
+            doc.setTextColor(255, 0, 0) // Red for office copy
+            doc.text('OFFICE COPY', pageWidth / 2, 10, { align: 'center' })
+        }
+        doc.setTextColor(0, 0, 0) // Reset color
+        }
+
+        // Generate first page - PATIENT COPY
+        await generatePage('PATIENT')
+        
+        // Add new page for OFFICE COPY
+        doc.addPage()
+        
+        // Generate second page - OFFICE COPY
+        await generatePage('OFFICE')
 
         // Save the PDF with patient name and OPD number
         const patientName = `${visit.patient?.firstName || ''} ${visit.patient?.lastName || ''}`.trim() || 'Patient'

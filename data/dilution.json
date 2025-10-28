@@ -1,0 +1,30 @@
+[
+    {
+        "value": "",
+        "label": "Dilution"
+    },
+    {
+        "value": "WTR",
+        "label": "WTR (in Water)"
+    },
+    {
+        "value": "DOT",
+        "label": "DOT (Direct on Tongue)"
+    },
+    {
+        "value": "LW WTR",
+        "label": "LW WTR (Luke Warm Water)"
+    },
+    {
+        "value": "MILK",
+        "label": "MILK"
+    },
+    {
+        "value": "HONEY",
+        "label": "HONEY"
+    },
+    {
+        "value": "JUICE",
+        "label": "JUICE"
+    }
+]

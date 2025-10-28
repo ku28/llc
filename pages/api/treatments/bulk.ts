@@ -8,13 +8,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'POST') {
         // Bulk create treatments
-        const { treatments } = req.body
+        const { treatments, mode = 'create' } = req.body // mode can be 'create' or 'upsert'
 
         if (!Array.isArray(treatments) || treatments.length === 0) {
             return res.status(400).json({ error: 'Invalid treatments array' })
         }
 
-        console.log(`[Bulk Create] Received ${treatments.length} treatments to import`)
+        console.log(`[Bulk Create] Received ${treatments.length} treatments to import (mode: ${mode})`)
 
         try {
             // Collect all unique product names from all treatments
@@ -123,6 +123,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             }
                         }).filter((p: any) => p !== null) // Remove null entries
 
+                        // Check if treatment exists (including deleted ones)
+                        const existing = provDiagnosis && planNumber ? await prisma.treatment.findUnique({
+                            where: {
+                                provDiagnosis_planNumber: {
+                                    provDiagnosis,
+                                    planNumber
+                                }
+                            },
+                            include: {
+                                treatmentProducts: true
+                            }
+                        }) : null
+
+                        if (existing) {
+                            // Treatment exists - update it (restore if deleted)
+                            // First delete old treatment products
+                            await prisma.treatmentProduct.deleteMany({
+                                where: { treatmentId: existing.id }
+                            })
+
+                            // Update treatment, restore if deleted, and create new products
+                            return await prisma.treatment.update({
+                                where: { id: existing.id },
+                                data: {
+                                    speciality,
+                                    organ,
+                                    diseaseAction,
+                                    treatmentPlan,
+                                    administration,
+                                    notes,
+                                    deleted: false, // Restore if deleted
+                                    treatmentProducts: {
+                                        create: productsWithIds
+                                    }
+                                }
+                            })
+                        }
+
+                        // Create new treatment (no existing record found)
                         return await prisma.treatment.create({
                             data: {
                                 provDiagnosis,
@@ -140,10 +179,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         })
                     } catch (err: any) {
                         // Track individual errors but continue processing
-                        errors.push({
+                        const errorDetail = {
                             planNumber: treatmentData.planNumber,
-                            error: err.message
-                        })
+                            provDiagnosis: treatmentData.provDiagnosis,
+                            error: err.message,
+                            code: err.code
+                        }
+                        errors.push(errorDetail)
+                        console.log(`[Bulk Create] Error: Plan ${treatmentData.planNumber} (${treatmentData.provDiagnosis}): ${err.message}`)
                         return null
                     }
                 })

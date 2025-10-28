@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import CustomSelect from '../components/CustomSelect'
 import ImportVisitsModal from '../components/ImportVisitsModal'
+import PatientSelectionModal from '../components/PatientSelectionModal'
 import { useToast } from '../hooks/useToast'
 
 export default function VisitsPage() {
@@ -15,6 +16,7 @@ export default function VisitsPage() {
     const [visitToDelete, setVisitToDelete] = useState<any>(null)
     const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
     const [showImportModal, setShowImportModal] = useState(false)
+    const [showPatientModal, setShowPatientModal] = useState(false)
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage] = useState(10)
     const isPatient = user?.role?.toLowerCase() === 'user'
@@ -108,7 +110,12 @@ export default function VisitsPage() {
                         }).length} total {isPatient ? 'appointments' : 'visits'}
                     </span>
                     {!isPatient && (
-                        <Link href="/prescriptions" className="btn btn-primary text-sm">Create Visit with Prescriptions</Link>
+                        <button
+                            onClick={() => setShowPatientModal(true)}
+                            className="btn btn-primary text-sm"
+                        >
+                            Create Visit with Prescriptions
+                        </button>
                     )}
                 </div>
             </div>
@@ -349,6 +356,22 @@ export default function VisitsPage() {
                     showSuccess('Visits imported successfully!')
                 }}
             />
+
+            <PatientSelectionModal
+                isOpen={showPatientModal}
+                onClose={() => setShowPatientModal(false)}
+            />
+
+            {/* Floating Button */}
+            <button
+                onClick={() => setShowPatientModal(true)}
+                className="fixed bottom-8 right-8 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors z-50"
+                title="Create Visit with Prescription"
+            >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+            </button>
         </div>
     )
 }

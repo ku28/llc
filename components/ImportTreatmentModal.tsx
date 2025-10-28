@@ -36,6 +36,7 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
     const [step, setStep] = useState<'select' | 'preview' | 'importing' | 'success'>('select')
     const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
     const [importSummary, setImportSummary] = useState({ success: 0, errors: 0 })
+    const [importMode, setImportMode] = useState<'create' | 'upsert'>('create')
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     if (!isOpen) return null
@@ -137,32 +138,67 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
         setStep('importing')
 
         try {
-            // Each row is a separate treatment plan
-            const totalPlans = parsedData.length
+            // Group rows by planNumber + provDiagnosis (rows with same plan should be merged)
+            const treatmentGroups = new Map<string, TreatmentRow[]>()
+            
+            parsedData.forEach(row => {
+                const key = `${row.planNumber}|${row.provDiagnosis || ''}`
+                if (!treatmentGroups.has(key)) {
+                    treatmentGroups.set(key, [])
+                }
+                treatmentGroups.get(key)!.push(row)
+            })
+
+            console.log(`Grouped ${parsedData.length} rows into ${treatmentGroups.size} unique treatment plans`)
+
+            const totalPlans = treatmentGroups.size
             setImportProgress({ current: 0, total: totalPlans })
 
-            // Prepare all treatments data - each row becomes one treatment with one product
-            const treatmentsToCreate = parsedData.map(row => ({
-                planNumber: row.planNumber,
-                provDiagnosis: row.provDiagnosis,
-                speciality: row.speciality,
-                organ: row.organ,
-                diseaseAction: row.diseaseAction,
-                treatmentPlan: row.treatmentPlan,
-                administration: row.administration,
-                notes: row.notes,
-                products: row.productName ? [{
-                    productName: row.productName,
-                    comp1: row.comp1,
-                    comp2: row.comp2,
-                    comp3: row.comp3,
-                    timing: row.timing,
-                    dosage: row.dosage,
-                    additions: row.additions,
-                    procedure: row.procedure,
-                    presentation: row.presentation,
-                }] : [] // Empty products array if no productName
-            }))
+            // Create one treatment per group, with all products from that group
+            const treatmentsToCreate = Array.from(treatmentGroups.values()).map(rows => {
+                const firstRow = rows[0] // Use first row for treatment-level data
+                
+                // Collect all products from all rows in this group
+                // Use a Map to deduplicate by productName (case-insensitive)
+                const productMap = new Map<string, any>()
+                
+                rows.forEach(row => {
+                    if (row.productName) {
+                        const productKey = row.productName.trim().toUpperCase()
+                        
+                        // Only add if not already present (avoid duplicates)
+                        if (!productMap.has(productKey)) {
+                            productMap.set(productKey, {
+                                productName: row.productName!,
+                                comp1: row.comp1,
+                                comp2: row.comp2,
+                                comp3: row.comp3,
+                                timing: row.timing,
+                                dosage: row.dosage,
+                                additions: row.additions,
+                                procedure: row.procedure,
+                                presentation: row.presentation,
+                            })
+                        } else {
+                            console.warn(`Skipping duplicate product "${row.productName}" in plan ${firstRow.planNumber} (${firstRow.provDiagnosis})`)
+                        }
+                    }
+                })
+                
+                const products = Array.from(productMap.values())
+
+                return {
+                    planNumber: firstRow.planNumber,
+                    provDiagnosis: firstRow.provDiagnosis,
+                    speciality: firstRow.speciality,
+                    organ: firstRow.organ,
+                    diseaseAction: firstRow.diseaseAction,
+                    treatmentPlan: firstRow.treatmentPlan,
+                    administration: firstRow.administration,
+                    notes: firstRow.notes,
+                    products: products
+                }
+            })
 
             // Split into chunks for better progress tracking and avoid timeouts
             const CHUNK_SIZE = 50
@@ -184,7 +220,7 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                 const response = await fetch('/api/treatments/bulk', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ treatments: chunk })
+                    body: JSON.stringify({ treatments: chunk, mode: importMode })
                 })
 
                 if (!response.ok) {
@@ -339,6 +375,45 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                                 <p className="text-xs text-green-700 dark:text-green-300 mt-2">
                                     (Multiple rows with same planNumber are grouped as one treatment with multiple products)
                                 </p>
+                            </div>
+
+                            {/* Import Mode Selection */}
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-3">Import Mode</h4>
+                                <div className="space-y-2">
+                                    <label className="flex items-start gap-3 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="importMode"
+                                            value="create"
+                                            checked={importMode === 'create'}
+                                            onChange={(e) => setImportMode(e.target.value as 'create' | 'upsert')}
+                                            className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <div>
+                                            <div className="font-medium text-blue-900 dark:text-blue-100">Create New Plans Only</div>
+                                            <div className="text-sm text-blue-700 dark:text-blue-300">
+                                                Skip plans that already exist (same diagnosis + plan number)
+                                            </div>
+                                        </div>
+                                    </label>
+                                    <label className="flex items-start gap-3 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="importMode"
+                                            value="upsert"
+                                            checked={importMode === 'upsert'}
+                                            onChange={(e) => setImportMode(e.target.value as 'create' | 'upsert')}
+                                            className="mt-1 w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <div>
+                                            <div className="font-medium text-blue-900 dark:text-blue-100">Update Existing Plans</div>
+                                            <div className="text-sm text-blue-700 dark:text-blue-300">
+                                                Replace existing plans with new data from CSV
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
 
                             <div>
