@@ -61,10 +61,31 @@ model Patient {
   fatherHusbandGuardianName String?
   createdAt                 DateTime          @default(now())
   imageUrl                  String?
+  temperament               String?
+  pulseDiagnosis            String?
+  pulseDiagnosis2           String?
+  majorComplaints           String?
+  historyReports            String?
+  investigations            String?
+  provisionalDiagnosis      String?
+  improvements              String?
   appointments              Appointment[]
   customerInvoices          CustomerInvoice[]
   invoices                  Invoice[]
   visits                    Visit[]
+  tokens                    Token[]
+}
+
+model Token {
+  id          Int      @id @default(autoincrement())
+  patientId   Int
+  tokenNumber Int
+  date        DateTime
+  status      String   @default("waiting")
+  createdAt   DateTime @default(now())
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([date, tokenNumber])
 }
 
 model Appointment {

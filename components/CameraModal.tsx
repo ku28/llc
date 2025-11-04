@@ -12,8 +12,9 @@ export default function CameraModal({ isOpen, onClose, onCapture, title = 'Captu
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [stream, setStream] = useState<MediaStream | null>(null)
     const [isCameraReady, setIsCameraReady] = useState(false)
+    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment')
 
-    // Start camera when modal opens
+    // Start camera when modal opens or facingMode changes
     useEffect(() => {
         if (isOpen) {
             startCamera()
@@ -21,13 +22,20 @@ export default function CameraModal({ isOpen, onClose, onCapture, title = 'Captu
             stopCamera()
         }
         return () => stopCamera()
-    }, [isOpen])
+    }, [isOpen, facingMode])
 
     const startCamera = async () => {
+        // Stop existing stream first
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop())
+        }
+        
+        setIsCameraReady(false)
+        
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: 'environment', // Use back camera on mobile
+                    facingMode: facingMode, // Use selected camera
                     width: { ideal: 1920 },
                     height: { ideal: 1080 }
                 }
@@ -43,6 +51,10 @@ export default function CameraModal({ isOpen, onClose, onCapture, title = 'Captu
             console.error('Error accessing camera:', err)
             alert('Unable to access camera. Please check permissions.')
         }
+    }
+
+    const switchCamera = () => {
+        setFacingMode(prev => prev === 'environment' ? 'user' : 'environment')
     }
 
     const stopCamera = () => {
@@ -130,6 +142,17 @@ export default function CameraModal({ isOpen, onClose, onCapture, title = 'Captu
                         className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
                     >
                         Cancel
+                    </button>
+                    <button
+                        onClick={switchCamera}
+                        disabled={!isCameraReady}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                        title="Switch Camera"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Switch
                     </button>
                     <button
                         onClick={captureImage}

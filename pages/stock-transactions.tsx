@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
-import Layout from '../components/Layout'
+import LoadingModal from '../components/LoadingModal'
+import ToastNotification from '../components/ToastNotification'
+import CustomSelect from '../components/CustomSelect'
+import { useToast } from '../hooks/useToast'
 
 export default function StockTransactionsPage() {
     const [transactions, setTransactions] = useState<any[]>([])
@@ -10,6 +13,9 @@ export default function StockTransactionsPage() {
     const [isAnimating, setIsAnimating] = useState(false)
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage] = useState(10)
+    const [loading, setLoading] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     
     const [form, setForm] = useState({
         productId: '',
@@ -23,10 +29,21 @@ export default function StockTransactionsPage() {
     const [user, setUser] = useState<any>(null)
 
     useEffect(() => {
-        fetchTransactions()
-        fetchProducts()
-        fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user))
+        fetchInitialData()
     }, [])
+
+    const fetchInitialData = async () => {
+        setLoading(true)
+        try {
+            await Promise.all([
+                fetchTransactions(),
+                fetchProducts(),
+                fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user))
+            ])
+        } finally {
+            setLoading(false)
+        }
+    }
 
     const fetchTransactions = async (productId?: string, type?: string) => {
         let url = '/api/stock-transactions?limit=100'
@@ -50,6 +67,7 @@ export default function StockTransactionsPage() {
 
     async function handleSubmit(e: any) {
         e.preventDefault()
+        setSubmitting(true)
         try {
             const payload = {
                 productId: Number(form.productId),
@@ -70,14 +88,16 @@ export default function StockTransactionsPage() {
                 await fetchTransactions(filterProduct, filterType)
                 await fetchProducts() // Refresh to get updated quantities
                 closeModal()
-                alert('Inventory movement recorded successfully!')
+                showSuccess('Inventory movement recorded successfully!')
             } else {
                 const error = await response.json()
-                alert('Failed: ' + (error.error || 'Unknown error'))
+                showError('Failed: ' + (error.error || 'Unknown error'))
             }
         } catch (error) {
             console.error('Error saving transaction:', error)
-            alert('Failed to save transaction')
+            showError('Failed to save transaction')
+        } finally {
+            setSubmitting(false)
         }
     }
 
@@ -117,20 +137,20 @@ export default function StockTransactionsPage() {
     }
 
     return (
-            <div>
-                <div className="section-header flex justify-between items-center">
-                    <h2 className="section-title">Inventory History</h2>
-                    <button 
-                        onClick={() => {
-                            setIsModalOpen(true)
-                            setIsAnimating(false)
-                            setTimeout(() => setIsAnimating(true), 10)
-                        }}
-                        className="btn btn-primary"
-                    >
-                        + Manual Adjustment
-                    </button>
-                </div>
+        <div>
+            <div className="section-header flex justify-between items-center">
+                <h2 className="section-title">Inventory History</h2>
+                <button 
+                    onClick={() => {
+                        setIsModalOpen(true)
+                        setIsAnimating(false)
+                        setTimeout(() => setIsAnimating(true), 10)
+                    }}
+                    className="btn btn-primary"
+                >
+                    + Manual Adjustment
+                </button>
+            </div>
 
                 {/* Info Card */}
                 <div className="card mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
@@ -149,27 +169,34 @@ export default function StockTransactionsPage() {
                 {/* Filter Bar */}
                 <div className="card mb-4">
                     <div className="flex items-center gap-3 flex-wrap">
-                        <select
-                            value={filterProduct}
-                            onChange={(e) => setFilterProduct(e.target.value)}
-                            className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white min-w-[200px]"
-                        >
-                            <option value="">All Products</option>
-                            {products.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={filterType}
-                            onChange={(e) => setFilterType(e.target.value)}
-                            className="p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                        >
-                            <option value="">All Types</option>
-                            <option value="IN">Stock In</option>
-                            <option value="OUT">Stock Out</option>
-                            <option value="ADJUSTMENT">Adjustments</option>
-                            <option value="RETURN">Returns</option>
-                        </select>
+                        <div className="min-w-[200px]">
+                            <CustomSelect
+                                value={filterProduct}
+                                onChange={(value) => setFilterProduct(value)}
+                                options={[
+                                    { value: '', label: 'All Products' },
+                                    ...products.map(p => ({
+                                        value: p.id.toString(),
+                                        label: p.name
+                                    }))
+                                ]}
+                                placeholder="All Products"
+                            />
+                        </div>
+                        <div className="min-w-[180px]">
+                            <CustomSelect
+                                value={filterType}
+                                onChange={(value) => setFilterType(value)}
+                                options={[
+                                    { value: '', label: 'All Types' },
+                                    { value: 'IN', label: 'Stock In' },
+                                    { value: 'OUT', label: 'Stock Out' },
+                                    { value: 'ADJUSTMENT', label: 'Adjustments' },
+                                    { value: 'RETURN', label: 'Returns' }
+                                ]}
+                                placeholder="All Types"
+                            />
+                        </div>
                         {(filterProduct || filterType) && (
                             <button
                                 onClick={() => {
@@ -186,80 +213,66 @@ export default function StockTransactionsPage() {
 
                 {/* Manual Adjustment Modal */}
                 {isModalOpen && (
-                    <div 
-                        className="fixed inset-0 bg-black flex items-center justify-center z-50 p-4 transition-opacity duration-200 ease-out"
-                        style={{
-                            opacity: isAnimating ? 1 : 0,
-                            backgroundColor: isAnimating ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0)'
-                        }}
-                        onClick={closeModal}
-                    >
-                        <div 
-                            className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full transition-all duration-200 ease-out"
-                            style={{
-                                transform: isAnimating ? 'scale(1)' : 'scale(0.95)',
-                                opacity: isAnimating ? 1 : 0
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="bg-white dark:bg-gray-900 border-b dark:border-gray-700 px-6 py-4 flex justify-between items-center rounded-t-lg">
-                                <h3 className="text-xl font-semibold">Manual Stock Adjustment</h3>
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Manual Stock Adjustment</h2>
                                 <button
                                     onClick={closeModal}
-                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none"
                                 >
                                     ×
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="p-6">
+                            {/* Form Content */}
+                            <form onSubmit={handleSubmit}>
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">Product *</label>
-                                        <select
-                                            required
+                                        <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Product *</label>
+                                        <CustomSelect
                                             value={form.productId}
-                                            onChange={(e) => setForm({...form, productId: e.target.value})}
-                                            className="input-field"
-                                        >
-                                            <option value="">Select Product</option>
-                                            {products.map(p => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.name} (Current: {p.quantity})
-                                                </option>
-                                            ))}
-                                        </select>
+                                            onChange={(value) => setForm({...form, productId: value})}
+                                            options={products.map(p => ({
+                                                value: p.id.toString(),
+                                                label: `${p.name} (Current: ${p.quantity})`
+                                            }))}
+                                            placeholder="Select Product"
+                                            required
+                                        />
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">Transaction Type *</label>
-                                        <select
-                                            required
+                                        <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Transaction Type *</label>
+                                        <CustomSelect
                                             value={form.transactionType}
-                                            onChange={(e) => setForm({...form, transactionType: e.target.value})}
-                                            className="input-field"
-                                        >
-                                            <option value="ADJUSTMENT">Adjustment (Correction)</option>
-                                            <option value="IN">Stock In (Add Stock)</option>
-                                            <option value="OUT">Stock Out (Remove Stock)</option>
-                                            <option value="RETURN">Return (Customer Return)</option>
-                                        </select>
+                                            onChange={(value) => setForm({...form, transactionType: value})}
+                                            options={[
+                                                { value: 'ADJUSTMENT', label: 'Adjustment (Correction)' },
+                                                { value: 'IN', label: 'Stock In (Add Stock)' },
+                                                { value: 'OUT', label: 'Stock Out (Remove Stock)' },
+                                                { value: 'RETURN', label: 'Return (Customer Return)' }
+                                            ]}
+                                            placeholder="Select transaction type"
+                                            required
+                                        />
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">Quantity *</label>
+                                            <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Quantity *</label>
                                             <input
                                                 type="number"
                                                 required
                                                 value={form.quantity}
                                                 onChange={(e) => setForm({...form, quantity: e.target.value})}
-                                                className="input-field"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="0"
                                                 min="0"
                                                 step="1"
                                             />
-                                            <p className="text-xs text-muted mt-1">
+                                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                                                 {form.transactionType === 'IN' || form.transactionType === 'RETURN' 
                                                     ? 'This will be added to current stock'
                                                     : 'This will be subtracted from current stock'}
@@ -267,12 +280,12 @@ export default function StockTransactionsPage() {
                                         </div>
 
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">Unit Price (₹)</label>
+                                            <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Unit Price (₹)</label>
                                             <input
                                                 type="number"
                                                 value={form.unitPrice}
                                                 onChange={(e) => setForm({...form, unitPrice: e.target.value})}
-                                                className="input-field"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="0.00"
                                                 min="0"
                                                 step="0.01"
@@ -281,41 +294,42 @@ export default function StockTransactionsPage() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">Performed By</label>
+                                        <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Performed By</label>
                                         <input
                                             type="text"
                                             value={form.performedBy}
                                             onChange={(e) => setForm({...form, performedBy: e.target.value})}
-                                            className="input-field"
+                                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                                             placeholder={user?.name || 'System'}
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">Notes *</label>
+                                        <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Notes *</label>
                                         <textarea
                                             required
                                             value={form.notes}
                                             onChange={(e) => setForm({...form, notes: e.target.value})}
-                                            className="input-field"
+                                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                                             rows={3}
                                             placeholder="Reason for this transaction (e.g., 'Damaged goods', 'Stock count correction', 'Customer return')"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t dark:border-gray-700">
+                                {/* Action Buttons */}
+                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                                     <button
                                         type="button"
                                         onClick={closeModal}
-                                        className="btn btn-secondary"
+                                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={!user}
-                                        className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
                                         Record Transaction
                                     </button>
@@ -449,7 +463,13 @@ export default function StockTransactionsPage() {
                         </div>
                     )}
                 </div>
-            </div>
 
+            <LoadingModal 
+                isOpen={loading || submitting} 
+                message={loading ? 'Loading transactions...' : 'Recording transaction...'}
+            />
+
+            <ToastNotification toasts={toasts} removeToast={removeToast} />
+        </div>
     )
 }

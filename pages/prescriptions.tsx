@@ -79,6 +79,47 @@ export default function PrescriptionsPage() {
     useEffect(() => { fetch('/api/treatments').then(r => r.json()).then(setTreatments) }, [])
     useEffect(() => { fetch('/api/products').then(r => r.json()).then(setProducts) }, [])
 
+    // Set patientId and visitNumber from URL query parameters
+    useEffect(() => {
+        const { patientId, visitNumber } = router.query
+        if (patientId && !isEditMode && patients.length > 0) {
+            const found = patients.find(p => String(p.id) === String(patientId))
+            if (found) {
+                setForm((prev: any) => ({ 
+                    ...prev, 
+                    patientId: String(patientId),
+                    opdNo: found.opdNo || '',
+                    visitNumber: visitNumber ? String(visitNumber) : prev.visitNumber,
+                    dob: formatDateForInput(found.dob),
+                    age: found.age ?? '',
+                    address: found.address || '',
+                    gender: found.gender || '',
+                    phone: found.phone || '',
+                    occupation: found.occupation || '',
+                    pendingPaymentCents: found.pendingPaymentCents ?? '',
+                    height: found.height ?? '',
+                    weight: found.weight ?? '',
+                    fatherHusbandGuardianName: found.fatherHusbandGuardianName || '',
+                    // Load clinical information from patient record
+                    temperament: found.temperament || '',
+                    pulseDiagnosis: found.pulseDiagnosis || '',
+                    pulseDiagnosis2: found.pulseDiagnosis2 || '',
+                    majorComplaints: found.majorComplaints || '',
+                    historyReports: found.historyReports || '',
+                    investigations: found.investigations || '',
+                    provisionalDiagnosis: found.provisionalDiagnosis || '',
+                    improvements: found.improvements || ''
+                }))
+            } else {
+                setForm((prev: any) => ({ 
+                    ...prev, 
+                    patientId: String(patientId),
+                    visitNumber: visitNumber ? String(visitNumber) : prev.visitNumber
+                }))
+            }
+        }
+    }, [router.query.patientId, router.query.visitNumber, isEditMode, patients])
+
     // Fetch previous weight when patient is selected
     useEffect(() => {
         if (form.patientId && !isEditMode) {
@@ -354,7 +395,7 @@ export default function PrescriptionsPage() {
                             droppersToday: p.droppersToday?.toString() || '',
                             medicineQuantity: p.medicineQuantity?.toString() || '',
                             administration: p.administration || '',
-                            taken: false, // Reset taken status for new visit
+                            taken: true, // Default to checked for new visit
                             patientHasMedicine: false // Reset for new visit
                         }))
                         
@@ -374,10 +415,10 @@ export default function PrescriptionsPage() {
                                 })
                                 .catch(err => console.error('Error fetching treatment plan:', err))
                         }
-                        
-                        showInfo('Previous visit data has been loaded. You can modify it before saving.')
                     }
-
+                    
+                    // Show success toast only once after all data is loaded
+                    showSuccess('Previous visit data loaded successfully')
                     setLoading(false)
                 })
                 .catch(err => {
@@ -386,7 +427,7 @@ export default function PrescriptionsPage() {
                     setLoading(false)
                 })
         }
-    }, [router.query, isEditMode, showError, showInfo])
+    }, [router.query.copyFromVisitId, isEditMode])
 
     async function handleAttachmentUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const files = e.target.files
@@ -707,7 +748,7 @@ export default function PrescriptionsPage() {
             quantity: 1, timing: '', dosage: '',
             additions: '', procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', taken: false, patientHasMedicine: false
+            administration: '', taken: true, patientHasMedicine: false
         }])
     }
 
@@ -741,7 +782,7 @@ export default function PrescriptionsPage() {
             quantity: 1, timing: '', dosage: '',
             additions: '', procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', taken: false, patientHasMedicine: false
+            administration: '', taken: true, patientHasMedicine: false
         }))
 
         setPrescriptions([...prescriptions, ...newPrescriptions])
@@ -802,7 +843,16 @@ export default function PrescriptionsPage() {
             occupation: found.occupation || '',
             pendingPaymentCents: found.pendingPaymentCents ?? '',
             height: found.height ?? '',
-            weight: found.weight ?? ''
+            weight: found.weight ?? '',
+            // Load clinical information from patient record
+            temperament: found.temperament || '',
+            pulseDiagnosis: found.pulseDiagnosis || '',
+            pulseDiagnosis2: found.pulseDiagnosis2 || '',
+            majorComplaints: found.majorComplaints || '',
+            historyReports: found.historyReports || '',
+            investigations: found.investigations || '',
+            provisionalDiagnosis: found.provisionalDiagnosis || '',
+            improvements: found.improvements || ''
         }))
     }
 
@@ -818,7 +868,7 @@ export default function PrescriptionsPage() {
             quantity: 1, timing: '', dosage: '',
             additions: '', procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', taken: false
+            administration: '', taken: true
         }])
     }
 
@@ -1153,38 +1203,38 @@ export default function PrescriptionsPage() {
                                         <label className="block text-sm font-medium mb-1.5">Height</label>
                                         <div className="grid grid-cols-2 gap-2">
                                             {/* CM Input */}
-                                            <div className="flex items-center border rounded overflow-hidden bg-white dark:bg-gray-800 w-32">
+                                            <div className="flex items-center rounded overflow-hidden bg-white dark:bg-gray-800 w-32">
                                                 <input 
                                                     type="number" 
                                                     placeholder="175" 
                                                     value={form.height} 
                                                     onChange={e => setForm({ ...form, height: e.target.value })} 
-                                                    className="w-20 p-2 border-0 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                    className="w-20 p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500" 
                                                 />
-                                                <span className="px-3 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700">cm</span>
+                                                <span className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 border-y border-r rounded-r">cm</span>
                                             </div>
                                             
                                             {/* Feet/Inches Input */}
-                                            <div className="flex items-center gap-1 border rounded overflow-hidden bg-white dark:bg-gray-800 w-40">
+                                            <div className="flex items-center gap-1 rounded overflow-hidden bg-white dark:bg-gray-800 w-40">
                                                 <input 
                                                     type="number" 
                                                     placeholder="5" 
                                                     value={form.heightFeet} 
                                                     onChange={e => setForm({ ...form, heightFeet: e.target.value })} 
-                                                    className="w-12 p-2 border-0 text-center focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                    className="w-12 p-2 border rounded-l text-center focus:outline-none focus:ring-2 focus:ring-blue-500" 
                                                     title="Feet"
                                                 />
-                                                <span className="text-sm font-medium text-gray-600">ft</span>
+                                                <span className="px-1 text-sm font-medium text-gray-600 dark:text-gray-400">ft</span>
                                                 <div className="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
                                                 <input 
                                                     type="number" 
                                                     placeholder="9" 
                                                     value={form.heightInches} 
                                                     onChange={e => setForm({ ...form, heightInches: e.target.value })} 
-                                                    className="w-12 p-2 border-0 text-center focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                                    className="w-12 p-2 border text-center focus:outline-none focus:ring-2 focus:ring-blue-500" 
                                                     title="Inches"
                                                 />
-                                                <span className="px-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700">in</span>
+                                                <span className="px-2 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 border-y border-r rounded-r">in</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1382,7 +1432,6 @@ export default function PrescriptionsPage() {
                             <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                                 <label className="block text-sm font-medium mb-2">
                                     Quick Add from Treatment Plan
-                                    {selectedTreatmentId && <span className="ml-2 text-xs text-gray-600">🔒 Locked</span>}
                                 </label>
                                 <div className="flex gap-2">
                                     <CustomSelect
@@ -1409,7 +1458,7 @@ export default function PrescriptionsPage() {
                                                     droppersToday: tp.droppersToday?.toString() || '',
                                                     medicineQuantity: tp.medicineQuantity?.toString() || '',
                                                     administration: treatment.administration || '',
-                                                    taken: false,
+                                                    taken: true,
                                                     patientHasMedicine: false
                                                 }))
                                                 setPrescriptions(newPrescriptions) // Replace, not add
@@ -1583,6 +1632,13 @@ export default function PrescriptionsPage() {
                                                         <div className="p-2 border rounded-lg bg-gray-100 dark:bg-gray-800 text-sm">
                                                             <span className="text-red-600 dark:text-red-400 font-bold">(DELETED)</span> {prescriptionTreatment?.treatmentPlan || prescriptionTreatment?.provDiagnosis || `Treatment #${pr.treatmentId}`}
                                                         </div>
+                                                    ) : pr.treatmentId ? (
+                                                        <div className="p-2 text-sm text-gray-700 dark:text-gray-300">
+                                                            {(() => {
+                                                                const treatment = Array.isArray(treatments) ? treatments.find(t => String(t.id) === String(pr.treatmentId)) : null
+                                                                return treatment ? `${treatment.planNumber ? `Plan ${treatment.planNumber} - ` : ''}${treatment.treatmentPlan || treatment.provDiagnosis || `Treatment #${pr.treatmentId}`}` : `Treatment #${pr.treatmentId}`
+                                                            })()}
+                                                        </div>
                                                     ) : (
                                                     <CustomSelect
                                                         value={pr.treatmentId}
@@ -1603,8 +1659,15 @@ export default function PrescriptionsPage() {
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1 text-muted">
                                                         Medicine (from inventory)
-                                                        {pr.productId && <span className="ml-2 text-xs text-gray-500">🔒 Locked</span>}
                                                     </label>
+                                                    {pr.productId ? (
+                                                        <div className="p-2 text-sm text-gray-700 dark:text-gray-300">
+                                                            {(() => {
+                                                                const product = products.find(p => String(p.id) === String(pr.productId))
+                                                                return product ? `${product.name} · Stock: ${product.quantity}` : `Product #${pr.productId}`
+                                                            })()}
+                                                        </div>
+                                                    ) : (
                                                     <CustomSelect
                                                         value={pr.productId}
                                                         onChange={(val) => !isDeleted && !pr.productId && updatePrescription(i, { productId: val })}
@@ -1616,8 +1679,9 @@ export default function PrescriptionsPage() {
                                                             }))
                                                         ]}
                                                         placeholder="-- select medicine --"
-                                                        className={`${isDeleted || pr.productId ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}
+                                                        className={`${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}
                                                     />
+                                                    )}
                                                 </div>
 
                                                 {/* Spagyrics Section - All in single line */}
@@ -1633,9 +1697,9 @@ export default function PrescriptionsPage() {
                                                                     updatePrescription(i, { comp1: formatComponent(val.toUpperCase(), parsed.volume) })
                                                                 }}
                                                                 options={components}
-                                                                placeholder="S1"
+                                                                placeholder="Spy1"
                                                                 allowCustom={true}
-                                                                className="w-28"
+                                                                className="w-20"
                                                             />
                                                             <input
                                                                 type="text"
@@ -1658,9 +1722,9 @@ export default function PrescriptionsPage() {
                                                                     updatePrescription(i, { comp2: formatComponent(val.toUpperCase(), parsed.volume) })
                                                                 }}
                                                                 options={components}
-                                                                placeholder="S2"
+                                                                placeholder="Spy2"
                                                                 allowCustom={true}
-                                                                className="w-28"
+                                                                className="w-20"
                                                             />
                                                             <input
                                                                 type="text"
@@ -1683,9 +1747,9 @@ export default function PrescriptionsPage() {
                                                                     updatePrescription(i, { comp3: formatComponent(val.toUpperCase(), parsed.volume) })
                                                                 }}
                                                                 options={components}
-                                                                placeholder="S3"
+                                                                placeholder="Spy3"
                                                                 allowCustom={true}
-                                                                className="w-28"
+                                                                className="w-20"
                                                             />
                                                             <input
                                                                 type="text"
@@ -1709,9 +1773,9 @@ export default function PrescriptionsPage() {
                                                                         updatePrescription(i, { comp4: formatComponent(val.toUpperCase(), parsed.volume) })
                                                                     }}
                                                                     options={components}
-                                                                    placeholder="S4"
+                                                                    placeholder="Spy4"
                                                                     allowCustom={true}
-                                                                    className="w-28"
+                                                                    className="w-20"
                                                                 />
                                                                 <input
                                                                     type="text"
@@ -1728,10 +1792,10 @@ export default function PrescriptionsPage() {
                                                                     onClick={() => {
                                                                         updatePrescription(i, { comp4: undefined, comp5: undefined })
                                                                     }}
-                                                                    className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-xs"
+                                                                    className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors text-sm font-bold"
                                                                     title="Remove spagyric 4"
                                                                 >
-                                                                    ×
+                                                                    −
                                                                 </button>
                                                             </div>
                                                         )}
@@ -1746,9 +1810,9 @@ export default function PrescriptionsPage() {
                                                                         updatePrescription(i, { comp5: formatComponent(val.toUpperCase(), parsed.volume) })
                                                                     }}
                                                                     options={components}
-                                                                    placeholder="S5"
+                                                                    placeholder="Spy5"
                                                                     allowCustom={true}
-                                                                    className="w-28"
+                                                                    className="w-20"
                                                                 />
                                                                 <input
                                                                     type="text"
@@ -1765,27 +1829,37 @@ export default function PrescriptionsPage() {
                                                                     onClick={() => {
                                                                         updatePrescription(i, { comp5: undefined })
                                                                     }}
-                                                                    className="flex-shrink-0 w-5 h-5 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-xs"
+                                                                    className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors text-sm font-bold"
                                                                     title="Remove spagyric 5"
                                                                 >
-                                                                    ×
+                                                                    −
                                                                 </button>
                                                             </div>
                                                         )}
 
                                                         {/* Plus button - show if less than 5 components */}
-                                                        {pr.comp5 === undefined && (
+                                                        {pr.comp4 === undefined && (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => {
-                                                                    if (pr.comp4 === undefined) {
-                                                                        updatePrescription(i, { comp4: '' })
-                                                                    } else {
-                                                                        updatePrescription(i, { comp5: '' })
-                                                                    }
+                                                                    updatePrescription(i, { comp4: '' })
                                                                 }}
-                                                                className="w-6 h-6 flex items-center justify-center bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
-                                                                title="Add spagyric"
+                                                                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors text-sm font-bold"
+                                                                title="Add spagyric 4"
+                                                            >
+                                                                +
+                                                            </button>
+                                                        )}
+                                                        
+                                                        {/* Plus button for spy5 - show if spy4 exists but spy5 doesn't */}
+                                                        {pr.comp4 !== undefined && pr.comp5 === undefined && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    updatePrescription(i, { comp5: '' })
+                                                                }}
+                                                                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors text-sm font-bold"
+                                                                title="Add spagyric 5"
                                                             >
                                                                 +
                                                             </button>

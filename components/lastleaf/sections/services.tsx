@@ -57,7 +57,7 @@ export default function ServicesSection() {
           </h2>
 
           <h2 className="text-3xl md:text-4xl text-center font-bold mb-4 text-gray-900 dark:text-white">
-            Hear Are Some Examples
+            Here Are Some Examples
           </h2>
         </div>
 

@@ -6,14 +6,18 @@ import { requireAuth } from '../../lib/auth'
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'GET') {
         try {
-            const { id } = req.query
+            const { id, patientId } = req.query
             
             // If ID is provided, fetch single visit
             if (id) {
                 const visit = await prisma.visit.findUnique({
                     where: { id: Number(id) },
                     include: {
-                        prescriptions: true,
+                        prescriptions: {
+                            include: {
+                                product: true
+                            }
+                        },
                         patient: true
                     }
                 })
@@ -25,11 +29,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 return res.status(200).json(visit)
             }
             
+            // If patientId is provided, fetch visits for that patient
+            if (patientId) {
+                const items = await prisma.visit.findMany({ 
+                    where: { patientId: Number(patientId) },
+                    orderBy: { date: 'desc' },
+                    include: {
+                        prescriptions: {
+                            include: {
+                                product: true
+                            }
+                        },
+                        patient: true
+                    }
+                })
+                return res.status(200).json(items)
+            }
+            
             // Otherwise fetch all visits
             const items = await prisma.visit.findMany({ 
                 orderBy: { date: 'desc' },
                 include: {
-                    prescriptions: true,
+                    prescriptions: {
+                        include: {
+                            product: true
+                        }
+                    },
                     patient: true
                 }
             })
@@ -122,6 +147,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     // Create new visit
                     visit = await tx.visit.create({ data: visitData })
                 }
+
+                // Update patient with clinical information for future reference
+                if (patientId) {
+                    const patientUpdateData: any = {}
+                    if (temperament) patientUpdateData.temperament = temperament
+                    if (pulseDiagnosis) patientUpdateData.pulseDiagnosis = pulseDiagnosis
+                    if (majorComplaints) patientUpdateData.majorComplaints = majorComplaints
+                    if (historyReports) patientUpdateData.historyReports = historyReports
+                    if (investigations) patientUpdateData.investigations = investigations
+                    if (provisionalDiagnosis) patientUpdateData.provisionalDiagnosis = provisionalDiagnosis
+                    if (improvements) patientUpdateData.improvements = improvements
+                    
+                    if (Object.keys(patientUpdateData).length > 0) {
+                        await tx.patient.update({
+                            where: { id: Number(patientId) },
+                            data: patientUpdateData
+                        })
+                    }
+                }
+
 
                 let createdPrescriptions: any[] = []
                 let invoiceItems: any[] = []

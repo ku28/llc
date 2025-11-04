@@ -3,6 +3,7 @@ import Link from 'next/link'
 import CustomSelect from '../components/CustomSelect'
 import ImportVisitsModal from '../components/ImportVisitsModal'
 import PatientSelectionModal from '../components/PatientSelectionModal'
+import LoadingModal from '../components/LoadingModal'
 import { useToast } from '../hooks/useToast'
 
 export default function VisitsPage() {
@@ -86,6 +87,7 @@ export default function VisitsPage() {
 
     return (
         <div>
+            <LoadingModal isOpen={loading} message="Loading visits..." />
             <div className="section-header flex justify-between items-center">
                 <h2 className="section-title">{isPatient ? 'My Appointments' : 'Patient Visits'}</h2>
                 <div className="flex items-center gap-3">

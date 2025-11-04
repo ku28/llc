@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { requireDoctorOrAdmin } from '../../lib/withAuth'
+import LoadingModal from '../../components/LoadingModal'
 
 function CompareVisitsPage() {
     const router = useRouter()
@@ -53,14 +54,7 @@ function CompareVisitsPage() {
     }
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-muted">Loading visits...</p>
-                </div>
-            </div>
-        )
+        return <LoadingModal isOpen={true} message="Loading visits..." />
     }
 
     if (!patient || visits.length === 0) {
@@ -201,24 +195,81 @@ function CompareVisitsPage() {
                                         <div className="space-y-2">
                                             {visit.prescriptions.map((prescription: any) => (
                                                 <div key={prescription.id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
-                                                    <p className="font-medium text-gray-900 dark:text-white">
-                                                        {prescription.product?.name || 'Unknown Medicine'}
+                                                    <p className="font-medium text-gray-900 dark:text-white mb-2">
+                                                        {prescription.product?.name || 'Custom Medicine'}
                                                     </p>
-                                                    {prescription.dosage && (
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                            Dosage: {prescription.dosage}
-                                                        </p>
+                                                    
+                                                    {/* Compositions */}
+                                                    {(prescription.comp1 || prescription.comp2 || prescription.comp3 || prescription.comp4 || prescription.comp5) && (
+                                                        <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                                            <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Compositions:</p>
+                                                            <div className="text-xs text-gray-700 dark:text-gray-300 space-y-0.5">
+                                                                {prescription.comp1 && <div>• {prescription.comp1}</div>}
+                                                                {prescription.comp2 && <div>• {prescription.comp2}</div>}
+                                                                {prescription.comp3 && <div>• {prescription.comp3}</div>}
+                                                                {prescription.comp4 && <div>• {prescription.comp4}</div>}
+                                                                {prescription.comp5 && <div>• {prescription.comp5}</div>}
+                                                            </div>
+                                                        </div>
                                                     )}
-                                                    {prescription.timing && (
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                            Timing: {prescription.timing}
-                                                        </p>
-                                                    )}
-                                                    {prescription.quantity && (
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                            Quantity: {prescription.quantity}
-                                                        </p>
-                                                    )}
+                                                    
+                                                    {/* Details Grid */}
+                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                        {prescription.dosage && (
+                                                            <div>
+                                                                <span className="text-gray-500 dark:text-gray-400">Dosage:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.dosage}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.timing && (
+                                                            <div>
+                                                                <span className="text-gray-500 dark:text-gray-400">Timing:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.timing}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.quantity && (
+                                                            <div>
+                                                                <span className="text-gray-500 dark:text-gray-400">Quantity:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.quantity}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.administration && (
+                                                            <div>
+                                                                <span className="text-gray-500 dark:text-gray-400">Administration:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.administration}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.additions && (
+                                                            <div className="col-span-2">
+                                                                <span className="text-gray-500 dark:text-gray-400">Additions:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.additions}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.procedure && (
+                                                            <div className="col-span-2">
+                                                                <span className="text-gray-500 dark:text-gray-400">Procedure:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.procedure}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.presentation && (
+                                                            <div className="col-span-2">
+                                                                <span className="text-gray-500 dark:text-gray-400">Presentation:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.presentation}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.droppersToday && (
+                                                            <div>
+                                                                <span className="text-gray-500 dark:text-gray-400">Droppers Today:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.droppersToday}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.medicineQuantity && (
+                                                            <div>
+                                                                <span className="text-gray-500 dark:text-gray-400">Medicine Qty:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.medicineQuantity}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>

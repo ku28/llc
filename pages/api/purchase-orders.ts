@@ -109,16 +109,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // If receiving goods, update stock
             if (status === 'received' && items) {
                 for (const item of items) {
-                    if (item.receivedQuantity > 0) {
+                    if (item.receivedQuantity > 0 && item.productId) {
                         // Update product quantity
                         const product = await prisma.product.findUnique({
-                            where: { id: item.productId }
+                            where: { id: Number(item.productId) }
                         })
 
                         if (product) {
                             const newQuantity = product.quantity + item.receivedQuantity
                             await prisma.product.update({
-                                where: { id: item.productId },
+                                where: { id: Number(item.productId) },
                                 data: {
                                     quantity: newQuantity,
                                     totalPurchased: product.totalPurchased + item.receivedQuantity
@@ -128,7 +128,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             // Create stock transaction
                             await prisma.stockTransaction.create({
                                 data: {
-                                    productId: item.productId,
+                                    productId: Number(item.productId),
                                     transactionType: 'IN',
                                     quantity: item.receivedQuantity,
                                     unitPrice: item.unitPrice,

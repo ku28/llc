@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 interface Option {
     value: string
     label: string
+    description?: string  // Optional description field
 }
 
 interface CustomSelectProps {
@@ -29,6 +30,7 @@ export default function CustomSelect({
     const [isOpen, setIsOpen] = useState(false)
     const [inputValue, setInputValue] = useState('')
     const [highlightedIndex, setHighlightedIndex] = useState(0)
+    const [hoveredOption, setHoveredOption] = useState<Option | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
     const optionsRef = useRef<HTMLDivElement>(null)
@@ -253,11 +255,29 @@ export default function CustomSelect({
                                     key={option.value}
                                     className={`custom-select-option ${value === option.value ? 'selected' : ''} ${highlightedIndex === index ? 'highlighted' : ''}`}
                                     onClick={() => handleOptionClick(option)}
-                                    onMouseEnter={() => setHighlightedIndex(index)}
-                                    style={{ cursor: 'pointer' }}
+                                    onMouseEnter={() => {
+                                        setHighlightedIndex(index)
+                                        if (option.description) {
+                                            setHoveredOption(option)
+                                        }
+                                    }}
+                                    onMouseLeave={() => setHoveredOption(null)}
+                                    style={{ cursor: 'pointer', position: 'relative' }}
                                 >
                                     {value === option.value && <span className="checkmark">✓ </span>}
-                                    {option.label}
+                                    <div className="flex flex-col">
+                                        <span>{option.label}</span>
+                                        {hoveredOption?.value === option.value && option.description && (
+                                            <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-800 dark:to-emerald-900/30 border-2 border-emerald-400 dark:border-emerald-600 rounded-lg shadow-xl p-3 text-xs text-gray-700 dark:text-gray-200 backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                                                <div className="flex items-start gap-2">
+                                                    <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                                    </svg>
+                                                    <span className="leading-relaxed">{option.description}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             ))
                         )}

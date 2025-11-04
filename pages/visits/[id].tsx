@@ -11,6 +11,7 @@ export default function VisitDetail() {
     const [products, setProducts] = useState<any[]>([])
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
     const [showPrintModal, setShowPrintModal] = useState(false)
+    const [copyType, setCopyType] = useState<'PATIENT' | 'OFFICE'>('PATIENT')
     const prescriptionRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -792,19 +793,13 @@ export default function VisitDetail() {
         doc.setTextColor(0, 0, 0) // Reset color
         }
 
-        // Generate first page - PATIENT COPY
-        await generatePage('PATIENT')
-        
-        // Add new page for OFFICE COPY
-        doc.addPage()
-        
-        // Generate second page - OFFICE COPY
-        await generatePage('OFFICE')
+        // Generate only the selected copy type (patient or office)
+        await generatePage(copyType)
 
-        // Save the PDF with patient name and OPD number
+        // Save the PDF with patient name, OPD number, and copy type
         const patientName = `${visit.patient?.firstName || ''} ${visit.patient?.lastName || ''}`.trim() || 'Patient'
         const opdNo = visit.opdNo || visit.id || 'Unknown'
-        const fileName = `${patientName} ${opdNo}.pdf`
+        const fileName = `${patientName} ${opdNo} - ${copyType}.pdf`
         doc.save(fileName)
         } catch (error) {
             console.error('Error generating PDF:', error)
@@ -1052,6 +1047,31 @@ export default function VisitDetail() {
                         >
                             ✏️ Edit
                         </button>
+                        
+                        {/* Copy Type Toggle */}
+                        <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden">
+                            <button
+                                onClick={() => setCopyType('PATIENT')}
+                                className={`px-3 py-1.5 text-sm font-medium transition-all ${
+                                    copyType === 'PATIENT'
+                                        ? 'bg-emerald-500 dark:bg-emerald-600 text-white'
+                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                            >
+                                Patient Copy
+                            </button>
+                            <button
+                                onClick={() => setCopyType('OFFICE')}
+                                className={`px-3 py-1.5 text-sm font-medium transition-all border-l border-gray-300 dark:border-gray-600 ${
+                                    copyType === 'OFFICE'
+                                        ? 'bg-emerald-500 dark:bg-emerald-600 text-white'
+                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                            >
+                                Office Copy
+                            </button>
+                        </div>
+                        
                         <button 
                             onClick={downloadPreviewAsPDF} 
                             disabled={isGeneratingPDF}

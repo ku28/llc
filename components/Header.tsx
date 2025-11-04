@@ -3,7 +3,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { canAccessRoute } from '../lib/permissions'
 
-export default function Header({ title = 'LLC ERP' }: { title?: string }) {
+interface HeaderProps {
+  title?: string
+  onOpenTokenSidebar?: () => void
+}
+
+export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: HeaderProps) {
   const [user, setUser] = useState<any>(null)
   const [dark, setDark] = useState<boolean>(false)
   const [accountingOpen, setAccountingOpen] = useState(false)
@@ -249,8 +254,9 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
                 
                 {/* Accounting Dropdown - only show for non-reception users who can access accounting features */}
                 {!isReception && (canAccess('/suppliers') || canAccess('/purchase-orders') || canAccess('/invoices') || canAccess('/stock-transactions') || canAccess('/analytics')) && (
-                <div className="relative" onMouseLeave={() => setAccountingOpen(false)}>
+                <div className="relative">
                   <button
+                    onMouseEnter={() => setAccountingOpen(true)}
                     onClick={() => setAccountingOpen(!accountingOpen)}
                     className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm flex items-center gap-1"
                   >
@@ -261,7 +267,11 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
                   </button>
                   
                   {accountingOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                    <div 
+                      className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
+                      onMouseEnter={() => setAccountingOpen(true)}
+                      onMouseLeave={() => setAccountingOpen(false)}
+                    >
                       {canAccess('/suppliers') && (
                         <Link 
                           href="/suppliers" 
@@ -317,6 +327,19 @@ export default function Header({ title = 'LLC ERP' }: { title?: string }) {
 
         </div>
         <div className="flex items-center gap-3">
+          {/* Tokens button for admin/reception */}
+          {user && !isPatient && (
+            <button 
+              onClick={onOpenTokenSidebar}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+              title="Token Queue"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+              </svg>
+            </button>
+          )}
+
           {/* Requests button for admin/reception */}
           {user && !isPatient && (
             <Link 

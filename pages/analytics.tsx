@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
+import LoadingModal from '../components/LoadingModal'
 
 export default function AnalyticsPage() {
     const [products, setProducts] = useState<any[]>([])
@@ -7,12 +8,14 @@ export default function AnalyticsPage() {
     const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
     const [invoices, setInvoices] = useState<any[]>([])
     const [transactions, setTransactions] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         fetchAllData()
     }, [])
 
     const fetchAllData = async () => {
+        setLoading(true)
         try {
             const [productsRes, suppliersRes, posRes, invoicesRes, txnRes] = await Promise.all([
                 fetch('/api/products/public'),
@@ -37,6 +40,8 @@ export default function AnalyticsPage() {
             setTransactions(Array.isArray(txnData) ? txnData : [])
         } catch (error) {
             console.error('Error fetching analytics data:', error)
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -73,6 +78,7 @@ export default function AnalyticsPage() {
         .slice(0, 10)
 
     return (
+        <Layout>
             <div>
                 <div className="section-header">
                     <h2 className="section-title">Analytics & Insights</h2>
@@ -346,5 +352,11 @@ export default function AnalyticsPage() {
                     )}
                 </div>
             </div>
+
+            <LoadingModal 
+                isOpen={loading} 
+                message="Loading analytics data..." 
+            />
+        </Layout>
     )
 }
