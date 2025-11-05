@@ -2,6 +2,17 @@
     "name": "llc-webapp",
     "version": "0.1.0",
     "private": true,
+    "description": "LLC Healthcare Management System - Web Application",
+    "author": {
+        "name": "Kushagra Juneja",
+        "email": "kushagrajuneja7@gmail.com",
+        "url": "https://kushagrajuneja.vercel.app"
+    },
+    "license": "UNLICENSED",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ku28/llc"
+    },
     "scripts": {
         "predev": "node tools/testEnvFull.ts",
         "dev": "next dev",

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
 import { Prisma } from '@prisma/client'
 import { requireAuth } from '../../lib/auth'
+import { generateOpdNo } from '../../lib/utils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'GET') {
@@ -103,10 +104,66 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         try {
             // Create or update visit, prescriptions, update inventory, and optionally create invoice - all in one transaction
             const result = await prisma.$transaction(async (tx: any) => {
+                // Auto-generate opdNo if creating a new visit
+                let generatedOpdNo = opdNo
+                if (!isUpdate && !opdNo) {
+                    // Get visit count for this patient
+                    const visitCount = await tx.visit.count({
+                        where: { patientId: Number(patientId) }
+                    })
+                    
+                    // Get token for today (or create one)
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const tomorrow = new Date(today)
+                    tomorrow.setDate(tomorrow.getDate() + 1)
+                    
+                    let token = await tx.token.findFirst({
+                        where: {
+                            patientId: Number(patientId),
+                            date: {
+                                gte: today,
+                                lt: tomorrow
+                            }
+                        }
+                    })
+                    
+                    // If no token exists for today, create one
+                    if (!token) {
+                        // Get the highest token number for today across all patients
+                        const todayTokens = await tx.token.findMany({
+                            where: {
+                                date: {
+                                    gte: today,
+                                    lt: tomorrow
+                                }
+                            },
+                            orderBy: {
+                                tokenNumber: 'desc'
+                            },
+                            take: 1
+                        })
+                        
+                        const nextTokenNumber = todayTokens.length > 0 ? todayTokens[0].tokenNumber + 1 : 1
+                        
+                        token = await tx.token.create({
+                            data: {
+                                patientId: Number(patientId),
+                                tokenNumber: nextTokenNumber,
+                                date: today,
+                                status: 'waiting'
+                            }
+                        })
+                    }
+                    
+                    // Generate OPD number
+                    generatedOpdNo = generateOpdNo(today, token.tokenNumber, visitCount + 1)
+                }
+                
                 // 1. Create or update the visit
                 const visitData = {
                     patientId: Number(patientId),
-                    opdNo: opdNo || '',
+                    opdNo: generatedOpdNo || '',
                     diagnoses,
                     temperament,
                     pulseDiagnosis,

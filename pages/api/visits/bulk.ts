@@ -11,10 +11,70 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         console.log(`[Bulk Create Visits] Received ${visits.length} visits to import`)
 
+        // Helper function to safely parse dates
+        const parseDate = (dateStr: any): Date | null => {
+            if (!dateStr) return null
+            
+            try {
+                const date = new Date(dateStr)
+                // Check if date is valid
+                if (isNaN(date.getTime())) {
+                    return null
+                }
+                return date
+            } catch {
+                return null
+            }
+        }
+
+        // Helper function to safely convert to string or null
+        const toString = (value: any): string | null => {
+            if (value === null || value === undefined || value === '') return null
+            if (typeof value === 'string') return value
+            // If it's a number or other type, try to convert but if it looks invalid, return null
+            try {
+                const str = String(value)
+                // Check if it looks like a malformed number (e.g., Excel date serial)
+                if (typeof value === 'number' && (value > 1000000 || value < -1000000)) {
+                    return null
+                }
+                return str
+            } catch {
+                return null
+            }
+        }
+
+        // Helper function to safely parse numbers
+        const toNumber = (value: any): number | null => {
+            if (value === null || value === undefined || value === '') return null
+            const num = Number(value)
+            if (isNaN(num)) return null
+            return num
+        }
+
         try {
             const BATCH_SIZE = 10
             const results: any[] = []
             const errors: any[] = []
+            
+            // Find or create dummy treatment once for all imports
+            let dummyTreatment = await prisma.treatment.findFirst({
+                where: {
+                    provDiagnosis: 'IMPORTED',
+                    planNumber: '00'
+                }
+            })
+            
+            if (!dummyTreatment) {
+                dummyTreatment = await prisma.treatment.create({
+                    data: {
+                        provDiagnosis: 'IMPORTED',
+                        planNumber: '00',
+                        treatmentPlan: 'IMPORTED PRESCRIPTIONS',
+                        notes: 'Auto-created treatment for bulk imported prescriptions'
+                    }
+                })
+            }
             
             const chunks = []
             for (let i = 0; i < visits.length; i += BATCH_SIZE) {
@@ -24,55 +84,152 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             for (const chunk of chunks) {
                 const chunkPromises = chunk.map(async (visitData: any) => {
                     try {
-                        const { patientIdentifier, opdNo, date, ...visitFields } = visitData
+                        const { 
+                            opdNo, 
+                            patientName, 
+                            phone,
+                            date, 
+                            prescriptions,
+                            discount,
+                            payment,
+                            procedureAdopted,
+                            discussion,
+                            extra,
+                            ...visitFields 
+                        } = visitData
 
-                        // Find patient by opdNo, email, or phone
-                        const patient = await prisma.patient.findFirst({
-                            where: {
-                                OR: [
-                                    { opdNo: patientIdentifier },
-                                    { email: patientIdentifier },
-                                    { phone: patientIdentifier }
-                                ]
-                            }
-                        })
-
+                        // Find or create patient by phone or name
+                        let patient = null
+                        
+                        // Try to find by phone first
+                        if (phone) {
+                            patient = await prisma.patient.findFirst({
+                                where: { phone: phone }
+                            })
+                        }
+                        
+                        // If not found and we have patient name, try to find by name
+                        if (!patient && patientName) {
+                            const nameParts = patientName.trim().split(' ')
+                            const firstName = nameParts[0]
+                            const lastName = nameParts.slice(1).join(' ')
+                            
+                            patient = await prisma.patient.findFirst({
+                                where: {
+                                    AND: [
+                                        { firstName: firstName },
+                                        lastName ? { lastName: lastName } : {}
+                                    ]
+                                }
+                            })
+                        }
+                        
+                        // If still not found, create new patient
                         if (!patient) {
-                            throw new Error(`Patient not found: ${patientIdentifier}`)
+                            const nameParts = (patientName || 'Unknown Patient').trim().split(' ')
+                            const firstName = nameParts[0]
+                            const lastName = nameParts.slice(1).join(' ') || null
+                            
+                            patient = await prisma.patient.create({
+                                data: {
+                                    firstName: firstName,
+                                    lastName: lastName,
+                                    phone: phone || null,
+                                    address: visitFields.address || null,
+                                    fatherHusbandGuardianName: visitFields.fatherHusbandGuardianName || null,
+                                    gender: visitFields.gender || null,
+                                    dob: parseDate(visitFields.dob),
+                                    age: visitFields.age || null
+                                }
+                            })
                         }
 
-                        return await prisma.visit.create({
+                        // Create the visit
+                        const visit = await prisma.visit.create({
                             data: {
                                 patientId: patient.id,
                                 opdNo: opdNo,
-                                date: date ? new Date(date) : new Date(),
-                                diagnoses: visitFields.diagnoses || null,
-                                temperament: visitFields.temperament || null,
-                                pulseDiagnosis: visitFields.pulseDiagnosis || null,
-                                pulseDiagnosis2: visitFields.pulseDiagnosis2 || null,
-                                majorComplaints: visitFields.majorComplaints || null,
-                                historyReports: visitFields.historyReports || null,
-                                investigations: visitFields.investigations || null,
-                                provisionalDiagnosis: visitFields.provisionalDiagnosis || null,
-                                improvements: visitFields.improvements || null,
-                                specialNote: visitFields.specialNote || null,
-                                initials: visitFields.initials || null,
-                                nextVisit: visitFields.nextVisit ? new Date(visitFields.nextVisit) : null,
-                                procedureAdopted: visitFields.procedureAdopted || null,
-                                precautions: visitFields.precautions || null,
-                                discussion: visitFields.discussion || null,
-                                extra: visitFields.extra || null,
-                                amount: visitFields.amount || null,
-                                discount: visitFields.discount || null,
-                                payment: visitFields.payment || null,
-                                balance: visitFields.balance || null,
-                                helper: visitFields.helper || null,
+                                date: parseDate(date) || new Date(),
+                                visitNumber: toNumber(visitFields.visitNumber),
+                                diagnoses: toString(visitFields.diagnoses),
+                                temperament: toString(visitFields.temperament),
+                                pulseDiagnosis: toString(visitFields.pulseDiagnosis),
+                                pulseDiagnosis2: toString(visitFields.pulseDiagnosis2),
+                                majorComplaints: toString(visitFields.majorComplaints),
+                                historyReports: toString(visitFields.historyReports),
+                                investigations: toString(visitFields.investigations),
+                                improvements: toString(visitFields.improvements),
+                                nextVisit: parseDate(visitFields.nextVisit),
+                                amount: toNumber(visitFields.amount),
+                                discount: toNumber(discount),
+                                payment: toNumber(payment),
+                                balance: toNumber(visitFields.balance),
+                                followUpCount: toNumber(visitFields.followUpCount),
+                                address: toString(visitFields.address),
+                                phone: toString(phone),
+                                gender: toString(visitFields.gender),
+                                dob: parseDate(visitFields.dob),
+                                age: toNumber(visitFields.age),
+                                weight: toNumber(visitFields.weight),
+                                height: toNumber(visitFields.height),
+                                procedureAdopted: toString(procedureAdopted),
+                                discussion: toString(discussion),
+                                extra: toString(extra)
                             }
                         })
+
+                        // Create prescriptions if provided
+                        if (prescriptions && Array.isArray(prescriptions) && prescriptions.length > 0) {
+                            for (const prData of prescriptions) {
+                                if (!prData.productName) continue // Skip empty prescriptions
+                                
+                                // Try to find the product by name
+                                let product = await prisma.product.findFirst({
+                                    where: {
+                                        name: {
+                                            contains: prData.productName,
+                                            mode: 'insensitive'
+                                        }
+                                    }
+                                })
+                                
+                                // If product not found, create it
+                                if (!product) {
+                                    product = await prisma.product.create({
+                                        data: {
+                                            name: prData.productName,
+                                            priceCents: 0,
+                                            quantity: 0
+                                        }
+                                    })
+                                }
+                                
+                                // Create prescription
+                                await prisma.prescription.create({
+                                    data: {
+                                        visitId: visit.id,
+                                        productId: product.id,
+                                        treatmentId: dummyTreatment.id,
+                                        quantity: toNumber(prData.quantity) || 1,
+                                        comp1: toString(prData.comp1),
+                                        comp2: toString(prData.comp2),
+                                        comp3: toString(prData.comp3),
+                                        timing: toString(prData.timing),
+                                        dosage: toString(prData.dosage),
+                                        additions: toString(prData.additions),
+                                        procedure: toString(prData.procedure),
+                                        presentation: toString(prData.presentation),
+                                        droppersToday: toNumber(prData.droppersToday)
+                                    }
+                                })
+                            }
+                        }
+
+                        return visit
                     } catch (err: any) {
                         console.error(`[Bulk Create Visits] Failed:`, err.message)
                         errors.push({
-                            patientIdentifier: visitData.patientIdentifier,
+                            opdNo: visitData.opdNo,
                             error: err.message
                         })
                         return null

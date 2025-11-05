@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { canAccessRoute } from '../lib/permissions'
+import ImportNotifications from './ImportNotifications'
 
 interface HeaderProps {
   title?: string
@@ -327,6 +328,9 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
 
         </div>
         <div className="flex items-center gap-3">
+          {/* Import Notifications - only for admin/reception */}
+          {user && !isPatient && <ImportNotifications />}
+
           {/* Tokens button for admin/reception */}
           {user && !isPatient && (
             <button 

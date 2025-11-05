@@ -44,20 +44,15 @@ model OTP {
 model Patient {
   id                        Int               @id @default(autoincrement())
   firstName                 String
-  lastName                  String
+  lastName                  String?
   phone                     String?
   email                     String?           @unique
-  opdNo                     String?
   date                      DateTime?         @default(now())
   dob                       DateTime?
   age                       Int?
   address                   String?
   gender                    String?
   nextVisit                 DateTime?
-  occupation                String?
-  pendingPaymentCents       Int               @default(0)
-  height                    Float?
-  weight                    Float?
   fatherHusbandGuardianName String?
   createdAt                 DateTime          @default(now())
   imageUrl                  String?

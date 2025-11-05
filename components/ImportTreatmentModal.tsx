@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import * as XLSX from 'xlsx'
+import { useImportContext } from '../contexts/ImportContext'
 
 interface ImportTreatmentModalProps {
     isOpen: boolean
@@ -33,11 +34,20 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
     const [previewData, setPreviewData] = useState<any[]>([])
     const [importing, setImporting] = useState(false)
     const [error, setError] = useState<string>('')
-    const [step, setStep] = useState<'select' | 'preview' | 'importing' | 'success'>('select')
+    const [step, setStep] = useState<'select' | 'preview' | 'checking' | 'confirm' | 'importing' | 'success'>('select')
     const [importProgress, setImportProgress] = useState({ current: 0, total: 0 })
     const [importSummary, setImportSummary] = useState({ success: 0, errors: 0 })
     const [importMode, setImportMode] = useState<'create' | 'upsert'>('create')
+    const [isMinimized, setIsMinimized] = useState(false)
+    const [taskId, setTaskId] = useState<string | null>(null)
+    const [duplicateCount, setDuplicateCount] = useState(0)
+    const [uniqueCount, setUniqueCount] = useState(0)
+    const [duplicateIndices, setDuplicateIndices] = useState<number[]>([])
+    const [cancelRequested, setCancelRequested] = useState(false)
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const cancelRef = useRef(false)
+    const { addTask, updateTask, removeTask, cancelTask } = useImportContext()
 
     if (!isOpen) return null
 
@@ -137,6 +147,15 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
         setError('')
         setStep('importing')
 
+        // Create task in global context
+        const id = addTask({
+            type: 'treatments',
+            operation: 'import',
+            status: 'importing',
+            progress: { current: 0, total: 0 } // Will update with actual count
+        })
+        setTaskId(id)
+
         try {
             // Group rows by planNumber + provDiagnosis (rows with same plan should be merged)
             const treatmentGroups = new Map<string, TreatmentRow[]>()
@@ -153,6 +172,11 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
 
             const totalPlans = treatmentGroups.size
             setImportProgress({ current: 0, total: totalPlans })
+            
+            // Update task with actual total
+            updateTask(id, {
+                progress: { current: 0, total: totalPlans }
+            })
 
             // Create one treatment per group, with all products from that group
             const treatmentsToCreate = Array.from(treatmentGroups.values()).map(rows => {
@@ -241,6 +265,11 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
 
                 completedCount += chunk.length
                 setImportProgress({ current: completedCount, total: totalPlans })
+                
+                // Update task progress
+                updateTask(id, {
+                    progress: { current: completedCount, total: totalPlans }
+                })
             }
 
             console.log(`Import completed: ${successCount} successful, ${allErrors.length} errors`)
@@ -264,6 +293,15 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
             
             setImportSummary({ success: successCount, errors: allErrors.length })
             setStep('success')
+            setImporting(false)
+            
+            // Update task to success
+            updateTask(id, {
+                status: 'success',
+                summary: { success: successCount, errors: allErrors.length },
+                endTime: Date.now()
+            })
+            
             setTimeout(() => {
                 onImportSuccess()
                 handleClose()
@@ -271,12 +309,31 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
         } catch (err: any) {
             setError(`Import failed: ${err.message}`)
             setStep('preview')
-        } finally {
             setImporting(false)
+            
+            // Update task to error
+            if (taskId) {
+                updateTask(taskId, {
+                    status: 'error',
+                    error: err.message,
+                    endTime: Date.now()
+                })
+            }
         }
     }
 
     const handleClose = () => {
+        // Only allow closing if not importing
+        if (importing) {
+            setIsMinimized(true)
+            return
+        }
+        
+        // Clean up task from context if it exists
+        if (taskId) {
+            removeTask(taskId)
+        }
+        
         setFile(null)
         setParsedData([])
         setPreviewData([])
@@ -285,11 +342,24 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
         setImporting(false)
         setImportProgress({ current: 0, total: 0 })
         setImportSummary({ success: 0, errors: 0 })
+        setIsMinimized(false)
+        setTaskId(null)
         if (fileInputRef.current) {
             fileInputRef.current.value = ''
         }
         onClose()
     }
+
+    const handleMinimize = () => {
+        setIsMinimized(true)
+    }
+
+    const handleMaximize = () => {
+        setIsMinimized(false)
+    }
+
+    // If minimized, show nothing (task is tracked in notification dropdown)
+    if (isMinimized) return null
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -297,15 +367,29 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">Import Treatment Plans</h2>
-                    <button
-                        onClick={handleClose}
-                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        disabled={importing}
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {/* Minimize button - only show during import */}
+                        {importing && (
+                            <button
+                                onClick={handleMinimize}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                title="Minimize"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                </svg>
+                            </button>
+                        )}
+                        <button
+                            onClick={handleClose}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                            title={importing ? "Minimize" : "Close"}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Content */}

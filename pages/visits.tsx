@@ -1,27 +1,53 @@
 import { useState, useEffect } from 'react'
+import * as XLSX from 'xlsx'
 import Link from 'next/link'
 import CustomSelect from '../components/CustomSelect'
 import ImportVisitsModal from '../components/ImportVisitsModal'
 import PatientSelectionModal from '../components/PatientSelectionModal'
 import LoadingModal from '../components/LoadingModal'
 import { useToast } from '../hooks/useToast'
+import { useImportContext } from '../contexts/ImportContext'
 
 export default function VisitsPage() {
     const [visits, setVisits] = useState<any[]>([])
     const [patients, setPatients] = useState<any[]>([])
     const [form, setForm] = useState({ patientId: '', opdNo: '', diagnoses: '' })
     const [searchQuery, setSearchQuery] = useState('')
+    const [sortBy, setSortBy] = useState<'patientName' | 'date' | 'opdNo'>('date')
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+    const [showSortDropdown, setShowSortDropdown] = useState(false)
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [deleting, setDeleting] = useState(false)
     const [visitToDelete, setVisitToDelete] = useState<any>(null)
     const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
     const [showImportModal, setShowImportModal] = useState(false)
+    const [showExportDropdown, setShowExportDropdown] = useState(false)
+    const [selectedVisitIds, setSelectedVisitIds] = useState<Set<number>>(new Set())
     const [showPatientModal, setShowPatientModal] = useState(false)
     const [currentPage, setCurrentPage] = useState(1)
+    const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+    const [showDeleteSelectedConfirm, setShowDeleteSelectedConfirm] = useState(false)
+    const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 })
+    const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
+    const [isDeleteMinimized, setIsDeleteMinimized] = useState(false)
+    const [cancelDeleteRequested, setCancelDeleteRequested] = useState(false)
+    const [showCancelDeleteConfirm, setShowCancelDeleteConfirm] = useState(false)
     const [itemsPerPage] = useState(10)
     const isPatient = user?.role?.toLowerCase() === 'user'
     const { toasts, removeToast, showSuccess, showError } = useToast()
+    const { addTask, updateTask, cancelTask } = useImportContext()
+    
+    // Listen for maximize events from notification dropdown
+    useEffect(() => {
+        const handleMaximize = (e: any) => {
+            if (e.detail.type === 'visits' && e.detail.operation === 'delete' && e.detail.taskId === deleteTaskId) {
+                setIsDeleteMinimized(false)
+            }
+        }
+        window.addEventListener('maximizeTask', handleMaximize)
+        return () => window.removeEventListener('maximizeTask', handleMaximize)
+    }, [deleteTaskId])
     
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
 
@@ -85,31 +111,510 @@ export default function VisitsPage() {
         }
     }
 
+    function toggleVisitSelection(id: number) {
+        const newSelected = new Set(selectedVisitIds)
+        if (newSelected.has(id)) {
+            newSelected.delete(id)
+        } else {
+            newSelected.add(id)
+        }
+        setSelectedVisitIds(newSelected)
+    }
+
+    function toggleSelectAll() {
+        const filteredVisits = visits.filter((v: any) => {
+            const patientName = `${v.patient?.firstName || ''} ${v.patient?.lastName || ''}`.toLowerCase()
+            const opdNo = (v.opdNo || '').toLowerCase()
+            const search = searchQuery.toLowerCase()
+            return patientName.includes(search) || opdNo.includes(search)
+        })
+        
+        if (selectedVisitIds.size === filteredVisits.length) {
+            setSelectedVisitIds(new Set())
+        } else {
+            setSelectedVisitIds(new Set(filteredVisits.map((v: any) => v.id)))
+        }
+    }
+
+    function toggleRowExpansion(id: number) {
+        const newExpanded = new Set(expandedRows)
+        if (newExpanded.has(id)) {
+            newExpanded.delete(id)
+        } else {
+            newExpanded.add(id)
+        }
+        setExpandedRows(newExpanded)
+    }
+
+    async function deleteSelectedVisits() {
+        if (selectedVisitIds.size === 0) return
+        
+        setShowDeleteSelectedConfirm(false)
+        setDeleting(true)
+        setCancelDeleteRequested(false)
+        
+        const idsArray = Array.from(selectedVisitIds)
+        const total = idsArray.length
+        setDeleteProgress({ current: 0, total })
+        
+        // Create task in global context
+        const id = addTask({
+            type: 'visits',
+            operation: 'delete',
+            status: 'deleting',
+            progress: { current: 0, total }
+        })
+        setDeleteTaskId(id)
+        
+        try {
+            let completed = 0
+            const deletedIds: number[] = []
+            
+            // Delete in batches for speed
+            const BATCH_SIZE = 20
+            const batches = []
+            for (let i = 0; i < idsArray.length; i += BATCH_SIZE) {
+                batches.push(idsArray.slice(i, i + BATCH_SIZE))
+            }
+            
+            console.log(`🗑️ Deleting ${total} visits in ${batches.length} batches`)
+            
+            for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+                // Check if cancel was requested at start of batch
+                if (cancelDeleteRequested) {
+                    console.log('❌ Delete cancelled by user at batch', batchIndex + 1)
+                    cancelTask(id)
+                    
+                    // Remove already deleted items from UI
+                    if (deletedIds.length > 0) {
+                        setVisits(visits.filter(v => !deletedIds.includes(v.id)))
+                        setSelectedVisitIds(new Set(idsArray.filter(id => !deletedIds.includes(id))))
+                    }
+                    
+                    setDeleting(false)
+                    setDeleteProgress({ current: 0, total: 0 })
+                    setDeleteTaskId(null)
+                    setIsDeleteMinimized(false)
+                    setCancelDeleteRequested(false)
+                    return
+                }
+                
+                const batch = batches[batchIndex]
+                const batchStartIndex = batchIndex * BATCH_SIZE
+                
+                // Delete all items in batch concurrently
+                const deletePromises = batch.map(visitId =>
+                    fetch(`/api/visits?id=${visitId}`, { method: 'DELETE' })
+                        .then(() => visitId)
+                        .catch(err => {
+                            console.error(`Failed to delete visit ${visitId}:`, err)
+                            return null
+                        })
+                )
+                
+                const results = await Promise.all(deletePromises)
+                
+                // Track successfully deleted IDs
+                results.forEach(visitId => {
+                    if (visitId !== null) {
+                        deletedIds.push(visitId)
+                        completed++
+                    }
+                })
+                
+                // Update progress for each item in the batch
+                for (let i = 0; i < batch.length; i++) {
+                    const currentProgress = batchStartIndex + i + 1
+                    setDeleteProgress({ current: currentProgress, total })
+                    updateTask(id, {
+                        progress: { current: currentProgress, total }
+                    })
+                }
+            }
+            
+            // Remove deleted visits from UI
+            setVisits(visits.filter(v => !deletedIds.includes(v.id)))
+            setSelectedVisitIds(new Set())
+            
+            // Update task to success
+            updateTask(id, {
+                status: 'success',
+                summary: { success: completed, errors: total - completed },
+                endTime: Date.now()
+            })
+            
+            showSuccess(`${completed} visit(s) deleted successfully`)
+        } catch (err) {
+            console.error(err)
+            
+            // Update task to error
+            if (id) {
+                updateTask(id, {
+                    status: 'error',
+                    error: 'Failed to delete some visits',
+                    endTime: Date.now()
+                })
+            }
+            
+            showError('Failed to delete some visits')
+        } finally {
+            setDeleting(false)
+            setDeleteProgress({ current: 0, total: 0 })
+            setDeleteTaskId(null)
+            setIsDeleteMinimized(false)
+            setCancelDeleteRequested(false)
+        }
+    }
+
+    const handleCancelDelete = () => {
+        setShowCancelDeleteConfirm(true)
+    }
+
+    const confirmCancelDelete = () => {
+        setCancelDeleteRequested(true)
+        setShowCancelDeleteConfirm(false)
+    }
+
+    function confirmDeleteSelected() {
+        if (selectedVisitIds.size === 0) {
+            showError('Please select at least one visit to delete')
+            return
+        }
+        setShowDeleteSelectedConfirm(true)
+    }
+
+    function exportData(format: 'csv' | 'json' | 'xlsx') {
+        try {
+            if (selectedVisitIds.size === 0) {
+                showError('Please select at least one visit to export')
+                return
+            }
+
+            const selectedVisits = visits.filter((v: any) => selectedVisitIds.has(v.id))
+
+            const dataToExport = selectedVisits.map((v: any) => {
+                const patientName = v.patient ? `${v.patient.firstName || ''} ${v.patient.lastName || ''}`.trim() : ''
+                const prescriptions = v.prescriptions || []
+                
+                // Helper function to format date as DD-MM-YYYY
+                const formatDate = (dateStr: any): string => {
+                    if (!dateStr) return ''
+                    try {
+                        const date = new Date(dateStr)
+                        if (isNaN(date.getTime())) return ''
+                        const day = String(date.getDate()).padStart(2, '0')
+                        const month = String(date.getMonth() + 1).padStart(2, '0')
+                        const year = date.getFullYear()
+                        return `${day}-${month}-${year}`
+                    } catch {
+                        return ''
+                    }
+                }
+                
+                // Base visit data matching the template format
+                const row: any = {
+                    'OPDN': v.opdNo || '',
+                    'Date': formatDate(v.date),
+                    'Patient Name': patientName,
+                    'Address': v.address || v.patient?.address || '',
+                    'F/H/G Name': v.patient?.fatherHusbandGuardianName || '',
+                    'Mob./Ph': v.phone || v.patient?.phone || '',
+                    'AMT': v.amount || '',
+                    'DISCOUNT': v.discount || '',
+                    'PAYMENT': v.payment || '',
+                    'BAL': v.balance || '',
+                    'V': v.visitNumber || '', // Visit number
+                    'FU': v.followUpCount || '',
+                    'Next V': formatDate(v.nextVisit),
+                    'Sex': v.gender || v.patient?.gender || '',
+                    'DOB': formatDate(v.dob || v.patient?.dob),
+                    'Age': v.age || v.patient?.age || '',
+                    'Wt': v.weight || '',
+                    'Ht': v.height || '',
+                    'Temp': v.temperament || '',
+                    'PulseD 1': v.pulseDiagnosis || '',
+                    'PulseD 2': v.pulseDiagnosis2 || '',
+                    'Investigations': v.investigations || '',
+                    'Diagnosis:': v.diagnoses || v.provisionalDiagnosis || '',
+                    'Hist/Reports': v.historyReports || '',
+                    'Chief Complaints': v.majorComplaints || '',
+                    'Imp': v.improvements || ''
+                }
+                
+                // Add prescription data for up to 12 medicines
+                for (let i = 0; i < 12; i++) {
+                    const pr = prescriptions[i]
+                    const num = String(i + 1).padStart(2, '0') // Format as 01, 02, etc.
+                    
+                    if (pr) {
+                        const productName = pr.product?.name || ''
+                        row[`DRN-${num}`] = i + 1 // Dropper number (sequential)
+                        row[`DL-${num}`] = pr.comp1 || ''
+                        row[`CR-${num}`] = productName
+                        row[`SY-${num}`] = pr.comp2 || ''
+                        row[`EF-${num}`] = pr.comp3 || ''
+                        row[`TM-${num}`] = pr.timing || ''
+                        row[`DOSE-${num}`] = pr.dosage || ''
+                        row[`AD-${num}`] = pr.additions || ''
+                        row[`PR-${num}`] = pr.procedure || ''
+                        row[`PRE-${num}`] = pr.presentation || ''
+                        row[`TDY-${num}`] = pr.droppersToday || ''
+                        row[i === 0 ? `QTY-${num}` : `QNTY-${num}`] = pr.quantity || '' // First one is QTY, rest are QNTY
+                    } else {
+                        row[`DRN-${num}`] = ''
+                        row[`DL-${num}`] = ''
+                        row[`CR-${num}`] = ''
+                        row[`SY-${num}`] = ''
+                        row[`EF-${num}`] = ''
+                        row[`TM-${num}`] = ''
+                        row[`DOSE-${num}`] = ''
+                        row[`AD-${num}`] = ''
+                        row[`PR-${num}`] = ''
+                        row[`PRE-${num}`] = ''
+                        row[`TDY-${num}`] = ''
+                        row[i === 0 ? `QTY-${num}` : `QNTY-${num}`] = ''
+                    }
+                }
+                
+                // Add final columns
+                row['PROCEDURE'] = v.procedureAdopted || ''
+                row['DISCUSSION'] = v.discussion || ''
+                row['EXTRA'] = v.extra || ''
+                
+                return row
+            })
+
+            const timestamp = new Date().toISOString().split('T')[0]
+            
+            if (format === 'json') {
+                const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `visits_${timestamp}.json`
+                a.click()
+                URL.revokeObjectURL(url)
+            } else if (format === 'csv') {
+                const headers = Object.keys(dataToExport[0] || {})
+                const csvContent = [
+                    headers.join(','),
+                    ...dataToExport.map(row => 
+                        headers.map(header => {
+                            const value = row[header as keyof typeof row] || ''
+                            return String(value).includes(',') || String(value).includes('"') 
+                                ? `"${String(value).replace(/"/g, '""')}"` 
+                                : value
+                        }).join(',')
+                    )
+                ].join('\n')
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `visits_${timestamp}.csv`
+                a.click()
+                URL.revokeObjectURL(url)
+            } else if (format === 'xlsx') {
+                const ws = XLSX.utils.json_to_sheet(dataToExport)
+                const wb = XLSX.utils.book_new()
+                XLSX.utils.book_append_sheet(wb, ws, 'Visits')
+                XLSX.writeFile(wb, `visits_${timestamp}.xlsx`)
+            }
+            
+            showSuccess(`${selectedVisitIds.size} visit(s) exported as ${format.toUpperCase()}`)
+            setShowExportDropdown(false)
+        } catch (e) {
+            console.error(e)
+            showError('Failed to export visits')
+        }
+    }
+
+    function getFilteredAndSortedVisits() {
+        // First filter by search query
+        let filtered = visits.filter(v => {
+            if (!searchQuery) return true
+            const patientName = (v.patient ? `${v.patient.firstName || ''} ${v.patient.lastName || ''}` : '').toLowerCase()
+            const opdNo = (v.opdNo || '').toLowerCase()
+            const search = searchQuery.toLowerCase()
+            return patientName.includes(search) || opdNo.includes(search)
+        })
+
+        // Then sort
+        filtered.sort((a, b) => {
+            let compareResult = 0
+            
+            if (sortBy === 'patientName') {
+                const nameA = (a.patient ? `${a.patient.firstName || ''} ${a.patient.lastName || ''}` : '').toLowerCase()
+                const nameB = (b.patient ? `${b.patient.firstName || ''} ${b.patient.lastName || ''}` : '').toLowerCase()
+                compareResult = nameA.localeCompare(nameB)
+            } else if (sortBy === 'date') {
+                const dateA = new Date(a.date || 0).getTime()
+                const dateB = new Date(b.date || 0).getTime()
+                compareResult = dateA - dateB
+            } else if (sortBy === 'opdNo') {
+                compareResult = (a.opdNo || '').localeCompare(b.opdNo || '')
+            }
+            
+            return sortOrder === 'asc' ? compareResult : -compareResult
+        })
+
+        return filtered
+    }
+
+    // Close export dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            const target = event.target as HTMLElement
+            if (showExportDropdown && !target.closest('.relative')) {
+                setShowExportDropdown(false)
+            }
+            if (showSortDropdown && !target.closest('.sort-dropdown')) {
+                setShowSortDropdown(false)
+            }
+        }
+        if (showExportDropdown || showSortDropdown) {
+            document.addEventListener('click', handleClickOutside)
+        }
+        return () => document.removeEventListener('click', handleClickOutside)
+    }, [showExportDropdown, showSortDropdown])
+
     return (
         <div>
-            <LoadingModal isOpen={loading} message="Loading visits..." />
+            {/* Progress Modal for Deleting - Minimizable */}
+            {deleting && deleteProgress.total > 0 && !isDeleteMinimized && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+                        {/* Header with minimize button */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Deleting Visits
+                            </h3>
+                            <button
+                                onClick={() => setIsDeleteMinimized(true)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                title="Minimize"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-8">
+                            <div className="text-center">
+                                <div className="mb-6">
+                                    <svg className="w-16 h-16 mx-auto text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </div>
+                                
+                                <div className="text-3xl font-bold text-red-600 dark:text-red-400 mb-2">
+                                    {deleteProgress.current} / {deleteProgress.total}
+                                </div>
+                                
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                                    {Math.round((deleteProgress.current / deleteProgress.total) * 100)}% Complete
+                                </p>
+                                
+                                {/* Progress Bar */}
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+                                    <div 
+                                        className="bg-red-600 h-4 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-2"
+                                        style={{ width: `${(deleteProgress.current / deleteProgress.total) * 100}%` }}
+                                    >
+                                        <span className="text-xs text-white font-medium">
+                                            {deleteProgress.current > 0 && `${Math.round((deleteProgress.current / deleteProgress.total) * 100)}%`}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-4">
+                                    Please wait, deleting visit {deleteProgress.current} of {deleteProgress.total}...
+                                </p>
+
+                                {/* Cancel Button */}
+                                <button
+                                    onClick={handleCancelDelete}
+                                    className="mt-6 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                                >
+                                    Cancel Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Loading Modal (for single deletes or when minimized) */}
+            {((deleting && deleteProgress.total === 0) || loading) && (
+                <LoadingModal isOpen={true} message={deleting ? "Deleting visit..." : "Loading visits..."} />
+            )}
+            
             <div className="section-header flex justify-between items-center">
                 <h2 className="section-title">{isPatient ? 'My Appointments' : 'Patient Visits'}</h2>
                 <div className="flex items-center gap-3">
                     {!isPatient && (
-                        <button 
-                            onClick={() => setShowImportModal(true)} 
-                            className="btn bg-green-600 hover:bg-green-700 text-white"
-                        >
-                            <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                            </svg>
-                            Import Visits
-                        </button>
+                        <>
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setShowExportDropdown(!showExportDropdown)}
+                                    className="group relative px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg font-medium text-sm transition-all duration-200 shadow-lg shadow-green-500/30 flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                                    </svg>
+                                    <span>{selectedVisitIds.size > 0 ? `Export (${selectedVisitIds.size})` : 'Export All'}</span>
+                                    <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+                                {showExportDropdown && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                                        <button
+                                            onClick={() => exportData('csv')}
+                                            className="w-full text-left px-4 py-3 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-gray-700 dark:hover:to-gray-700 transition-all duration-200 flex items-center gap-2 text-sm font-medium"
+                                        >
+                                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export as CSV
+                                        </button>
+                                        <button
+                                            onClick={() => exportData('json')}
+                                            className="w-full text-left px-4 py-3 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-gray-700 dark:hover:to-gray-700 transition-all duration-200 flex items-center gap-2 text-sm font-medium"
+                                        >
+                                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                            </svg>
+                                            Export as JSON
+                                        </button>
+                                        <button
+                                            onClick={() => exportData('xlsx')}
+                                            className="w-full text-left px-4 py-3 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-gray-700 dark:hover:to-gray-700 transition-all duration-200 flex items-center gap-2 text-sm font-medium"
+                                        >
+                                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            Export as XLSX
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <button 
+                                onClick={() => setShowImportModal(true)} 
+                                className="group relative px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg font-medium text-sm transition-all duration-200 shadow-lg shadow-green-500/30 flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <span>Import</span>
+                            </button>
+                        </>
                     )}
                     <span className="badge">
-                        {visits.filter(v => {
-                            if (!searchQuery) return true
-                            const patientName = (v.patient ? `${v.patient.firstName || ''} ${v.patient.lastName || ''}` : '').toLowerCase()
-                            const opdNo = (v.opdNo || '').toLowerCase()
-                            const search = searchQuery.toLowerCase()
-                            return patientName.includes(search) || opdNo.includes(search)
-                        }).length} total {isPatient ? 'appointments' : 'visits'}
+                        {getFilteredAndSortedVisits().length} total {isPatient ? 'appointments' : 'visits'}
                     </span>
                     {!isPatient && (
                         <button
@@ -137,6 +642,112 @@ export default function VisitsPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </div>
+                    
+                    {/* Sort Dropdown */}
+                    <div className="relative sort-dropdown">
+                        <button
+                            onClick={() => setShowSortDropdown(!showSortDropdown)}
+                            className="px-4 py-2.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-400 dark:hover:border-green-600 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-sm hover:shadow-md"
+                        >
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
+                            <span>Sort</span>
+                        </button>
+                        {showSortDropdown && (
+                            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-900 dark:to-gray-900">
+                                    <p className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">
+                                        Sort By
+                                    </p>
+                                </div>
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => {
+                                            setSortBy('date')
+                                            setShowSortDropdown(false)
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortBy === 'date'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortBy === 'date' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        <span className="font-medium">Visit Date</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSortBy('patientName')
+                                            setShowSortDropdown(false)
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortBy === 'patientName'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortBy === 'patientName' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        <span className="font-medium">Patient Name</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSortBy('opdNo')
+                                            setShowSortDropdown(false)
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortBy === 'opdNo'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortBy === 'opdNo' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                                        </svg>
+                                        <span className="font-medium">OPD Number</span>
+                                    </button>
+                                </div>
+                                <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+                                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 py-1">
+                                        Order
+                                    </p>
+                                </div>
+                                <div className="p-1">
+                                    <button
+                                        onClick={() => {
+                                            setSortOrder('asc')
+                                            setShowSortDropdown(false)
+                                        }}
+                                        className={`w-full text-left px-3 py-2 rounded ${
+                                            sortOrder === 'asc'
+                                                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                                                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        Ascending (A-Z, Old-New)
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSortOrder('desc')
+                                            setShowSortDropdown(false)
+                                        }}
+                                        className={`w-full text-left px-3 py-2 rounded ${
+                                            sortOrder === 'desc'
+                                                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                                                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        Descending (Z-A, New-Old)
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
                     {searchQuery && (
                         <button
                             onClick={() => setSearchQuery('')}
@@ -149,15 +760,32 @@ export default function VisitsPage() {
             </div>
 
             <div className="card">
-                <h3 className="text-lg font-semibold mb-4">{isPatient ? 'My Appointment History' : 'Visit History'}</h3>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-3">
+                    {!isPatient && (
+                        <label className="relative group/checkbox cursor-pointer flex-shrink-0">
+                            <input
+                                type="checkbox"
+                                checked={getFilteredAndSortedVisits().length > 0 && selectedVisitIds.size === getFilteredAndSortedVisits().length}
+                                onChange={toggleSelectAll}
+                                className="peer sr-only"
+                            />
+                            <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                        </label>
+                    )}
+                    <span>{isPatient ? 'My Appointment History' : 'Visit History'}</span>
+                    {!isPatient && selectedVisitIds.size > 0 && (
+                        <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">
+                            {selectedVisitIds.size} selected
+                        </span>
+                    )}
+                </h3>
                 {(() => {
-                    const filteredVisits = visits.filter(v => {
-                        if (!searchQuery) return true
-                        const patientName = (v.patient ? `${v.patient.firstName || ''} ${v.patient.lastName || ''}` : '').toLowerCase()
-                        const opdNo = (v.opdNo || '').toLowerCase()
-                        const search = searchQuery.toLowerCase()
-                        return patientName.includes(search) || opdNo.includes(search)
-                    })
+                    const filteredVisits = getFilteredAndSortedVisits()
                     
                     if (loading) {
                         return (
@@ -187,61 +815,113 @@ export default function VisitsPage() {
                     
                     return (
                         <>
-                        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                            {filteredVisits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(v => (
-                            <li key={v.id} className="list-item">
-                                <div className="flex items-start gap-4">
-                                    {/* Patient Image Circle */}
-                                    <div className="flex-shrink-0">
-                                        <img 
-                                            src={v.patient?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
-                                            alt="Patient" 
-                                            className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
-                                        />
-                                    </div>
-                                    
-                                    {/* Visit Details */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <h4 className="font-semibold text-base">
-                                                {v.patient?.firstName} {v.patient?.lastName}
-                                            </h4>
-                                            <span className="badge">OPD: {v.opdNo}</span>
-                                        </div>
-                                        <div className="text-sm text-muted space-y-1">
-                                            <div><span className="font-medium">Date:</span> {new Date(v.date).toLocaleString()}</div>
-                                            {v.diagnoses && <div><span className="font-medium">Diagnosis:</span> {v.diagnoses}</div>}
-                                            {v.prescriptions && v.prescriptions.length > 0 && (
-                                                <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded">
-                                                    <span className="font-medium">Prescriptions:</span> {v.prescriptions.length} item(s)
+                        <div className="space-y-3">
+                            {filteredVisits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(v => {
+                                const isExpanded = expandedRows.has(v.id)
+                                const isSelected = selectedVisitIds.has(v.id)
+                                
+                                return (
+                                    <div key={v.id} className={`card p-4 transition-all duration-200 ${isSelected ? 'ring-2 ring-green-500 shadow-xl shadow-green-100 dark:shadow-green-900/30 bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-gray-800 dark:to-gray-800' : ''}`}>
+                                        <div className="flex items-start gap-4">
+                                            {/* Checkbox (only for non-patient users) */}
+                                            {!isPatient && (
+                                                <div className="flex-shrink-0 pt-1">
+                                                    <label className="relative group/checkbox cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={() => toggleVisitSelection(v.id)}
+                                                            className="peer sr-only"
+                                                        />
+                                                        <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                                            <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        </div>
+                                                        <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                                    </label>
                                                 </div>
                                             )}
+                                            
+                                            {/* Patient Image Circle */}
+                                            <div className="flex-shrink-0">
+                                                <img 
+                                                    src={v.patient?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
+                                                    alt="Patient" 
+                                                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                                                />
+                                            </div>
+                                            
+                                            {/* Visit Details */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <h4 className="font-semibold text-base">
+                                                        {v.patient?.firstName} {v.patient?.lastName}
+                                                    </h4>
+                                                    <span className="badge">OPD: {v.opdNo}</span>
+                                                </div>
+                                                <div className="text-sm text-muted space-y-1">
+                                                    <div><span className="font-medium">Date:</span> {new Date(v.date).toLocaleString()}</div>
+                                                    {!isExpanded && v.diagnoses && (
+                                                        <div className="truncate"><span className="font-medium">Diagnosis:</span> {v.diagnoses}</div>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* Expanded Details */}
+                                                {isExpanded && (
+                                                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2 text-sm">
+                                                        {v.diagnoses && (
+                                                            <div><span className="font-medium">Diagnosis:</span> {v.diagnoses}</div>
+                                                        )}
+                                                        {v.patient?.email && (
+                                                            <div><span className="font-medium">Patient Email:</span> {v.patient.email}</div>
+                                                        )}
+                                                        {v.patient?.phone && (
+                                                            <div><span className="font-medium">Patient Phone:</span> {v.patient.phone}</div>
+                                                        )}
+                                                        {v.prescriptions && v.prescriptions.length > 0 && (
+                                                            <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                                                                <span className="font-medium">Prescriptions:</span> {v.prescriptions.length} item(s)
+                                                            </div>
+                                                        )}
+                                                        <div><span className="font-medium">Created:</span> {new Date(v.createdAt).toLocaleString()}</div>
+                                                        {v.updatedAt && new Date(v.updatedAt).getTime() !== new Date(v.createdAt).getTime() && (
+                                                            <div><span className="font-medium">Last Updated:</span> {new Date(v.updatedAt).toLocaleString()}</div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            {/* Action Buttons */}
+                                            <div className="flex flex-col gap-2 self-start flex-shrink-0">
+                                                <button
+                                                    onClick={() => toggleRowExpansion(v.id)}
+                                                    className="btn btn-secondary text-sm"
+                                                >
+                                                    {isExpanded ? '▲ Show Less' : '▼ View More'}
+                                                </button>
+                                                <Link href={`/visits/${v.id}`} className="btn btn-primary text-sm">
+                                                    View Details
+                                                </Link>
+                                                {!isPatient && (
+                                                    <>
+                                                        <Link href={`/prescriptions?visitId=${v.id}&edit=true`} className="btn btn-secondary text-sm">
+                                                            Edit
+                                                        </Link>
+                                                        <button
+                                                            onClick={() => openDeleteModal(v)}
+                                                            className="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    
-                                    {/* Action Buttons */}
-                                    <div className="flex gap-2 self-start flex-shrink-0">
-                                        <Link href={`/visits/${v.id}`} className="btn btn-primary text-sm">
-                                            View Details
-                                        </Link>
-                                        {!isPatient && (
-                                            <>
-                                                <Link href={`/prescriptions?visitId=${v.id}&edit=true`} className="btn btn-secondary text-sm">
-                                                    Edit
-                                                </Link>
-                                                <button
-                                                    onClick={() => openDeleteModal(v)}
-                                                    className="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
-                                                >
-                                                    Delete
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
+                                )
+                            })}
+                        </div>
                     
                     {/* Pagination Controls */}
                     {filteredVisits.length > itemsPerPage && (
@@ -359,21 +1039,172 @@ export default function VisitsPage() {
                 }}
             />
 
+            {/* Floating Export Button */}
+            {!isPatient && selectedVisitIds.size > 0 && (
+                <div className="relative">
+                    <button
+                        onClick={() => setShowExportDropdown(!showExportDropdown)}
+                        className="fixed bottom-8 right-40 z-50 group"
+                        title={`Export ${selectedVisitIds.size} selected visit(s)`}
+                    >
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-200"></div>
+                            <div className="relative w-14 h-14 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 transform group-hover:scale-110">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                                </svg>
+                                <span className="absolute -top-1 -right-1 min-w-[24px] h-5 px-1.5 bg-green-600 text-white rounded-full text-xs font-bold flex items-center justify-center shadow-lg ring-2 ring-white">
+                                    {selectedVisitIds.size}
+                                </span>
+                            </div>
+                        </div>
+                    </button>
+                    {showExportDropdown && (
+                        <div className="fixed bottom-24 right-40 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-50 overflow-hidden">
+                            <button
+                                onClick={() => exportData('csv')}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                            >
+                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span className="font-medium">CSV Format</span>
+                            </button>
+                            <button
+                                onClick={() => exportData('json')}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                            >
+                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                </svg>
+                                <span className="font-medium">JSON Format</span>
+                            </button>
+                            <button
+                                onClick={() => exportData('xlsx')}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
+                            >
+                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                <span className="font-medium">Excel Format</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Floating Delete Selected Button */}
+            {!isPatient && selectedVisitIds.size > 0 && (
+                <button
+                    onClick={confirmDeleteSelected}
+                    className="fixed bottom-8 right-24 z-50 group"
+                    title={`Delete ${selectedVisitIds.size} selected visit(s)`}
+                >
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-rose-600 rounded-full blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-200 animate-pulse"></div>
+                        <div className="relative w-14 h-14 bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 transform group-hover:scale-110">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span className="absolute -top-1 -right-1 min-w-[24px] h-5 px-1.5 bg-red-600 text-white rounded-full text-xs font-bold flex items-center justify-center shadow-lg ring-2 ring-white">
+                                {selectedVisitIds.size}
+                            </span>
+                        </div>
+                    </div>
+                </button>
+            )}
+
             <PatientSelectionModal
                 isOpen={showPatientModal}
                 onClose={() => setShowPatientModal(false)}
             />
 
+            {/* Delete Selected Confirmation Modal */}
+            {showDeleteSelectedConfirm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                        <h3 className="text-lg font-semibold mb-4">Confirm Delete</h3>
+                        <p className="text-gray-600 dark:text-gray-300 mb-6">
+                            Are you sure you want to delete {selectedVisitIds.size} selected visit(s)? This action cannot be undone.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setShowDeleteSelectedConfirm(false)}
+                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                                disabled={deleting}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={deleteSelectedVisits}
+                                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center gap-2"
+                                disabled={deleting}
+                            >
+                                {deleting && (
+                                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                )}
+                                {deleting ? 'Deleting...' : `Delete ${selectedVisitIds.size} Visit(s)`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Floating Button */}
             <button
                 onClick={() => setShowPatientModal(true)}
-                className="fixed bottom-8 right-8 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors z-50"
+                className="fixed bottom-8 right-8 z-50 group"
                 title="Create Visit with Prescription"
             >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
+                <div className="relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-full blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-200"></div>
+                    <div className="relative w-14 h-14 bg-gradient-to-r from-blue-600 to-cyan-700 hover:from-blue-700 hover:to-cyan-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 transform group-hover:scale-110 group-hover:rotate-90">
+                        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+                        </svg>
+                    </div>
+                </div>
             </button>
+
+            {/* Cancel Delete Confirmation Modal */}
+            {showCancelDeleteConfirm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+                        <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0 w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                                    Cancel Delete Operation
+                                </h3>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                                    Are you sure you want to cancel this delete operation? Already deleted items cannot be recovered.
+                                </p>
+                                <div className="flex justify-end gap-3">
+                                    <button
+                                        onClick={() => setShowCancelDeleteConfirm(false)}
+                                        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                    >
+                                        No, Continue
+                                    </button>
+                                    <button
+                                        onClick={confirmCancelDelete}
+                                        className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                                    >
+                                        Yes, Cancel Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

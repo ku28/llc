@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import * as XLSX from 'xlsx'
 import CustomSelect from '../components/CustomSelect'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingModal from '../components/LoadingModal'
@@ -6,6 +7,7 @@ import ImportProductsModal from '../components/ImportProductsModal'
 import ToastNotification from '../components/ToastNotification'
 import { useToast } from '../hooks/useToast'
 import { requireStaffOrAbove } from '../lib/withAuth'
+import { useImportContext } from '../contexts/ImportContext'
 
 function ProductsPage() {
     const [items, setItems] = useState<any[]>([])
@@ -16,8 +18,18 @@ function ProductsPage() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [deleteId, setDeleteId] = useState<number | null>(null)
     const [searchQuery, setSearchQuery] = useState('')
+    const [sortBy, setSortBy] = useState<'name' | 'price' | 'quantity'>('name')
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+    const [showSortDropdown, setShowSortDropdown] = useState(false)
     const [loading, setLoading] = useState(true)
     const [showImportModal, setShowImportModal] = useState(false)
+    const [showExportDropdown, setShowExportDropdown] = useState(false)
+    const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(new Set())
+    const [showDeleteSelectedConfirm, setShowDeleteSelectedConfirm] = useState(false)
+    const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 })
+    const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
+    const [isDeleteMinimized, setIsDeleteMinimized] = useState(false)
+    const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage] = useState(10)
     const [generatingPO, setGeneratingPO] = useState(false)
@@ -27,6 +39,7 @@ function ProductsPage() {
     const [suppliers, setSuppliers] = useState<any[]>([])
     const [sendingEmail, setSendingEmail] = useState(false)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
+    const { addTask, updateTask } = useImportContext()
     
     // Filter states
     const [filterCategory, setFilterCategory] = useState<string>('')
@@ -216,6 +229,168 @@ function ProductsPage() {
         setShowDeleteConfirm(true)
     }
 
+    function toggleProductSelection(id: number) {
+        const newSelected = new Set(selectedProductIds)
+        if (newSelected.has(id)) {
+            newSelected.delete(id)
+        } else {
+            newSelected.add(id)
+        }
+        setSelectedProductIds(newSelected)
+    }
+
+    function toggleSelectAll() {
+        const filteredProducts = getFilteredProducts()
+        if (selectedProductIds.size === filteredProducts.length) {
+            setSelectedProductIds(new Set())
+        } else {
+            setSelectedProductIds(new Set(filteredProducts.map((p: any) => p.id)))
+        }
+    }
+
+    function toggleRowExpansion(id: number) {
+        const newExpanded = new Set(expandedRows)
+        if (newExpanded.has(id)) {
+            newExpanded.delete(id)
+        } else {
+            newExpanded.add(id)
+        }
+        setExpandedRows(newExpanded)
+    }
+
+    async function deleteSelectedProducts() {
+        if (selectedProductIds.size === 0) {
+            showError('Please select products to delete')
+            return
+        }
+        setShowDeleteSelectedConfirm(true)
+    }
+
+    async function confirmDeleteSelected() {
+        const idsToDelete = Array.from(selectedProductIds)
+        const total = idsToDelete.length
+
+        setShowDeleteSelectedConfirm(false)
+
+        // Initialize progress
+        setDeleteProgress({ current: 0, total })
+
+        // Create task in global context
+        const id = addTask({
+            type: 'products',
+            operation: 'delete',
+            status: 'deleting',
+            progress: { current: 0, total }
+        })
+        setDeleteTaskId(id)
+
+        const CHUNK_SIZE = 10
+        let deletedCount = 0
+
+        try {
+            // Process in chunks
+            for (let i = 0; i < idsToDelete.length; i += CHUNK_SIZE) {
+                const chunk = idsToDelete.slice(i, i + CHUNK_SIZE)
+                
+                // Delete chunk
+                await Promise.all(chunk.map(productId =>
+                    fetch('/api/products', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: productId })
+                    })
+                ))
+
+                deletedCount += chunk.length
+                setDeleteProgress({ current: deletedCount, total })
+
+                // Update task progress
+                updateTask(id, {
+                    progress: { current: deletedCount, total }
+                })
+
+                // Small delay between chunks for better UX
+                if (i + CHUNK_SIZE < idsToDelete.length) {
+                    await new Promise(resolve => setTimeout(resolve, 100))
+                }
+            }
+
+            // Refresh data
+            setItems(await (await fetch('/api/products')).json())
+            setSelectedProductIds(new Set())
+            
+            // Update task to success
+            updateTask(id, {
+                status: 'success',
+                summary: { success: total, errors: 0 },
+                endTime: Date.now()
+            })
+            
+            showSuccess(`Deleted ${total} product(s) successfully`)
+        } catch (error) {
+            console.error('Delete error:', error)
+            
+            // Update task to error
+            updateTask(id, {
+                status: 'error',
+                error: 'Failed to delete products',
+                endTime: Date.now()
+            })
+            
+            showError('Failed to delete products')
+        } finally {
+            setDeleteProgress({ current: 0, total: 0 })
+            setDeleteTaskId(null)
+            setIsDeleteMinimized(false)
+        }
+    }
+
+    function getFilteredProducts() {
+        let filtered = items.filter((product: any) => {
+            // Search filter
+            if (searchQuery && !product.name?.toLowerCase().includes(searchQuery.toLowerCase())) {
+                return false
+            }
+            // Category filter
+            if (filterCategory && String(product.categoryId) !== filterCategory) {
+                return false
+            }
+            // Stock status filter
+            if (filterStockStatus) {
+                const qty = product.quantity || 0
+                const reorderLevel = product.category?.reorderLevel || 10
+                if (filterStockStatus === 'low' && qty >= reorderLevel) return false
+                if (filterStockStatus === 'out' && qty > 0) return false
+                if (filterStockStatus === 'in' && qty <= 0) return false
+            }
+            // Price range filter
+            if (filterPriceRange) {
+                const price = product.priceCents || 0
+                if (filterPriceRange === 'low' && price >= 5000) return false
+                if (filterPriceRange === 'medium' && (price < 5000 || price >= 20000)) return false
+                if (filterPriceRange === 'high' && price < 20000) return false
+            }
+            return true
+        })
+
+        // Sort products
+        filtered.sort((a, b) => {
+            let compareResult = 0
+            
+            if (sortBy === 'name') {
+                compareResult = (a.name || '').localeCompare(b.name || '')
+            } else if (sortBy === 'price') {
+                compareResult = (a.priceCents || 0) - (b.priceCents || 0)
+            } else if (sortBy === 'quantity') {
+                compareResult = (a.quantity || 0) - (b.quantity || 0)
+            }
+            
+            return sortOrder === 'asc' ? compareResult : -compareResult
+        })
+
+        return filtered
+    }
+
     async function autoGeneratePurchaseOrder() {
         // Get low stock products
         const lowStockProducts = items.filter((product: any) => {
@@ -371,8 +546,141 @@ function ProductsPage() {
         }
     }
 
+    function exportData(format: 'csv' | 'json' | 'xlsx') {
+        try {
+            if (selectedProductIds.size === 0) {
+                showError('Please select at least one product to export')
+                return
+            }
+
+            const selectedProducts = items.filter((product: any) => selectedProductIds.has(product.id))
+
+            const dataToExport = selectedProducts.map((p: any) => ({
+                'name': p.name || '',
+                'priceCents': p.priceCents || 0,
+                'quantity': p.quantity || 0,
+                'purchasePriceCents': p.purchasePriceCents || 0,
+                'unit': p.unit || ''
+            }))
+
+            const timestamp = new Date().toISOString().split('T')[0]
+            
+            if (format === 'json') {
+                const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `products_${timestamp}.json`
+                a.click()
+                URL.revokeObjectURL(url)
+            } else if (format === 'csv') {
+                const headers = Object.keys(dataToExport[0] || {})
+                const csvContent = [
+                    headers.join(','),
+                    ...dataToExport.map(row => 
+                        headers.map(header => {
+                            const value = row[header as keyof typeof row] || ''
+                            return String(value).includes(',') || String(value).includes('"') 
+                                ? `"${String(value).replace(/"/g, '""')}"` 
+                                : value
+                        }).join(',')
+                    )
+                ].join('\n')
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `products_${timestamp}.csv`
+                a.click()
+                URL.revokeObjectURL(url)
+            } else if (format === 'xlsx') {
+                const ws = XLSX.utils.json_to_sheet(dataToExport)
+                const wb = XLSX.utils.book_new()
+                XLSX.utils.book_append_sheet(wb, ws, 'Products')
+                XLSX.writeFile(wb, `products_${timestamp}.xlsx`)
+            }
+            
+            showSuccess(`${selectedProductIds.size} product(s) exported as ${format.toUpperCase()}`)
+            setShowExportDropdown(false)
+        } catch (e) {
+            console.error(e)
+            showError('Failed to export products')
+        }
+    }
+
+    // Close export dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            const target = event.target as HTMLElement
+            if (showExportDropdown && !target.closest('.relative')) {
+                setShowExportDropdown(false)
+            }
+            if (showSortDropdown && !target.closest('.relative')) {
+                setShowSortDropdown(false)
+            }
+        }
+        if (showExportDropdown || showSortDropdown) {
+            document.addEventListener('click', handleClickOutside)
+        }
+        return () => document.removeEventListener('click', handleClickOutside)
+    }, [showExportDropdown, showSortDropdown])
+
     return (
         <div>
+            {/* Delete Progress Modal - Minimizable */}
+            {deleteProgress.total > 0 && !isDeleteMinimized && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+                        {/* Header with minimize button */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Deleting Products
+                            </h3>
+                            <button
+                                onClick={() => setIsDeleteMinimized(true)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                title="Minimize"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-8">
+                            <div className="flex flex-col items-center">
+                                <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mb-4">
+                                    <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                                    Deleting Products
+                                </h3>
+                                <div className="text-3xl font-bold text-red-600 dark:text-red-400 mb-4">
+                                    {deleteProgress.current} / {deleteProgress.total}
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-4 overflow-hidden">
+                                    <div 
+                                        className="h-full bg-gradient-to-r from-red-500 to-red-600 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-2"
+                                        style={{ width: `${(deleteProgress.current / deleteProgress.total) * 100}%` }}
+                                    >
+                                        <span className="text-xs font-semibold text-white">
+                                            {Math.round((deleteProgress.current / deleteProgress.total) * 100)}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                                    Please wait, deleting product {deleteProgress.current} of {deleteProgress.total}...
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="section-header flex justify-between items-center">
                 <h2 className="section-title">Inventory Management</h2>
                 <div className="flex gap-2">
@@ -398,14 +706,59 @@ function ProductsPage() {
                             </>
                         )}
                     </button>
+                    <div className="relative">
+                        <button 
+                            onClick={() => setShowExportDropdown(!showExportDropdown)}
+                            className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                            </svg>
+                            <span className="font-semibold">{selectedProductIds.size > 0 ? `Export (${selectedProductIds.size})` : 'Export All'}</span>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {showExportDropdown && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-50 overflow-hidden">
+                                <button
+                                    onClick={() => exportData('csv')}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                >
+                                    <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <span className="font-medium">CSV Format</span>
+                                </button>
+                                <button
+                                    onClick={() => exportData('json')}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                >
+                                    <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                    </svg>
+                                    <span className="font-medium">JSON Format</span>
+                                </button>
+                                <button
+                                    onClick={() => exportData('xlsx')}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
+                                >
+                                    <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    <span className="font-medium">Excel Format</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                     <button 
                         onClick={() => setShowImportModal(true)} 
-                        className="btn bg-green-600 hover:bg-green-700 text-white"
+                        className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2"
                     >
-                        <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                         </svg>
-                        Import Products
+                        <span className="font-semibold">Import</span>
                     </button>
                     <button 
                         onClick={() => {
@@ -504,6 +857,99 @@ function ProductsPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </div>
+                    
+                    {/* Sort Dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowSortDropdown(!showSortDropdown)}
+                            className="px-4 py-2.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-400 dark:hover:border-green-600 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-sm hover:shadow-md"
+                        >
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
+                            <span>Sort</span>
+                        </button>
+                        {showSortDropdown && (
+                            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-900 dark:to-gray-900">
+                                    <p className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">
+                                        Sort By
+                                    </p>
+                                </div>
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => { setSortBy('name'); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortBy === 'name'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortBy === 'name' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                                        </svg>
+                                        <span className="font-medium">Name</span>
+                                    </button>
+                                    <button
+                                        onClick={() => { setSortBy('price'); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortBy === 'price'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortBy === 'price' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="font-medium">Price</span>
+                                    </button>
+                                    <button
+                                        onClick={() => { setSortBy('quantity'); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortBy === 'quantity'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortBy === 'quantity' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                        </svg>
+                                        <span className="font-medium">Quantity</span>
+                                    </button>
+                                </div>
+                                <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-3 py-2">Order</div>
+                                    <button
+                                        onClick={() => { setSortOrder('asc'); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortOrder === 'asc'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortOrder === 'asc' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                        </svg>
+                                        <span className="font-medium">Ascending</span>
+                                    </button>
+                                    <button
+                                        onClick={() => { setSortOrder('desc'); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortOrder === 'desc'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortOrder === 'desc' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                        <span className="font-medium">Descending</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
                     <button
                         onClick={() => setShowFilters(!showFilters)}
                         className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -710,214 +1156,196 @@ function ProductsPage() {
 
             {/* Products Table */}
             <div className="card">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
-                            <span>Products Inventory</span>
-                            <span className="badge">
-                                {(() => {
-                                    // Apply same filtering logic for count
-                                    return items.filter(p => {
-                                        if (searchQuery) {
-                                            const name = (p.name || '').toLowerCase()
-                                            if (!name.includes(searchQuery.toLowerCase())) return false
-                                        }
-                                        if (filterCategory && p.categoryId !== Number(filterCategory)) return false
-                                        if (filterStockStatus) {
-                                            const quantity = p.quantity || 0
-                                            const threshold = p.category?.reorderLevel || 0
-                                            if (filterStockStatus === 'in-stock' && quantity <= threshold) return false
-                                            if (filterStockStatus === 'low-stock' && (quantity > threshold || quantity === 0)) return false
-                                            if (filterStockStatus === 'out-of-stock' && quantity !== 0) return false
-                                        }
-                                        if (filterPriceRange) {
-                                            const price = p.priceCents || 0
-                                            if (filterPriceRange === '0-100' && (price < 0 || price > 100)) return false
-                                            if (filterPriceRange === '100-500' && (price < 100 || price > 500)) return false
-                                            if (filterPriceRange === '500-1000' && (price < 500 || price > 1000)) return false
-                                            if (filterPriceRange === '1000-5000' && (price < 1000 || price > 5000)) return false
-                                            if (filterPriceRange === '5000+' && price < 5000) return false
-                                        }
-                                        return true
-                                    }).length
-                                })()} of {items.length} items
-                            </span>
-                        </h3>
-                    {(() => {
-                        const filteredItems = items.filter(p => {
-                            // Search filter
-                            if (searchQuery) {
-                                const name = (p.name || '').toLowerCase()
-                                if (!name.includes(searchQuery.toLowerCase())) return false
-                            }
-                            
-                            // Category filter
-                            if (filterCategory) {
-                                if (p.categoryId !== Number(filterCategory)) return false
-                            }
-                            
-                            // Stock status filter
-                            if (filterStockStatus) {
-                                const quantity = p.quantity || 0
-                                const threshold = p.category?.reorderLevel || 0
-                                
-                                if (filterStockStatus === 'in-stock' && quantity <= threshold) return false
-                                if (filterStockStatus === 'low-stock' && (quantity > threshold || quantity === 0)) return false
-                                if (filterStockStatus === 'out-of-stock' && quantity !== 0) return false
-                            }
-                            
-                            // Price range filter
-                            if (filterPriceRange) {
-                                const price = p.priceCents || 0
-                                
-                                if (filterPriceRange === '0-100' && (price < 0 || price > 100)) return false
-                                if (filterPriceRange === '100-500' && (price < 100 || price > 500)) return false
-                                if (filterPriceRange === '500-1000' && (price < 500 || price > 1000)) return false
-                                if (filterPriceRange === '1000-5000' && (price < 1000 || price > 5000)) return false
-                                if (filterPriceRange === '5000+' && price < 5000) return false
-                            }
-                            
-                            return true
-                        })
-                        
-                        if (loading) {
-                            return (
-                                <div className="flex flex-col items-center justify-center py-12">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                                    <p className="text-muted">Loading products...</p>
-                                </div>
-                            )
-                        }
-                        
-                        if (filteredItems.length === 0 && (searchQuery || filterCategory || filterStockStatus || filterPriceRange)) {
-                            return (
-                                <div className="text-center py-8 text-muted">
-                                    <p className="text-lg mb-2">No products match your filters</p>
-                                    <p className="text-sm">Try adjusting your search or filter criteria</p>
-                                </div>
-                            )
-                        }
-                        
-                        if (filteredItems.length === 0) {
-                            return <div className="text-center py-8 text-muted">No products yet</div>
-                        }
-                        
-                        return (
-                        <>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                                <thead className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
-                                    <tr>
-                                        <th className="px-2 py-1 text-left font-semibold text-xs">ITEM</th>
-                                        <th className="px-1 py-1 text-left font-semibold text-xs">UNIT</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">RATE/U</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">P/PRICE</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">THRESH/IN</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">INVENTORY</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">INV/VAL</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">PURCHASE</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">PUR/VAL</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">SALES</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">SALE/VAL</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">LATEST</th>
-                                        <th className="px-1 py-1 text-right font-semibold text-xs">ACTUAL</th>
-                                        <th className="px-2 py-1 text-center font-semibold text-xs">ACTIONS</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                    {filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(p => (
-                                        <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                            <td className="px-2 py-1.5">
-                                                <div className="font-medium text-xs leading-tight">{p.name}</div>
-                                                {p.category && (
-                                                    <div className="text-[10px] text-brand">{p.category.name}</div>
-                                                )}
-                                            </td>
-                                            <td className="px-1 py-1.5 text-left text-xs">{p.unit || '-'}</td>
-                                            <td className="px-1 py-1.5 text-right text-xs">₹{(p.priceCents || 0).toFixed(2)}</td>
-                                            <td className="px-1 py-1.5 text-right text-xs">₹{(p.purchasePriceCents || 0).toFixed(2)}</td>
-                                            <td className="px-1 py-1.5 text-right text-xs">{(p.category?.reorderLevel || 0).toFixed(0)}</td>
-                                            <td className="px-1 py-1.5 text-right text-xs">
-                                                {(() => {
-                                                    const qty = p.quantity || 0
-                                                    const reorderLevel = p.category?.reorderLevel || 10
-                                                    const isLowStock = qty < reorderLevel && qty > 0
-                                                    const isOutOfStock = qty <= 0
-                                                    
-                                                    return (
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            {isOutOfStock && (
-                                                                <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-[10px] rounded font-semibold">
-                                                                    OUT
-                                                                </span>
-                                                            )}
-                                                            {isLowStock && (
-                                                                <span className="px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-[10px] rounded font-semibold">
-                                                                    LOW
-                                                                </span>
-                                                            )}
-                                                            <span className={
-                                                                isOutOfStock ? 'text-red-600 dark:text-red-400 font-bold' :
-                                                                isLowStock ? 'text-yellow-600 dark:text-yellow-400 font-semibold' :
-                                                                'text-green-600 dark:text-green-400'
-                                                            }>
-                                                                {Math.max(0, qty).toFixed(0)}
-                                                            </span>
+                <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
+                    <span className="flex items-center gap-3">
+                        <label className="relative group/checkbox cursor-pointer flex-shrink-0">
+                            <input
+                                type="checkbox"
+                                checked={getFilteredProducts().length > 0 && selectedProductIds.size === getFilteredProducts().length}
+                                onChange={toggleSelectAll}
+                                className="peer sr-only"
+                            />
+                            <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                        </label>
+                        <span className="font-bold text-gray-900 dark:text-gray-100">Products Inventory {selectedProductIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">({selectedProductIds.size} selected)</span>}</span>
+                    </span>
+                    <span className="badge">{getFilteredProducts().length} products</span>
+                </h3>
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                        <p className="text-muted">Loading products...</p>
+                    </div>
+                ) : getFilteredProducts().length === 0 ? (
+                    <div className="text-center py-12 text-muted">
+                        <p className="text-lg mb-2">No products found</p>
+                        <p className="text-sm">Try adjusting your search or filter criteria</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="space-y-2">
+                            {getFilteredProducts()
+                                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                                .map(p => {
+                                    const isExpanded = expandedRows.has(p.id)
+                                    const qty = p.quantity || 0
+                                    const reorderLevel = p.category?.reorderLevel || 10
+                                    const isLowStock = qty < reorderLevel && qty > 0
+                                    const isOutOfStock = qty <= 0
+                                    
+                                    return (
+                                        <div key={p.id} className={`border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden transition-all duration-200 ${selectedProductIds.has(p.id) ? 'ring-2 ring-green-500 shadow-xl shadow-green-100 dark:shadow-green-900/30 bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-gray-800 dark:to-gray-800' : ''}`}>
+                                            {/* Summary Row */}
+                                            <div className="bg-gray-50 dark:bg-gray-800 p-3 flex items-center gap-3">
+                                                {/* Checkbox */}
+                                                <div className="flex-shrink-0">
+                                                    <label className="relative group/checkbox cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedProductIds.has(p.id)}
+                                                            onChange={() => toggleProductSelection(p.id)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="peer sr-only"
+                                                        />
+                                                        <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                                            <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                            </svg>
                                                         </div>
-                                                    )
-                                                })()}
-                                            </td>
-                                            <td className="px-1 py-1.5 text-right text-xs">{p.inventoryValue ? `₹${p.inventoryValue.toFixed(0)}` : '-'}</td>
-                                            <td className="px-1 py-1.5 text-right text-xs">{(p.totalPurchased || 0).toFixed(0)}</td>
-                                            <td className="px-1 py-1.5 text-right text-xs">{p.purchaseValue ? `₹${p.purchaseValue.toFixed(0)}` : '-'}</td>
-                                            <td className="px-1 py-1.5 text-right text-xs">{(p.totalSales || 0).toFixed(0)}</td>
-                                            <td className="px-1 py-1.5 text-right text-xs">{p.salesValue ? `₹${p.salesValue.toFixed(0)}` : '-'}</td>
-                                            <td className="px-1 py-1.5 text-right text-[10px]">{p.latestUpdate ? new Date(p.latestUpdate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) : '-'}</td>
-                                            <td className="px-1 py-1.5 text-right text-xs">{p.actualInventory ? (p.actualInventory).toFixed(0) : '-'}</td>
-                                            <td className="px-2 py-1.5 text-center">
-                                                <div className="flex items-center justify-center gap-1">
+                                                        <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                                    </label>
+                                                </div>
+                                                
+                                                {/* Product Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-semibold text-sm">{p.name}</div>
+                                                    <div className="text-xs text-muted mt-0.5">
+                                                        {p.category && <span className="mr-2">📦 {p.category.name}</span>}
+                                                        <span className="mr-2">Unit: {p.unit || 'N/A'}</span>
+                                                        <span>₹{(p.priceCents || 0).toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Stock Status Badge */}
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    {isOutOfStock && (
+                                                        <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded font-semibold">
+                                                            OUT OF STOCK
+                                                        </span>
+                                                    )}
+                                                    {isLowStock && (
+                                                        <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs rounded font-semibold">
+                                                            LOW STOCK
+                                                        </span>
+                                                    )}
+                                                    <span className={`text-sm font-semibold ${
+                                                        isOutOfStock ? 'text-red-600 dark:text-red-400' :
+                                                        isLowStock ? 'text-yellow-600 dark:text-yellow-400' :
+                                                        'text-green-600 dark:text-green-400'
+                                                    }`}>
+                                                        Qty: {Math.max(0, qty).toFixed(0)}
+                                                    </span>
+                                                </div>
+                                                
+                                                {/* Action Buttons */}
+                                                <div className="flex items-center gap-2 flex-shrink-0">
                                                     <button
                                                         onClick={() => editProduct(p)}
-                                                        disabled={!user}
-                                                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed text-[10px] px-1.5 py-0.5 border border-blue-600 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                                        title="Edit product"
+                                                        className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+                                                        title="Edit"
                                                     >
-                                                        ✏️
+                                                        ✏️ Edit
                                                     </button>
                                                     <button
                                                         onClick={() => deleteProduct(p.id)}
-                                                        disabled={!user}
-                                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed text-[10px] px-1.5 py-0.5 border border-red-600 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                        title="Delete product"
+                                                        className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+                                                        title="Delete"
                                                     >
-                                                        🗑️
+                                                        🗑️ Delete
+                                                    </button>
+                                                    <button
+                                                        onClick={() => toggleRowExpansion(p.id)}
+                                                        className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                                                        title={isExpanded ? "Hide Details" : "View More"}
+                                                    >
+                                                        {isExpanded ? '▲ Hide' : '▼ View More'}
                                                     </button>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                            </div>
+
+                                            {/* Expanded Details */}
+                                            {isExpanded && (
+                                                <div className="bg-white dark:bg-gray-900 p-4 border-t border-gray-200 dark:border-gray-700">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-sm">
+                                                        <div>
+                                                            <div className="text-xs text-muted mb-1">Purchase Price</div>
+                                                            <div className="text-sm font-medium">₹{(p.purchasePriceCents || 0).toFixed(2)}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted mb-1">Reorder Level</div>
+                                                            <div className="text-sm font-medium">{p.category?.reorderLevel || '-'}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted mb-1">Total Purchased</div>
+                                                            <div className="text-sm font-medium">{(p.totalPurchased || 0).toFixed(0)}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted mb-1">Total Sales</div>
+                                                            <div className="text-sm font-medium">{(p.totalSales || 0).toFixed(0)}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted mb-1">Inventory Value</div>
+                                                            <div className="text-sm font-medium">{p.inventoryValue ? `₹${p.inventoryValue.toFixed(2)}` : '-'}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted mb-1">Purchase Value</div>
+                                                            <div className="text-sm font-medium">{p.purchaseValue ? `₹${p.purchaseValue.toFixed(2)}` : '-'}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted mb-1">Sales Value</div>
+                                                            <div className="text-sm font-medium">{p.salesValue ? `₹${p.salesValue.toFixed(2)}` : '-'}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted mb-1">Actual Inventory</div>
+                                                            <div className="text-sm font-medium">{p.actualInventory ? p.actualInventory.toFixed(0) : '-'}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-xs text-muted mb-1">Latest Update</div>
+                                                            <div className="text-sm font-medium">{p.latestUpdate ? new Date(p.latestUpdate).toLocaleDateString() : '-'}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
                         </div>
 
                         {/* Pagination Controls */}
-                        {filteredItems.length > itemsPerPage && (
+                        {getFilteredProducts().length > itemsPerPage && (
                             <div className="mt-4 flex items-center justify-center gap-4">
                                 <button
                                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                     disabled={currentPage === 1}
-                                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="px-4 py-2 bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
                                     Previous
                                 </button>
-                                <span className="text-sm text-gray-700 dark:text-gray-300">
-                                    Page {currentPage} of {Math.ceil(filteredItems.length / itemsPerPage)}
+                                <span className="text-sm">
+                                    Page {currentPage} of {Math.ceil(getFilteredProducts().length / itemsPerPage)}
                                 </span>
                                 <button
-                                    onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredItems.length / itemsPerPage), prev + 1))}
-                                    disabled={currentPage === Math.ceil(filteredItems.length / itemsPerPage)}
-                                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    onClick={() => setCurrentPage(prev => Math.min(Math.ceil(getFilteredProducts().length / itemsPerPage), prev + 1))}
+                                    disabled={currentPage >= Math.ceil(getFilteredProducts().length / itemsPerPage)}
+                                    className="px-4 py-2 bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                 >
                                     Next
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -926,10 +1354,20 @@ function ProductsPage() {
                                 </button>
                             </div>
                         )}
-                        </>
-)
-                    })()}
-                </div>
+                    </>
+                )}
+            </div>
+
+            <ConfirmModal
+                isOpen={showDeleteSelectedConfirm}
+                title="Delete Selected Products"
+                message={`Are you sure you want to delete ${selectedProductIds.size} product(s)? This action cannot be undone.`}
+                confirmText="Delete All"
+                cancelText="Cancel"
+                variant="danger"
+                onConfirm={confirmDeleteSelected}
+                onCancel={() => setShowDeleteSelectedConfirm(false)}
+            />
 
             <ConfirmModal
                 isOpen={showDeleteConfirm}
@@ -1108,6 +1546,81 @@ function ProductsPage() {
 
             {/* Toast Notifications */}
             <ToastNotification toasts={toasts} removeToast={removeToast} />
+
+            {/* Floating Export Button */}
+            {selectedProductIds.size > 0 && (
+                <div className="relative">
+                    <button
+                        onClick={() => setShowExportDropdown(!showExportDropdown)}
+                        className="fixed bottom-8 right-40 z-50 group"
+                        title={`Export ${selectedProductIds.size} selected product(s)`}
+                    >
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-200"></div>
+                            <div className="relative w-14 h-14 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 transform group-hover:scale-110">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                                </svg>
+                                <span className="absolute -top-1 -right-1 min-w-[24px] h-5 px-1.5 bg-green-600 text-white rounded-full text-xs font-bold flex items-center justify-center shadow-lg ring-2 ring-white">
+                                    {selectedProductIds.size}
+                                </span>
+                            </div>
+                        </div>
+                    </button>
+                    {showExportDropdown && (
+                        <div className="fixed bottom-24 right-40 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-50 overflow-hidden">
+                            <button
+                                onClick={() => exportData('csv')}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                            >
+                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span className="font-medium">CSV Format</span>
+                            </button>
+                            <button
+                                onClick={() => exportData('json')}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                            >
+                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                </svg>
+                                <span className="font-medium">JSON Format</span>
+                            </button>
+                            <button
+                                onClick={() => exportData('xlsx')}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
+                            >
+                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                <span className="font-medium">Excel Format</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Floating Delete Selected Button */}
+            {selectedProductIds.size > 0 && (
+                <button
+                    onClick={deleteSelectedProducts}
+                    className="fixed bottom-8 right-24 z-50 group"
+                    title={`Delete ${selectedProductIds.size} selected product(s)`}
+                >
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-rose-600 rounded-full blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-200 animate-pulse"></div>
+                        <div className="relative w-14 h-14 bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 transform group-hover:scale-110">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span className="absolute -top-1 -right-1 min-w-[24px] h-5 px-1.5 bg-red-600 text-white rounded-full text-xs font-bold flex items-center justify-center shadow-lg ring-2 ring-white">
+                                {selectedProductIds.size}
+                            </span>
+                        </div>
+                    </div>
+                </button>
+            )}
         </div>
     )
 }

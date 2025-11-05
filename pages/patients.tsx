@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import * as XLSX from 'xlsx'
 import DateInput from '../components/DateInput'
 import ToastNotification from '../components/ToastNotification'
 import { useToast } from '../hooks/useToast'
 import CustomSelect from '../components/CustomSelect'
 import ImportPatientsModal from '../components/ImportPatientsModal'
+import LoadingModal from '../components/LoadingModal'
+import { useImportContext } from '../contexts/ImportContext'
 import genderOptions from '../data/gender.json'
 
 export default function PatientsPage() {
@@ -16,8 +19,13 @@ export default function PatientsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isAnimating, setIsAnimating] = useState(false)
     const [showImportModal, setShowImportModal] = useState(false)
+    const [showExportDropdown, setShowExportDropdown] = useState(false)
+    const [selectedPatientIds, setSelectedPatientIds] = useState<Set<number>>(new Set())
     const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
     const [searchQuery, setSearchQuery] = useState('')
+    const [sortBy, setSortBy] = useState<'name' | 'date' | 'age'>('date')
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+    const [showSortDropdown, setShowSortDropdown] = useState(false)
     const [imagePreview, setImagePreview] = useState<string>('')
     const [uploadingImage, setUploadingImage] = useState(false)
     const [showCamera, setShowCamera] = useState(false)
@@ -25,13 +33,17 @@ export default function PatientsPage() {
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [deleting, setDeleting] = useState(false)
-    const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; message?: string }>({ open: false })
+    const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; deleteMultiple?: boolean; message?: string }>({ open: false })
     const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
+    const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 })
+    const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
+    const [isDeleteMinimized, setIsDeleteMinimized] = useState(false)
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage] = useState(10)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
+    const { addTask, updateTask } = useImportContext()
     
-    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', opdNo: '', date: '', age: '', address: '', gender: '', occupation: '', pendingPaymentCents: '', height: '', weight: '', imageUrl: '', fatherHusbandGuardianName: '' }
+    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', date: '', age: '', address: '', gender: '', imageUrl: '', fatherHusbandGuardianName: '' }
     const [form, setForm] = useState(emptyForm)
 
     // Calculate age from date of birth
@@ -106,9 +118,6 @@ export default function PatientsPage() {
                 age, 
                 address, 
                 gender, 
-                occupation, 
-                height, 
-                weight, 
                 fatherHusbandGuardianName,
                 imageUrl 
             } = router.query
@@ -125,9 +134,6 @@ export default function PatientsPage() {
                 age: age as string || '',
                 address: address as string || '',
                 gender: gender as string || '',
-                occupation: occupation as string || '',
-                height: height as string || '',
-                weight: weight as string || '',
                 fatherHusbandGuardianName: fatherHusbandGuardianName as string || '',
                 imageUrl: imageUrl as string || ''
             }))
@@ -299,6 +305,23 @@ export default function PatientsPage() {
         }
     }, [cameraStream])
 
+    // Close export dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            const target = event.target as HTMLElement
+            if (showExportDropdown && !target.closest('.relative')) {
+                setShowExportDropdown(false)
+            }
+            if (showSortDropdown && !target.closest('.relative')) {
+                setShowSortDropdown(false)
+            }
+        }
+        if (showExportDropdown || showSortDropdown) {
+            document.addEventListener('click', handleClickOutside)
+        }
+        return () => document.removeEventListener('click', handleClickOutside)
+    }, [showExportDropdown, showSortDropdown])
+
     function toggleRowExpansion(id: number) {
         const newExpanded = new Set(expandedRows)
         if (newExpanded.has(id)) {
@@ -307,6 +330,58 @@ export default function PatientsPage() {
             newExpanded.add(id)
         }
         setExpandedRows(newExpanded)
+    }
+
+    function togglePatientSelection(id: number) {
+        const newSelected = new Set(selectedPatientIds)
+        if (newSelected.has(id)) {
+            newSelected.delete(id)
+        } else {
+            newSelected.add(id)
+        }
+        setSelectedPatientIds(newSelected)
+    }
+
+    function toggleSelectAll() {
+        const filteredPatients = getFilteredAndSortedPatients()
+        
+        if (selectedPatientIds.size === filteredPatients.length) {
+            // Deselect all
+            setSelectedPatientIds(new Set())
+        } else {
+            // Select all filtered patients
+            setSelectedPatientIds(new Set(filteredPatients.map(p => p.id)))
+        }
+    }
+
+    function getFilteredAndSortedPatients() {
+        // Filter patients
+        let filtered = patients.filter(p => {
+            if (!searchQuery) return true
+            const fullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase()
+            return fullName.includes(searchQuery.toLowerCase())
+        })
+
+        // Sort patients
+        filtered.sort((a, b) => {
+            let compareResult = 0
+            
+            if (sortBy === 'name') {
+                const nameA = `${a.firstName || ''} ${a.lastName || ''}`.toLowerCase()
+                const nameB = `${b.firstName || ''} ${b.lastName || ''}`.toLowerCase()
+                compareResult = nameA.localeCompare(nameB)
+            } else if (sortBy === 'date') {
+                const dateA = a.date ? new Date(a.date).getTime() : 0
+                const dateB = b.date ? new Date(b.date).getTime() : 0
+                compareResult = dateA - dateB
+            } else if (sortBy === 'age') {
+                compareResult = (a.age || 0) - (b.age || 0)
+            }
+            
+            return sortOrder === 'asc' ? compareResult : -compareResult
+        })
+
+        return filtered
     }
 
     function editPatient(patient: any) {
@@ -318,15 +393,10 @@ export default function PatientsPage() {
             phone: patient.phone || '',
             email: patient.email || '',
             dob: patient.dob ? new Date(patient.dob).toISOString().slice(0, 10) : '',
-            opdNo: patient.opdNo || '',
             date: patient.date ? new Date(patient.date).toISOString().slice(0, 10) : '',
             age: patient.age ? String(patient.age) : '',
             address: patient.address || '',
             gender: patient.gender || '',
-            occupation: patient.occupation || '',
-            pendingPaymentCents: patient.pendingPaymentCents ? String(patient.pendingPaymentCents) : '',
-            height: patient.height ? String(patient.height) : '',
-            weight: patient.weight ? String(patient.weight) : '',
             imageUrl: patient.imageUrl || '',
             fatherHusbandGuardianName: patient.fatherHusbandGuardianName || ''
         })
@@ -343,7 +413,6 @@ export default function PatientsPage() {
         const errors: { [key: string]: string } = {};
         if (!form.firstName.trim()) errors.firstName = 'First Name is required';
         if (!form.lastName.trim()) errors.lastName = 'Last Name is required';
-        if (!form.opdNo.trim()) errors.opdNo = 'OPD Number is required';
         setFieldErrors(errors);
         if (Object.keys(errors).length > 0) return;
 
@@ -355,9 +424,6 @@ export default function PatientsPage() {
                 payload.email = null;
             }
             if (payload.age) payload.age = Number(payload.age);
-            if (payload.pendingPaymentCents) payload.pendingPaymentCents = Number(payload.pendingPaymentCents);
-            if (payload.height) payload.height = Number(payload.height);
-            if (payload.weight) payload.weight = Number(payload.weight);
 
             const method = editingId ? 'PUT' : 'POST';
             const body = editingId ? { id: editingId, ...payload } : payload;
@@ -436,48 +502,297 @@ export default function PatientsPage() {
     }
 
     async function handleConfirmDelete(id?: number) {
-        if (!id) {
+        if (!id && !confirmModal.deleteMultiple) {
             closeConfirmModal()
             return
         }
+        
+        closeConfirmModal()
         setDeleting(true)
+        
         try {
-            const response = await fetch('/api/patients', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id })
-            })
-            if (response.ok) {
+            if (confirmModal.deleteMultiple) {
+                // Delete multiple patients with progress tracking
+                const idsArray = Array.from(selectedPatientIds)
+                const total = idsArray.length
+                setDeleteProgress({ current: 0, total })
+                
+                // Create task in global context
+                const taskId = addTask({
+                    type: 'patients',
+                    operation: 'delete',
+                    status: 'deleting',
+                    progress: { current: 0, total }
+                })
+                setDeleteTaskId(taskId)
+                
+                // Delete in chunks for better progress tracking
+                const CHUNK_SIZE = 10
+                let completed = 0
+                
+                for (let i = 0; i < idsArray.length; i += CHUNK_SIZE) {
+                    const chunk = idsArray.slice(i, i + CHUNK_SIZE)
+                    const deletePromises = chunk.map(patientId =>
+                        fetch('/api/patients', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: patientId })
+                        })
+                    )
+                    await Promise.all(deletePromises)
+                    
+                    completed += chunk.length
+                    setDeleteProgress({ current: completed, total })
+                    
+                    // Update task progress
+                    updateTask(taskId, {
+                        progress: { current: completed, total }
+                    })
+                    
+                    // Small delay for UI feedback
+                    await new Promise(resolve => setTimeout(resolve, 100))
+                }
+                
                 setPatients(await (await fetch('/api/patients')).json())
-                showSuccess('Patient deleted successfully')
-                closeConfirmModal()
+                setSelectedPatientIds(new Set())
+                
+                // Update task to success
+                updateTask(taskId, {
+                    status: 'success',
+                    summary: { success: total, errors: 0 },
+                    endTime: Date.now()
+                })
+                
+                showSuccess(`Deleted ${total} patient(s) successfully`)
             } else {
-                const error = await response.json()
-                console.error('Delete failed:', error)
-                showError('Failed to delete patient')
+                // Delete single patient
+                const response = await fetch('/api/patients', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                })
+                if (response.ok) {
+                    setPatients(await (await fetch('/api/patients')).json())
+                    showSuccess('Patient deleted successfully')
+                } else {
+                    const error = await response.json()
+                    console.error('Delete failed:', error)
+                    showError('Failed to delete patient')
+                }
             }
         } catch (error) {
             console.error('Delete error:', error)
-            showError('Failed to delete patient')
+            
+            // Update task to error if it exists
+            if (deleteTaskId) {
+                updateTask(deleteTaskId, {
+                    status: 'error',
+                    error: 'Failed to delete patient(s)',
+                    endTime: Date.now()
+                })
+            }
+            
+            showError('Failed to delete patient(s)')
         } finally {
             setDeleting(false)
+            setDeleteProgress({ current: 0, total: 0 })
+            setDeleteTaskId(null)
+            setIsDeleteMinimized(false)
+        }
+    }
+
+    function exportData(format: 'csv' | 'json' | 'xlsx') {
+        try {
+            // Get selected patients or show error
+            if (selectedPatientIds.size === 0) {
+                showError('Please select at least one patient to export')
+                return
+            }
+
+            const selectedPatients = patients.filter(p => selectedPatientIds.has(p.id))
+
+            const dataToExport = selectedPatients.map(p => ({
+                'firstName': p.firstName || '',
+                'lastName': p.lastName || '',
+                'phone': p.phone || '',
+                'email': p.email || '',
+                'date': p.date || '',
+                'dob': p.dob || '',
+                'age': p.age || '',
+                'address': p.address || '',
+                'gender': p.gender || '',
+                'fatherHusbandGuardianName': p.fatherHusbandGuardianName || ''
+            }))
+
+            const timestamp = new Date().toISOString().split('T')[0]
+            
+            if (format === 'json') {
+                const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `patients_${timestamp}.json`
+                a.click()
+                URL.revokeObjectURL(url)
+            } else if (format === 'csv') {
+                const headers = Object.keys(dataToExport[0] || {})
+                const csvContent = [
+                    headers.join(','),
+                    ...dataToExport.map(row => 
+                        headers.map(header => {
+                            const value = row[header as keyof typeof row] || ''
+                            // Escape quotes and wrap in quotes if contains comma or quote
+                            return String(value).includes(',') || String(value).includes('"') 
+                                ? `"${String(value).replace(/"/g, '""')}"` 
+                                : value
+                        }).join(',')
+                    )
+                ].join('\n')
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `patients_${timestamp}.csv`
+                a.click()
+                URL.revokeObjectURL(url)
+            } else if (format === 'xlsx') {
+                const ws = XLSX.utils.json_to_sheet(dataToExport)
+                const wb = XLSX.utils.book_new()
+                XLSX.utils.book_append_sheet(wb, ws, 'Patients')
+                XLSX.writeFile(wb, `patients_${timestamp}.xlsx`)
+            }
+            
+            showSuccess(`${selectedPatientIds.size} patient(s) exported as ${format.toUpperCase()}`)
+            setShowExportDropdown(false)
+        } catch (e) {
+            console.error(e)
+            showError('Failed to export patients')
         }
     }
 
     return (
         <div>
+            {/* Progress Modal for Deleting - Minimizable */}
+            {deleting && deleteProgress.total > 0 && !isDeleteMinimized && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+                        {/* Header with minimize button */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Deleting Patients
+                            </h3>
+                            <button
+                                onClick={() => setIsDeleteMinimized(true)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                title="Minimize"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-8">
+                            <div className="text-center">
+                                <div className="mb-6">
+                                    <svg className="w-16 h-16 mx-auto text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </div>
+                                
+                                <div className="text-3xl font-bold text-red-600 dark:text-red-400 mb-2">
+                                    {deleteProgress.current} / {deleteProgress.total}
+                                </div>
+                                
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                                    {Math.round((deleteProgress.current / deleteProgress.total) * 100)}% Complete
+                                </p>
+                                
+                                {/* Progress Bar */}
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+                                    <div 
+                                        className="bg-red-600 h-4 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-2"
+                                        style={{ width: `${(deleteProgress.current / deleteProgress.total) * 100}%` }}
+                                    >
+                                        <span className="text-xs text-white font-medium">
+                                            {deleteProgress.current > 0 && `${Math.round((deleteProgress.current / deleteProgress.total) * 100)}%`}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-4">
+                                    Please wait, deleting patient {deleteProgress.current} of {deleteProgress.total}...
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Loading Modal (for single deletes or when minimized) */}
+            {((deleting && deleteProgress.total === 0) || (deleting && isDeleteMinimized)) && (
+                <LoadingModal isOpen={true} message="Deleting patient..." />
+            )}
+            
             <div className="section-header flex justify-between items-center">
                 <h2 className="section-title">Patient Management</h2>
                 {user && (
                     <div className="flex gap-2">
+                        <div className="relative">
+                            <button 
+                                onClick={() => setShowExportDropdown(!showExportDropdown)}
+                                className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                                </svg>
+                                <span className="font-semibold">{selectedPatientIds.size > 0 ? `Export (${selectedPatientIds.size})` : 'Export All'}</span>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            {showExportDropdown && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-50 overflow-hidden">
+                                    <button
+                                        onClick={() => exportData('csv')}
+                                        className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                    >
+                                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        <span className="font-medium">CSV Format</span>
+                                    </button>
+                                    <button
+                                        onClick={() => exportData('json')}
+                                        className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                    >
+                                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                        </svg>
+                                        <span className="font-medium">JSON Format</span>
+                                    </button>
+                                    <button
+                                        onClick={() => exportData('xlsx')}
+                                        className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
+                                    >
+                                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        <span className="font-medium">Excel Format</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         <button 
                             onClick={() => setShowImportModal(true)} 
-                            className="btn bg-green-600 hover:bg-green-700 text-white"
+                            className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2"
                         >
-                            <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                             </svg>
-                            Import Patients
+                            <span className="font-semibold">Import</span>
                         </button>
                         <button onClick={openModal} className="btn btn-primary">
                             + Register New Patient
@@ -507,6 +822,99 @@ export default function PatientsPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </div>
+                    
+                    {/* Sort Dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowSortDropdown(!showSortDropdown)}
+                            className="px-4 py-2.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-400 dark:hover:border-green-600 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-sm hover:shadow-md"
+                        >
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
+                            <span>Sort</span>
+                        </button>
+                        {showSortDropdown && (
+                            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-900 dark:to-gray-900">
+                                    <p className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">
+                                        Sort By
+                                    </p>
+                                </div>
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => { setSortBy('name'); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortBy === 'name'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortBy === 'name' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        <span className="font-medium">Name</span>
+                                    </button>
+                                    <button
+                                        onClick={() => { setSortBy('date'); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortBy === 'date'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortBy === 'date' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        <span className="font-medium">Registration Date</span>
+                                    </button>
+                                    <button
+                                        onClick={() => { setSortBy('age'); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortBy === 'age'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortBy === 'age' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                                        </svg>
+                                        <span className="font-medium">Age</span>
+                                    </button>
+                                </div>
+                                <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-3 py-2">Order</div>
+                                    <button
+                                        onClick={() => { setSortOrder('asc'); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortOrder === 'asc'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortOrder === 'asc' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                        </svg>
+                                        <span className="font-medium">Ascending</span>
+                                    </button>
+                                    <button
+                                        onClick={() => { setSortOrder('desc'); setShowSortDropdown(false) }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                            sortOrder === 'desc'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <svg className={`w-4 h-4 ${sortOrder === 'desc' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                        <span className="font-medium">Descending</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
                     {searchQuery && (
                         <button
                             onClick={() => setSearchQuery('')}
@@ -611,17 +1019,6 @@ export default function PatientsPage() {
                                             <input required placeholder="Doe" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value.toUpperCase() })} className={`p-2 rounded w-full border ${fieldErrors.lastName ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} />
                                             {fieldErrors.lastName && <p className="text-xs text-red-600 mt-1">{fieldErrors.lastName}</p>}
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1.5">OPD Number <span className="text-red-600">*</span></label>
-                                            <input 
-                                                required
-                                                placeholder="251009 1 1" 
-                                                value={form.opdNo} 
-                                                onChange={e => setForm({ ...form, opdNo: e.target.value.toUpperCase() })} 
-                                                className={`p-2 rounded w-full font-mono border ${fieldErrors.opdNo ? 'border-red-600' : 'border-gray-300 dark:border-gray-600'}`} 
-                                            />
-                                            {fieldErrors.opdNo && <p className="text-xs text-red-600 mt-1">{fieldErrors.opdNo}</p>}
-                                        </div>
                                         {/* Optional fields below, not required */}
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Phone</label>
@@ -650,25 +1047,9 @@ export default function PatientsPage() {
                                                 allowCustom={true}
                                             />
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1.5">Occupation</label>
-                                            <input placeholder="Engineer" value={(form as any).occupation || ''} onChange={e => setForm({ ...form, occupation: e.target.value.toUpperCase() })} className="p-2 border rounded w-full" />
-                                        </div>
                                         <div className="sm:col-span-2 lg:col-span-3">
                                             <label className="block text-sm font-medium mb-1.5">Address</label>
                                             <input placeholder="123 Main St, City" value={(form as any).address || ''} onChange={e => setForm({ ...form, address: e.target.value.toUpperCase() })} className="p-2 border rounded w-full" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1.5">Height (cm)</label>
-                                            <input placeholder="175" type="number" value={(form as any).height || ''} onChange={e => setForm({ ...form, height: e.target.value })} className="p-2 border rounded w-full" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1.5">Weight (kg)</label>
-                                            <input placeholder="70" type="number" value={(form as any).weight || ''} onChange={e => setForm({ ...form, weight: e.target.value })} className="p-2 border rounded w-full" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium mb-1.5">Pending Payment (₹)</label>
-                                            <input placeholder="500.00" type="number" step="0.01" value={(form as any).pendingPaymentCents || ''} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} className="p-2 border rounded w-full" />
                                         </div>
                                     </div>
                                     
@@ -805,15 +1186,102 @@ export default function PatientsPage() {
             {/* Toasts */}
             <ToastNotification toasts={toasts} removeToast={removeToast} />
 
+            {/* Floating Export Button */}
+            {selectedPatientIds.size > 0 && (
+                <div className="relative">
+                    <button
+                        onClick={() => setShowExportDropdown(!showExportDropdown)}
+                        className="fixed bottom-8 right-40 z-50 group"
+                        title={`Export ${selectedPatientIds.size} selected patient(s)`}
+                    >
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-200"></div>
+                            <div className="relative w-14 h-14 bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 transform group-hover:scale-110">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                                </svg>
+                                <span className="absolute -top-1 -right-1 min-w-[24px] h-5 px-1.5 bg-green-600 text-white rounded-full text-xs font-bold flex items-center justify-center shadow-lg ring-2 ring-white">
+                                    {selectedPatientIds.size}
+                                </span>
+                            </div>
+                        </div>
+                    </button>
+                    {showExportDropdown && (
+                        <div className="fixed bottom-24 right-40 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-50 overflow-hidden">
+                            <button
+                                onClick={() => exportData('csv')}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                            >
+                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span className="font-medium">CSV Format</span>
+                            </button>
+                            <button
+                                onClick={() => exportData('json')}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                            >
+                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                </svg>
+                                <span className="font-medium">JSON Format</span>
+                            </button>
+                            <button
+                                onClick={() => exportData('xlsx')}
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
+                            >
+                                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                <span className="font-medium">Excel Format</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Floating Delete Selected Button */}
+            {selectedPatientIds.size > 0 && (
+                <button
+                    onClick={() => setConfirmModal({ open: true, deleteMultiple: true, message: `Are you sure you want to delete ${selectedPatientIds.size} selected patient(s)?` })}
+                    className="fixed bottom-8 right-24 z-50 group"
+                    title={`Delete ${selectedPatientIds.size} selected patient(s)`}
+                >
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-rose-600 rounded-full blur-xl opacity-75 group-hover:opacity-100 transition-opacity duration-200 animate-pulse"></div>
+                        <div className="relative w-14 h-14 bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-700 hover:to-rose-800 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 transform group-hover:scale-110">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span className="absolute -top-1 -right-1 min-w-[24px] h-5 px-1.5 bg-red-600 text-white rounded-full text-xs font-bold flex items-center justify-center shadow-lg ring-2 ring-white">
+                                {selectedPatientIds.size}
+                            </span>
+                        </div>
+                    </div>
+                </button>
+            )}
+
             {/* Patients List */}
             <div className="card">
                 <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
-                    <span>Patient Records</span>
-                    <span className="badge">{patients.filter(p => {
-                        if (!searchQuery) return true
-                        const fullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase()
-                        return fullName.includes(searchQuery.toLowerCase())
-                    }).length} patients</span>
+                    <span className="flex items-center gap-3">
+                        <label className="relative group/checkbox cursor-pointer flex-shrink-0">
+                            <input
+                                type="checkbox"
+                                checked={getFilteredAndSortedPatients().length > 0 && selectedPatientIds.size === getFilteredAndSortedPatients().length}
+                                onChange={toggleSelectAll}
+                                className="peer sr-only"
+                            />
+                            <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                        </label>
+                        <span className="font-bold text-gray-900 dark:text-gray-100">Patient Records {selectedPatientIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">({selectedPatientIds.size} selected)</span>}</span>
+                    </span>
+                    <span className="badge">{getFilteredAndSortedPatients().length} patients</span>
                 </h3>
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-12">
@@ -825,11 +1293,7 @@ export default function PatientsPage() {
                         <p className="text-lg mb-2">No patients registered yet</p>
                         <p className="text-sm">Click "Register New Patient" to get started</p>
                     </div>
-                ) : patients.filter(p => {
-                    if (!searchQuery) return true
-                    const fullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase()
-                    return fullName.includes(searchQuery.toLowerCase())
-                }).length === 0 ? (
+                ) : getFilteredAndSortedPatients().length === 0 ? (
                     <div className="text-center py-12 text-muted">
                         <p className="text-lg mb-2">No patients found</p>
                         <p className="text-sm">Try a different search term</p>
@@ -837,20 +1301,35 @@ export default function PatientsPage() {
                 ) : (
                     <>
                     <div className="space-y-2">
-                        {patients.filter(p => {
-                            if (!searchQuery) return true
-                            const fullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase()
-                            return fullName.includes(searchQuery.toLowerCase())
-                        })
+                        {getFilteredAndSortedPatients()
                         .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
                         .map(p => {
                             const isExpanded = expandedRows.has(p.id)
                             const fullName = `${p.firstName || ''} ${p.lastName || ''}`.trim()
                             
                             return (
-                                <div key={p.id} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                                <div key={p.id} className={`border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden transition-all duration-200 ${selectedPatientIds.has(p.id) ? 'ring-2 ring-green-500 shadow-xl shadow-green-100 dark:shadow-green-900/30 bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-gray-800 dark:to-gray-800' : ''}`}>
                                     {/* Summary Row */}
                                     <div className="bg-gray-50 dark:bg-gray-800 p-3 flex items-center gap-3">
+                                        {/* Checkbox */}
+                                        <div className="flex-shrink-0">
+                                            <label className="relative group/checkbox cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedPatientIds.has(p.id)}
+                                                    onChange={() => togglePatientSelection(p.id)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="peer sr-only"
+                                                />
+                                                <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                                    <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                </div>
+                                                <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                            </label>
+                                        </div>
+                                        
                                         {/* Patient Image Circle */}
                                         <div className="flex-shrink-0">
                                             <img 
@@ -864,7 +1343,6 @@ export default function PatientsPage() {
                                         <div className="flex-1 min-w-0">
                                             <div className="font-semibold text-sm">{fullName || 'Unknown Patient'}</div>
                                             <div className="text-xs text-muted mt-0.5">
-                                                {p.opdNo && <span className="mr-2">OPD: {p.opdNo}</span>}
                                                 {p.phone && <span className="mr-2">📞 {p.phone}</span>}
                                                 {p.age && <span>Age: {p.age}</span>}
                                             </div>
@@ -920,10 +1398,6 @@ export default function PatientsPage() {
                                                         <div className="text-sm font-medium">{p.lastName || '-'}</div>
                                                     </div>
                                                     <div>
-                                                        <div className="text-xs text-muted mb-1">OPD Number</div>
-                                                        <div className="text-sm font-medium font-mono">{p.opdNo || '-'}</div>
-                                                    </div>
-                                                    <div>
                                                         <div className="text-xs text-muted mb-1">Age</div>
                                                         <div className="text-sm font-medium">{p.age || '-'}</div>
                                                     </div>
@@ -934,10 +1408,6 @@ export default function PatientsPage() {
                                                     <div>
                                                         <div className="text-xs text-muted mb-1">Date of Birth</div>
                                                         <div className="text-sm font-medium">{p.dob ? new Date(p.dob).toLocaleDateString() : '-'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-muted mb-1">Occupation</div>
-                                                        <div className="text-sm font-medium">{p.occupation || '-'}</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -959,26 +1429,6 @@ export default function PatientsPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            {/* Medical Info */}
-                                            <div>
-                                                <div className="text-sm font-semibold mb-2">Medical Information</div>
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                                    <div>
-                                                        <div className="text-xs text-muted mb-1">Height</div>
-                                                        <div className="text-sm font-medium">{p.height ? `${p.height} cm` : '-'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-muted mb-1">Weight</div>
-                                                        <div className="text-sm font-medium">{p.weight ? `${p.weight} kg` : '-'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-muted mb-1">Pending Payment</div>
-                                                        <div className="text-sm font-medium text-red-600 dark:text-red-400">
-                                                            {p.pendingPaymentCents ? `₹${p.pendingPaymentCents}` : '-'}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -988,11 +1438,7 @@ export default function PatientsPage() {
 
                     {/* Pagination Controls */}
                     {(() => {
-                        const filteredPatients = patients.filter(p => {
-                            if (!searchQuery) return true
-                            const fullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase()
-                            return fullName.includes(searchQuery.toLowerCase())
-                        })
+                        const filteredPatients = getFilteredAndSortedPatients()
                         const totalPages = Math.ceil(filteredPatients.length / itemsPerPage)
                         
                         if (totalPages <= 1) return null

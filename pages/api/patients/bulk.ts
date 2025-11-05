@@ -28,9 +28,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 const chunkPromises = chunk.map(async (patientData: any) => {
                     try {
                         const { 
-                            firstName, lastName, phone, email, opdNo, date, dob, age, 
-                            address, gender, occupation, pendingPaymentCents, height, 
-                            weight, fatherHusbandGuardianName 
+                            firstName, lastName, phone, email, date, dob, age, 
+                            address, gender, fatherHusbandGuardianName 
                         } = patientData
 
                         return await prisma.patient.create({
@@ -39,16 +38,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 lastName,
                                 phone: phone || null,
                                 email: email || null,
-                                opdNo: opdNo || null,
                                 date: date ? new Date(date) : null,
                                 dob: dob ? new Date(dob) : null,
                                 age: age || null,
                                 address: address || null,
                                 gender: gender || null,
-                                occupation: occupation || null,
-                                pendingPaymentCents: pendingPaymentCents || 0,
-                                height: height || null,
-                                weight: weight || null,
                                 fatherHusbandGuardianName: fatherHusbandGuardianName || null,
                             }
                         })

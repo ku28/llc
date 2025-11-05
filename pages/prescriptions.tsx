@@ -62,6 +62,56 @@ export default function PrescriptionsPage() {
     const previewRef = useRef<HTMLDivElement | null>(null)
     const isPatient = user?.role?.toLowerCase() === 'user'
 
+    // Generate OPD number preview
+    async function generateOpdNoPreview(patientId: string) {
+        try {
+            // Get visit count for patient
+            const visitsRes = await fetch(`/api/visits?patientId=${patientId}`)
+            const visits = await visitsRes.json()
+            const visitCount = visits.length + 1 // Next visit number
+            
+            // Get token for today (or calculate next token)
+            const today = new Date()
+            const yy = today.getFullYear().toString().slice(-2)
+            const mm = (today.getMonth() + 1).toString().padStart(2, '0')
+            const dd = today.getDate().toString().padStart(2, '0')
+            
+            // Get tokens for today to determine next token number
+            const tokensRes = await fetch('/api/tokens')
+            const tokens = await tokensRes.json()
+            
+            const todayStart = new Date(today)
+            todayStart.setHours(0, 0, 0, 0)
+            const todayEnd = new Date(today)
+            todayEnd.setHours(23, 59, 59, 999)
+            
+            const todayTokens = tokens.filter((t: any) => {
+                const tokenDate = new Date(t.date)
+                return tokenDate >= todayStart && tokenDate <= todayEnd
+            })
+            
+            // Find token for this patient or estimate next token
+            let tokenNumber = 1
+            const patientToken = todayTokens.find((t: any) => t.patientId === Number(patientId))
+            if (patientToken) {
+                tokenNumber = patientToken.tokenNumber
+            } else {
+                // Estimate next token number
+                const maxToken = todayTokens.reduce((max: number, t: any) => 
+                    Math.max(max, t.tokenNumber), 0)
+                tokenNumber = maxToken + 1
+            }
+            
+            const token = tokenNumber.toString().padStart(2, '0')
+            const visit = visitCount.toString().padStart(2, '0')
+            
+            return `${yy}${mm}${dd} ${token} ${visit}`
+        } catch (error) {
+            console.error('Error generating OPD preview:', error)
+            return ''
+        }
+    }
+
     // Track treatment plan modifications
     const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | null>(null)
     const [selectedTreatmentPlan, setSelectedTreatmentPlan] = useState<any>(null)
@@ -73,6 +123,7 @@ export default function PrescriptionsPage() {
     const [savedVisitIdForNav, setSavedVisitIdForNav] = useState<string | null>(null)
     const [creatingTreatment, setCreatingTreatment] = useState(false)
     const [treatmentModalMessage, setTreatmentModalMessage] = useState('Creating Treatment Plan and Saving Prescription...')
+    const [generatedOpdNo, setGeneratedOpdNo] = useState<string>('')
 
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
     useEffect(() => { fetch('/api/patients').then(r => r.json()).then(setPatients) }, [])
@@ -85,31 +136,73 @@ export default function PrescriptionsPage() {
         if (patientId && !isEditMode && patients.length > 0) {
             const found = patients.find(p => String(p.id) === String(patientId))
             if (found) {
-                setForm((prev: any) => ({ 
-                    ...prev, 
-                    patientId: String(patientId),
-                    opdNo: found.opdNo || '',
-                    visitNumber: visitNumber ? String(visitNumber) : prev.visitNumber,
-                    dob: formatDateForInput(found.dob),
-                    age: found.age ?? '',
-                    address: found.address || '',
-                    gender: found.gender || '',
-                    phone: found.phone || '',
-                    occupation: found.occupation || '',
-                    pendingPaymentCents: found.pendingPaymentCents ?? '',
-                    height: found.height ?? '',
-                    weight: found.weight ?? '',
-                    fatherHusbandGuardianName: found.fatherHusbandGuardianName || '',
-                    // Load clinical information from patient record
-                    temperament: found.temperament || '',
-                    pulseDiagnosis: found.pulseDiagnosis || '',
-                    pulseDiagnosis2: found.pulseDiagnosis2 || '',
-                    majorComplaints: found.majorComplaints || '',
-                    historyReports: found.historyReports || '',
-                    investigations: found.investigations || '',
-                    provisionalDiagnosis: found.provisionalDiagnosis || '',
-                    improvements: found.improvements || ''
-                }))
+                // Fetch the most recent visit for this patient to get opdNo
+                fetch(`/api/visits?patientId=${patientId}`)
+                    .then(r => r.json())
+                    .then(async (patientVisits: any[]) => {
+                        const latestVisit = patientVisits.length > 0 ? patientVisits[0] : null
+                        
+                        // Generate preview for new visits
+                        let previewOpdNo = ''
+                        if (!latestVisit?.opdNo) {
+                            previewOpdNo = await generateOpdNoPreview(String(patientId))
+                            setGeneratedOpdNo(previewOpdNo)
+                        }
+                        
+                        setForm((prev: any) => ({ 
+                            ...prev, 
+                            patientId: String(patientId),
+                            opdNo: latestVisit?.opdNo || previewOpdNo,
+                            visitNumber: visitNumber ? String(visitNumber) : prev.visitNumber,
+                            dob: formatDateForInput(found.dob),
+                            age: found.age ?? '',
+                            address: found.address || '',
+                            gender: found.gender || '',
+                            phone: found.phone || '',
+                            occupation: found.occupation || '',
+                            pendingPaymentCents: found.pendingPaymentCents ?? '',
+                            height: found.height ?? '',
+                            weight: found.weight ?? '',
+                            fatherHusbandGuardianName: found.fatherHusbandGuardianName || '',
+                            // Load clinical information from patient record
+                            temperament: found.temperament || '',
+                            pulseDiagnosis: found.pulseDiagnosis || '',
+                            pulseDiagnosis2: found.pulseDiagnosis2 || '',
+                            majorComplaints: found.majorComplaints || '',
+                            historyReports: found.historyReports || '',
+                            investigations: found.investigations || '',
+                            provisionalDiagnosis: found.provisionalDiagnosis || '',
+                            improvements: found.improvements || ''
+                        }))
+                    })
+                    .catch(() => {
+                        // If fetch fails, just set patient data without opdNo
+                        setForm((prev: any) => ({ 
+                            ...prev, 
+                            patientId: String(patientId),
+                            opdNo: '',
+                            visitNumber: visitNumber ? String(visitNumber) : prev.visitNumber,
+                            dob: formatDateForInput(found.dob),
+                            age: found.age ?? '',
+                            address: found.address || '',
+                            gender: found.gender || '',
+                            phone: found.phone || '',
+                            occupation: found.occupation || '',
+                            pendingPaymentCents: found.pendingPaymentCents ?? '',
+                            height: found.height ?? '',
+                            weight: found.weight ?? '',
+                            fatherHusbandGuardianName: found.fatherHusbandGuardianName || '',
+                            // Load clinical information from patient record
+                            temperament: found.temperament || '',
+                            pulseDiagnosis: found.pulseDiagnosis || '',
+                            pulseDiagnosis2: found.pulseDiagnosis2 || '',
+                            majorComplaints: found.majorComplaints || '',
+                            historyReports: found.historyReports || '',
+                            investigations: found.investigations || '',
+                            provisionalDiagnosis: found.provisionalDiagnosis || '',
+                            improvements: found.improvements || ''
+                        }))
+                    })
             } else {
                 setForm((prev: any) => ({ 
                     ...prev, 
@@ -829,31 +922,73 @@ export default function PrescriptionsPage() {
             nextVisitTime = dt.slice(11, 16)
         }
 
-        setForm((prev: any) => ({
-            ...prev,
-            patientId: String(found.id),
-            opdNo: found.opdNo || '',
-            dob: formatDateForInput(found.dob),
-            age: found.age ?? '',
-            address: found.address || '',
-            gender: found.gender || '',
-            phone: found.phone || '',
-            nextVisitDate,
-            nextVisitTime,
-            occupation: found.occupation || '',
-            pendingPaymentCents: found.pendingPaymentCents ?? '',
-            height: found.height ?? '',
-            weight: found.weight ?? '',
-            // Load clinical information from patient record
-            temperament: found.temperament || '',
-            pulseDiagnosis: found.pulseDiagnosis || '',
-            pulseDiagnosis2: found.pulseDiagnosis2 || '',
-            majorComplaints: found.majorComplaints || '',
-            historyReports: found.historyReports || '',
-            investigations: found.investigations || '',
-            provisionalDiagnosis: found.provisionalDiagnosis || '',
-            improvements: found.improvements || ''
-        }))
+        // Fetch the most recent visit for this patient to get opdNo
+        fetch(`/api/visits?patientId=${id}`)
+            .then(r => r.json())
+            .then(async (patientVisits: any[]) => {
+                const latestVisit = patientVisits.length > 0 ? patientVisits[0] : null
+                
+                // Generate preview for new visits
+                let previewOpdNo = ''
+                if (!latestVisit?.opdNo) {
+                    previewOpdNo = await generateOpdNoPreview(id)
+                    setGeneratedOpdNo(previewOpdNo)
+                }
+                
+                setForm((prev: any) => ({
+                    ...prev,
+                    patientId: String(found.id),
+                    opdNo: latestVisit?.opdNo || previewOpdNo,
+                    dob: formatDateForInput(found.dob),
+                    age: found.age ?? '',
+                    address: found.address || '',
+                    gender: found.gender || '',
+                    phone: found.phone || '',
+                    nextVisitDate,
+                    nextVisitTime,
+                    occupation: found.occupation || '',
+                    pendingPaymentCents: found.pendingPaymentCents ?? '',
+                    height: found.height ?? '',
+                    weight: found.weight ?? '',
+                    // Load clinical information from patient record
+                    temperament: found.temperament || '',
+                    pulseDiagnosis: found.pulseDiagnosis || '',
+                    pulseDiagnosis2: found.pulseDiagnosis2 || '',
+                    majorComplaints: found.majorComplaints || '',
+                    historyReports: found.historyReports || '',
+                    investigations: found.investigations || '',
+                    provisionalDiagnosis: found.provisionalDiagnosis || '',
+                    improvements: found.improvements || ''
+                }))
+            })
+            .catch(() => {
+                // If fetch fails, just set patient data without opdNo
+                setForm((prev: any) => ({
+                    ...prev,
+                    patientId: String(found.id),
+                    opdNo: '',
+                    dob: formatDateForInput(found.dob),
+                    age: found.age ?? '',
+                    address: found.address || '',
+                    gender: found.gender || '',
+                    phone: found.phone || '',
+                    nextVisitDate,
+                    nextVisitTime,
+                    occupation: found.occupation || '',
+                    pendingPaymentCents: found.pendingPaymentCents ?? '',
+                    height: found.height ?? '',
+                    weight: found.weight ?? '',
+                    // Load clinical information from patient record
+                    temperament: found.temperament || '',
+                    pulseDiagnosis: found.pulseDiagnosis || '',
+                    pulseDiagnosis2: found.pulseDiagnosis2 || '',
+                    majorComplaints: found.majorComplaints || '',
+                    historyReports: found.historyReports || '',
+                    investigations: found.investigations || '',
+                    provisionalDiagnosis: found.provisionalDiagnosis || '',
+                    improvements: found.improvements || ''
+                }))
+            })
     }
 
     function addEmptyPrescription() {
@@ -1086,29 +1221,62 @@ export default function PrescriptionsPage() {
                                                     nextVisitTime = dt.slice(11, 16)
                                                 }
 
-                                                setForm((prev: any) => ({
-                                                    ...prev,
-                                                    patientId: String(found.id),
-                                                    opdNo: found.opdNo || '',
-                                                    dob: formatDateForInput(found.dob),
-                                                    age: found.age ?? '',
-                                                    address: found.address || '',
-                                                    gender: found.gender || '',
-                                                    phone: found.phone || '',
-                                                    nextVisitDate,
-                                                    nextVisitTime,
-                                                    occupation: found.occupation || '',
-                                                    pendingPaymentCents: found.pendingPaymentCents ?? '',
-                                                    height: found.height ?? '',
-                                                    weight: found.weight ?? '',
-                                                    imageUrl: found.imageUrl || ''
-                                                }))
+                                                // Fetch the most recent visit for this patient to get opdNo
+                                                fetch(`/api/visits?patientId=${id}`)
+                                                    .then(r => r.json())
+                                                    .then(async (patientVisits: any[]) => {
+                                                        const latestVisit = patientVisits.length > 0 ? patientVisits[0] : null
+                                                        
+                                                        // Generate preview for new visits
+                                                        let previewOpdNo = ''
+                                                        if (!latestVisit?.opdNo) {
+                                                            previewOpdNo = await generateOpdNoPreview(id)
+                                                            setGeneratedOpdNo(previewOpdNo)
+                                                        }
+                                                        
+                                                        setForm((prev: any) => ({
+                                                            ...prev,
+                                                            patientId: String(found.id),
+                                                            opdNo: latestVisit?.opdNo || previewOpdNo,
+                                                            dob: formatDateForInput(found.dob),
+                                                            age: found.age ?? '',
+                                                            address: found.address || '',
+                                                            gender: found.gender || '',
+                                                            phone: found.phone || '',
+                                                            nextVisitDate,
+                                                            nextVisitTime,
+                                                            occupation: found.occupation || '',
+                                                            pendingPaymentCents: found.pendingPaymentCents ?? '',
+                                                            height: found.height ?? '',
+                                                            weight: found.weight ?? '',
+                                                            imageUrl: found.imageUrl || ''
+                                                        }))
+                                                    })
+                                                    .catch(() => {
+                                                        setForm((prev: any) => ({
+                                                            ...prev,
+                                                            patientId: String(found.id),
+                                                            opdNo: '',
+                                                            dob: formatDateForInput(found.dob),
+                                                            age: found.age ?? '',
+                                                            address: found.address || '',
+                                                            gender: found.gender || '',
+                                                            phone: found.phone || '',
+                                                            nextVisitDate,
+                                                            nextVisitTime,
+                                                            occupation: found.occupation || '',
+                                                            pendingPaymentCents: found.pendingPaymentCents ?? '',
+                                                            height: found.height ?? '',
+                                                            weight: found.weight ?? '',
+                                                            imageUrl: found.imageUrl || ''
+                                                        }))
+                                                    })
                                             }}
                                             options={[
                                                 { value: '', label: '-- select patient --' },
                                                 ...patients.map(p => ({
                                                     value: String(p.id),
-                                                    label: `${p.firstName} ${p.lastName}${p.opdNo ? ' · OPD: ' + p.opdNo : ''}`
+                                                    label: `${p.firstName} ${p.lastName}${p.phone ? ' · ' + p.phone : ''}`
                                                 }))
                                             ]}
                                             placeholder="-- select patient --"
@@ -1162,7 +1330,7 @@ export default function PrescriptionsPage() {
                                     <div>
                                         <label className="block text-sm font-medium mb-1.5">OPD Number</label>
                                         <div className="p-2 text-base font-medium text-gray-900 dark:text-gray-100">
-                                            {form.opdNo || 'Not assigned'}
+                                            {form.opdNo || <span className="text-muted italic">Select a patient first</span>}
                                         </div>
                                     </div>
                                     <div>
