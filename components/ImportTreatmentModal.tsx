@@ -429,13 +429,28 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                                 <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Template Information</h4>
                                 <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                                    <li>• Required: <strong>planNumber</strong></li>
-                                    <li>• <strong>productName</strong> is optional - leave blank to skip products</li>
-                                    <li>• Product IDs are automatically matched or created</li>
-                                    <li>• Each row = 1 treatment plan with 1 product</li>
-                                    <li>• Plan numbers are per diagnosis (Fever Plan 1, Cold Plan 1, etc.)</li>
-                                    <li>• Download template: <a href="/templates/treatment_plans_import_template.csv" download className="underline hover:text-blue-600">CSV Template</a></li>
-                                    <li>• <a href="/templates/TREATMENT_IMPORT_INSTRUCTIONS.md" target="_blank" className="underline hover:text-blue-600">View Full Instructions</a></li>
+                                    <li><strong>🔑 Required Field:</strong></li>
+                                    <li className="ml-4">• <strong>planNumber</strong> - Treatment plan identifier (e.g., "01", "02")</li>
+                                    
+                                    <li className="mt-2"><strong>📝 Recommended Fields:</strong></li>
+                                    <li className="ml-4">• <strong>provDiagnosis</strong> - Provisional diagnosis (e.g., "Fever", "Cold")</li>
+                                    <li className="ml-4">• <strong>treatmentPlan</strong> - Description of treatment</li>
+                                    
+                                    <li className="mt-2"><strong>💊 Medicine Fields (optional):</strong></li>
+                                    <li className="ml-4">• <strong>productName</strong> - Medicine name (auto-creates if not found)</li>
+                                    <li className="ml-4">• <strong>quantity</strong> - Amount to prescribe</li>
+                                    <li className="ml-4">• <strong>dosage</strong> - Dosage instructions</li>
+                                    <li className="ml-4">• <strong>timing</strong> - When to take (e.g., "After meals")</li>
+                                    <li className="ml-4">• Components: comp1-comp5 for medicine composition</li>
+                                    
+                                    <li className="mt-2"><strong>ℹ️ Important Notes:</strong></li>
+                                    <li className="ml-4">• Plan numbers are <strong>per diagnosis</strong> (Fever Plan 1, Cold Plan 1, etc.)</li>
+                                    <li className="ml-4">• Multiple rows with same planNumber + provDiagnosis = 1 treatment with multiple medicines</li>
+                                    <li className="ml-4">• Leave productName blank to create treatment without medicines</li>
+                                    <li className="ml-4">• Duplicate plans will update existing, not create new</li>
+                                    
+                                    <li className="mt-2">• 📥 <a href="/templates/treatment_plans_import_template.csv" download className="underline hover:text-blue-600 font-semibold">Download CSV Template</a></li>
+                                    <li>• 📖 <a href="/templates/TREATMENT_IMPORT_INSTRUCTIONS.md" target="_blank" className="underline hover:text-blue-600 font-semibold">View Full Instructions</a></li>
                                 </ul>
                             </div>
 

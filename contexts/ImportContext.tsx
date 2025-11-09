@@ -31,7 +31,34 @@ interface ImportContextType {
 const ImportContext = createContext<ImportContextType | undefined>(undefined)
 
 export function ImportProvider({ children }: { children: ReactNode }) {
-    const [tasks, setTasks] = useState<ImportTask[]>([])
+    const [tasks, setTasks] = useState<ImportTask[]>(() => {
+        // Load tasks from localStorage on initialization
+        if (typeof window !== 'undefined') {
+            try {
+                const saved = localStorage.getItem('importTasks')
+                if (saved) {
+                    const parsed = JSON.parse(saved)
+                    console.log('📂 Loaded tasks from localStorage:', parsed)
+                    return parsed
+                }
+            } catch (error) {
+                console.error('Error loading tasks from localStorage:', error)
+            }
+        }
+        return []
+    })
+
+    // Save tasks to localStorage whenever they change
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                localStorage.setItem('importTasks', JSON.stringify(tasks))
+                console.log('💾 Saved tasks to localStorage:', tasks)
+            } catch (error) {
+                console.error('Error saving tasks to localStorage:', error)
+            }
+        }
+    }, [tasks])
 
     // Debug logging for all state changes
     useEffect(() => {

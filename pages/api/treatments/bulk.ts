@@ -76,7 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log(`[Bulk Create] All products resolved. Starting treatment import...`)
 
             // Process in parallel batches for much faster performance
-            const BATCH_SIZE = 10
+            const BATCH_SIZE = 50 // Increased for better performance
             const results: any[] = []
             const errors: any[] = []
             

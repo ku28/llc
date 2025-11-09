@@ -354,11 +354,25 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
                             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                                 <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Template Information</h4>
                                 <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                                    <li>• Required: <strong>name</strong></li>
-                                    <li>• Optional: price, quantity, purchasePrice, unit</li>
-                                    <li>• Prices can be in rupees (will be converted to cents)</li>
-                                    <li>• Each row = 1 product</li>
-                                    <li>• Download template: <a href="/templates/products_import_template.csv" download className="underline hover:text-blue-600">CSV Template</a></li>
+                                    <li><strong>🔑 Required Field:</strong></li>
+                                    <li className="ml-4">• <strong>name</strong> - Product/Medicine name (must be unique)</li>
+                                    
+                                    <li className="mt-2"><strong>📝 Optional Fields:</strong></li>
+                                    <li className="ml-4">• <strong>price</strong> - Selling price (₹ or paise, auto-converts)</li>
+                                    <li className="ml-4">• <strong>purchasePrice</strong> - Cost price for inventory</li>
+                                    <li className="ml-4">• <strong>quantity</strong> - Stock quantity (default: 0)</li>
+                                    <li className="ml-4">• <strong>unit</strong> - Unit of measurement (e.g., "tablets", "ml", "box")</li>
+                                    
+                                    <li className="mt-2"><strong>💰 Price Format:</strong></li>
+                                    <li className="ml-4">• Enter in rupees: <strong>50</strong> or <strong>50.00</strong> (auto-converts to paise)</li>
+                                    <li className="ml-4">• Or in paise: <strong>5000</strong> (₹50.00)</li>
+                                    
+                                    <li className="mt-2"><strong>ℹ️ Notes:</strong></li>
+                                    <li className="ml-4">• Each row = 1 product</li>
+                                    <li className="ml-4">• Duplicate names will be skipped (keeps existing)</li>
+                                    <li className="ml-4">• Missing prices default to ₹0.00</li>
+                                    
+                                    <li className="mt-2">• 📥 <a href="/templates/products_import_template.csv" download className="underline hover:text-blue-600 font-semibold">Download CSV Template</a></li>
                                 </ul>
                             </div>
 

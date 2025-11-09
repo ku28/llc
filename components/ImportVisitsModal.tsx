@@ -26,13 +26,13 @@ interface VisitRow {
     gender?: string
     dob?: string
     age?: number
-    weight?: number
+    weight?: any // Can be string (for history like "94/93/94") or number
     height?: number
     temperament?: string
     pulseDiagnosis?: string
     pulseDiagnosis2?: string
     investigations?: string
-    diagnoses?: string
+    provDiagnosis?: string // Changed from diagnoses to match schema
     historyReports?: string
     majorComplaints?: string
     improvements?: string
@@ -44,10 +44,12 @@ interface VisitRow {
     prescriptions?: Array<{
         quantity?: number
         productName?: string
-        comp1?: string
-        comp2?: string
-        comp3?: string
-        timing?: string
+        comp1?: string // CR - Spagyric 1 (SPY1)
+        comp2?: string // SY - Spagyric 2 (SPY2)
+        comp3?: string // EF - Spagyric 3 (SPY3)
+        comp4?: string // CP4 - Component 4 (optional)
+        comp5?: string // CP5 - Component 5 (optional)
+        timing?: string // TM - Timing
         dosage?: string
         additions?: string
         procedure?: string
@@ -141,7 +143,17 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
             const str = String(dateStr).trim()
             if (!str) return undefined
             
-            // Try to parse DD-MM-YYYY format (e.g., "01-11-2025")
+            // Handle Excel serial date numbers (days since 1900-01-01)
+            if (/^\d+$/.test(str) && Number(str) > 40000 && Number(str) < 60000) {
+                const excelEpoch = new Date(1900, 0, 1)
+                const days = parseInt(str) - 2 // Excel has a leap year bug, subtract 2
+                const date = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000)
+                if (!isNaN(date.getTime())) {
+                    return date.toISOString().split('T')[0]
+                }
+            }
+            
+            // Try to parse DD-MM-YYYY format (e.g., "01-11-2025" or "04-11-2025")
             const ddmmyyyyMatch = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
             if (ddmmyyyyMatch) {
                 const [, day, month, year] = ddmmyyyyMatch
@@ -171,16 +183,18 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                 const num = String(i).padStart(2, '0') // Format as 01, 02, etc.
                 const qtyKey = i === 1 ? `QTY-${num}` : `QNTY-${num}` // First is QTY, rest are QNTY
                 const qty = row[qtyKey]
-                const productName = row[`CR-${num}`]
+                const productName = row[`DL-${num}`] // DL = Medicine name (corrected mapping)
                 
-                // Only add prescription if at least product name or quantity exists
-                if (qty || productName) {
+                // Only add prescription if at least product name exists
+                if (productName) {
                     prescriptions.push({
                         quantity: qty ? Number(qty) : 1,
-                        productName: productName || '',
-                        comp1: row[`DL-${num}`] || '',
-                        comp2: row[`SY-${num}`] || '',
-                        comp3: row[`EF-${num}`] || '',
+                        productName: String(productName).trim(),
+                        comp1: row[`CR-${num}`] || '', // CR = Spagyric 1 (SPY1)
+                        comp2: row[`SY-${num}`] || '', // SY = Spagyric 2 (SPY2)
+                        comp3: row[`EF-${num}`] || '', // EF = Spagyric 3 (SPY3)
+                        comp4: row[`CP4-${num}`] || '', // CP4 = Component 4 (optional)
+                        comp5: row[`CP5-${num}`] || '', // CP5 = Component 5 (optional)
                         timing: row[`TM-${num}`] || '',
                         dosage: row[`DOSE-${num}`] || '',
                         additions: row[`AD-${num}`] || '',
@@ -208,13 +222,24 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                 gender: row.Sex || row.gender || undefined,
                 dob: parseDate(row.DOB || row.dob),
                 age: row.Age ? Number(String(row.Age).replace(/[^0-9]/g, '')) : undefined,
-                weight: row.Wt ? parseFloat(row.Wt) : undefined,
-                height: row.Ht ? parseFloat(row.Ht) : undefined,
+                weight: row.Wt || row.weight || undefined, // Keep as string to preserve history format like "94/93/94"
+                height: row.Ht ? (() => {
+                    const htStr = String(row.Ht).trim()
+                    // Handle formats like "3' 9\"" or "3'9" or plain numbers
+                    const feetInchMatch = htStr.match(/(\d+)'?\s*(\d+)?/)
+                    if (feetInchMatch) {
+                        const feet = parseInt(feetInchMatch[1]) || 0
+                        const inches = parseInt(feetInchMatch[2] || '0')
+                        return feet * 12 + inches // Convert to total inches
+                    }
+                    // Plain number
+                    return parseFloat(htStr.replace(/[^0-9.]/g, '')) || undefined
+                })() : undefined,
                 temperament: row.Temp || row.temperament || undefined,
                 pulseDiagnosis: row['PulseD 1'] || row.pulseDiagnosis || undefined,
                 pulseDiagnosis2: row['PulseD 2'] || row.pulseDiagnosis2 || undefined,
                 investigations: row.Investigations || row.investigations || undefined,
-                diagnoses: row['Diagnosis:'] || row.diagnoses || undefined,
+                provDiagnosis: row.Diagnosis || row['Diagnosis:'] || row.provDiagnosis || undefined,
                 historyReports: row['Hist/Reports'] || row.historyReports || undefined,
                 majorComplaints: row['Chief Complaints'] || row.majorComplaints || undefined,
                 improvements: row.Imp || row.improvements || undefined,
@@ -551,12 +576,39 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                                 <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Template Information</h4>
                                 <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                                    <li>• Required: <strong>OPDN</strong> (OPD Number)</li>
-                                    <li>• System will match/create patients by phone number or patient name</li>
-                                    <li>• Optional fields: Date, Patient Name, V (Visit Number), Address, Age, Gender, AMT, DISCOUNT, PAYMENT, BAL, etc.</li>
-                                    <li>• Prescriptions: Use DRN-01 to DRN-12, DL-01 to DL-12, CR-01 to CR-12 (medicine names), SY-01 to SY-12, EF-01 to EF-12, TM-01 to TM-12, DOSE-01 to DOSE-12, AD-01 to AD-12, PR-01 to PR-12, PRE-01 to PRE-12, TDY-01 to TDY-12, QTY-01/QNTY-02 to QNTY-12</li>
-                                    <li>• Each row = 1 visit with up to 12 medicines</li>
-                                    <li>• Download template: <a href="/templates/visits import.csv" download className="underline hover:text-blue-600">CSV Template</a></li>
+                                    <li><strong>🔑 Required Field:</strong></li>
+                                    <li className="ml-4">• <strong>OPDN</strong> - OPD Number (unique identifier)</li>
+                                    
+                                    <li className="mt-2"><strong>👤 Patient Matching:</strong></li>
+                                    <li className="ml-4">• System matches by <strong>phone number</strong> first, then by patient name</li>
+                                    <li className="ml-4">• If no match found, creates new patient automatically</li>
+                                    
+                                    <li className="mt-2"><strong>📝 Visit Fields (all optional):</strong></li>
+                                    <li className="ml-4">• Date, Patient Name, V (Visit Number), Age, Gender, Phone, Address</li>
+                                    <li className="ml-4">• AMT (Amount), DISCOUNT, PAYMENT, BAL (Balance)</li>
+                                    <li className="ml-4">• Diagnoses, Major Complaints, History Reports, Investigations</li>
+                                    
+                                    <li className="mt-2"><strong>💊 Medicines (supports up to 12 per visit):</strong></li>
+                                    <li className="ml-4">• <strong>DL-01 to DL-12:</strong> Medicine/Drug names (auto-creates if not found)</li>
+                                    <li className="ml-4">• <strong>CR-01 to CR-12:</strong> Spagyric 1 (SPY1/Comp1)</li>
+                                    <li className="ml-4">• <strong>SY-01 to SY-12:</strong> Spagyric 2 (SPY2/Comp2)</li>
+                                    <li className="ml-4">• <strong>EF-01 to EF-12:</strong> Spagyric 3 (SPY3/Comp3)</li>
+                                    <li className="ml-4">• <strong>CP4-01 to CP4-12:</strong> Component 4 (optional)</li>
+                                    <li className="ml-4">• <strong>CP5-01 to CP5-12:</strong> Component 5 (optional)</li>
+                                    <li className="ml-4">• <strong>TM-01 to TM-12:</strong> Timing</li>
+                                    <li className="ml-4">• <strong>DOSE-01 to DOSE-12:</strong> Dosage amount</li>
+                                    <li className="ml-4">• <strong>AD-01 to AD-12:</strong> Additions</li>
+                                    <li className="ml-4">• <strong>PR-01 to PR-12:</strong> Procedure</li>
+                                    <li className="ml-4">• <strong>PRE-01 to PRE-12:</strong> Presentation</li>
+                                    <li className="ml-4">• <strong>TDY-01 to TDY-12:</strong> Droppers today</li>
+                                    <li className="ml-4">• <strong>QTY-01, QNTY-02 to QNTY-12:</strong> Quantity prescribed</li>
+                                    
+                                    <li className="mt-2"><strong>⚠️ Important Notes:</strong></li>
+                                    <li className="ml-4">• Each row = 1 visit with all its medicines</li>
+                                    <li className="ml-4">• Duplicate OPD numbers will <strong>update</strong> the existing visit</li>
+                                    <li className="ml-4">• Weight format "69/70/71" stores history (uses last value)</li>
+                                    
+                                    <li className="mt-2">• 📥 <a href="/templates/visits import.csv" download className="underline hover:text-blue-600 font-semibold">Download CSV Template</a></li>
                                 </ul>
                             </div>
 

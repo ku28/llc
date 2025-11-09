@@ -372,10 +372,25 @@ export default function ImportPatientsModal({ isOpen, onClose, onImportSuccess }
                             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                                 <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Template Information</h4>
                                 <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                                    <li>• Required: <strong>firstName</strong>, <strong>lastName</strong></li>
-                                    <li>• Optional: phone, email, opdNo, dob, age, gender, address, etc.</li>
-                                    <li>• Each row = 1 patient</li>
-                                    <li>• Download template: <a href="/templates/patients_import_template.csv" download className="underline hover:text-blue-600">CSV Template</a></li>
+                                    <li><strong>🔑 Required Fields:</strong></li>
+                                    <li className="ml-4">• <strong>firstName</strong> - Patient's first name</li>
+                                    <li className="ml-4">• <strong>lastName</strong> - Patient's last name</li>
+                                    
+                                    <li className="mt-2"><strong>📝 Optional Fields:</strong></li>
+                                    <li className="ml-4">• <strong>phone</strong> - Contact number (recommended for matching)</li>
+                                    <li className="ml-4">• <strong>email</strong> - Email address</li>
+                                    <li className="ml-4">• <strong>opdNo</strong> - OPD Number</li>
+                                    <li className="ml-4">• <strong>dob</strong> - Date of Birth (format: YYYY-MM-DD)</li>
+                                    <li className="ml-4">• <strong>age</strong> - Patient age</li>
+                                    <li className="ml-4">• <strong>gender</strong> - Male/Female/Other</li>
+                                    <li className="ml-4">• <strong>address</strong> - Full address</li>
+                                    <li className="ml-4">• <strong>fatherHusbandGuardianName</strong> - Guardian name</li>
+                                    
+                                    <li className="mt-2"><strong>ℹ️ Notes:</strong></li>
+                                    <li className="ml-4">• Each row = 1 patient</li>
+                                    <li className="ml-4">• Duplicates by phone will skip or update based on your choice</li>
+                                    
+                                    <li className="mt-2">• 📥 <a href="/templates/patients_import_template.csv" download className="underline hover:text-blue-600 font-semibold">Download CSV Template</a></li>
                                 </ul>
                             </div>
 

@@ -44,7 +44,7 @@ export default function PrescriptionsPage() {
     const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
     const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({})
     const [form, setForm] = useState<any>({
-        patientId: '', opdNo: '', temperament: '', pulseDiagnosis: '', pulseDiagnosis2: '',
+        patientId: '', opdNo: '', date: new Date().toISOString().split('T')[0], temperament: '', pulseDiagnosis: '', pulseDiagnosis2: '',
         majorComplaints: '', historyReports: '', investigations: '', reports: '', provisionalDiagnosis: '',
         improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '',
         nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '',
@@ -126,7 +126,18 @@ export default function PrescriptionsPage() {
     const [generatedOpdNo, setGeneratedOpdNo] = useState<string>('')
 
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
-    useEffect(() => { fetch('/api/patients').then(r => r.json()).then(setPatients) }, [])
+    useEffect(() => { 
+        fetch('/api/patients')
+            .then(r => r.json())
+            .then(data => {
+                console.log('Patients fetched:', data)
+                setPatients(Array.isArray(data) ? data : [])
+            })
+            .catch(err => {
+                console.error('Error fetching patients:', err)
+                setPatients([])
+            })
+    }, [])
     useEffect(() => { fetch('/api/treatments').then(r => r.json()).then(setTreatments) }, [])
     useEffect(() => { fetch('/api/products').then(r => r.json()).then(setProducts) }, [])
 
@@ -354,6 +365,7 @@ export default function PrescriptionsPage() {
                     setForm({
                         patientId: String(visit.patientId),
                         opdNo: visit.opdNo || '',
+                        date: formatDateForInput(visit.date),
                         temperament: visit.temperament || '',
                         pulseDiagnosis: visit.pulseDiagnosis || '',
                         pulseDiagnosis2: visit.pulseDiagnosis2 || '',
@@ -404,7 +416,6 @@ export default function PrescriptionsPage() {
                             droppersToday: p.droppersToday?.toString() || '',
                             medicineQuantity: p.medicineQuantity?.toString() || '',
                             administration: p.administration || '',
-                            taken: p.taken || false,
                             patientHasMedicine: p.patientHasMedicine || false
                         }))
                         
@@ -488,7 +499,6 @@ export default function PrescriptionsPage() {
                             droppersToday: p.droppersToday?.toString() || '',
                             medicineQuantity: p.medicineQuantity?.toString() || '',
                             administration: p.administration || '',
-                            taken: true, // Default to checked for new visit
                             patientHasMedicine: false // Reset for new visit
                         }))
                         
@@ -841,7 +851,7 @@ export default function PrescriptionsPage() {
             quantity: 1, timing: '', dosage: '',
             additions: '', procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', taken: true, patientHasMedicine: false
+            administration: '', patientHasMedicine: false
         }])
     }
 
@@ -875,7 +885,7 @@ export default function PrescriptionsPage() {
             quantity: 1, timing: '', dosage: '',
             additions: '', procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', taken: true, patientHasMedicine: false
+            administration: '', patientHasMedicine: false
         }))
 
         setPrescriptions([...prescriptions, ...newPrescriptions])
@@ -1003,7 +1013,7 @@ export default function PrescriptionsPage() {
             quantity: 1, timing: '', dosage: '',
             additions: '', procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', taken: true
+            administration: '', patientHasMedicine: false
         }])
     }
 
@@ -1193,16 +1203,18 @@ export default function PrescriptionsPage() {
                         ))}
                     </div>
 
-                    <form onSubmit={submit} className="space-y-6">
-                        {/* Patient Selection Card */}
-                        <div className="card">
-                            <h3 className="text-lg font-semibold mb-4">Patient Information</h3>
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1.5">
-                                        Select Patient <span className="text-red-600">*</span>
-                                    </label>
-                                    <div className={fieldErrors.patientId ? 'border-2 border-red-600 rounded-lg' : ''}>
+                    <form onSubmit={submit} className="space-y-5">
+                        {/* Patient Selection Card - Green Futuristic Theme */}
+                        <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+                            <div className="relative p-6">
+                                <h3 className="text-lg font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Patient Information</h3>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1.5">
+                                            Select Patient <span className="text-red-600">*</span>
+                                        </label>
+                                        <div className={fieldErrors.patientId ? 'border-2 border-red-600 rounded-lg' : ''}>
                                         <CustomSelect
                                             required
                                             value={form.patientId}
@@ -1307,7 +1319,12 @@ export default function PrescriptionsPage() {
                                                 <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-300">
                                                     {form.opdNo && (
                                                         <span className="flex items-center gap-1">
-                                                            <span className="font-semibold">OPD:</span> {form.opdNo}
+                                                            <span className="font-semibold">OPD:</span> <span className="text-green-600 dark:text-green-400">{form.opdNo}</span>
+                                                        </span>
+                                                    )}
+                                                    {form.date && (
+                                                        <span className="flex items-center gap-1">
+                                                            <span className="font-semibold">Visit Date:</span> {new Date(form.date).toLocaleDateString()}
                                                         </span>
                                                     )}
                                                     {form.age && (
@@ -1332,6 +1349,10 @@ export default function PrescriptionsPage() {
                                         <div className="p-2 text-base font-medium text-gray-900 dark:text-gray-100">
                                             {form.opdNo || <span className="text-muted italic">Select a patient first</span>}
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1.5">Current Visit Date <span className="text-red-600">*</span></label>
+                                        <DateInput type="date" placeholder="Select visit date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full p-2 border rounded" required />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium mb-1.5">Date of Birth</label>
@@ -1423,14 +1444,16 @@ export default function PrescriptionsPage() {
                                     </div>
                                 </div>
                             </div>
+                            </div>
                         </div>
 
                         {/* Clinical Information Card */}
-                        <div className="card">
-                            <h3 className="text-lg font-semibold mb-4">Clinical Information</h3>
+                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
+                            <h3 className="relative text-lg font-semibold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Clinical Information</h3>
                             
                             {/* Temperament and Pulse Diagnoses in one line */}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
+                            <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Temperament</label>
                                     <CustomSelect
@@ -1569,16 +1592,13 @@ export default function PrescriptionsPage() {
                         </div>
 
                         {/* Next Visit & Tracking - Consolidated in single line */}
-                        <div className="card">
-                            <h3 className="text-lg font-semibold mb-4">Next Visit & Tracking</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
+                            <h3 className="relative text-lg font-semibold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Next Visit & Tracking</h3>
+                            <div className="relative grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Next Visit Date</label>
                                     <DateInput type="date" placeholder="Select visit date" value={form.nextVisitDate} onChange={e => setForm({ ...form, nextVisitDate: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1.5">Next Visit Time</label>
-                                    <input type="time" placeholder="Select time" value={form.nextVisitTime} onChange={e => setForm({ ...form, nextVisitTime: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Visit Number (V)</label>
@@ -1593,11 +1613,12 @@ export default function PrescriptionsPage() {
 
 
                         {/* Medicines Selection Card */}
-                        <div className="card">
-                            <h3 className="text-lg font-semibold mb-4">Medicine Selection</h3>
+                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
+                            <h3 className="relative text-lg font-semibold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Medicine Selection</h3>
 
                             {/* Add from Treatment Plan */}
-                            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <div className="relative mb-4 p-3 bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl backdrop-blur-sm">
                                 <label className="block text-sm font-medium mb-2">
                                     Quick Add from Treatment Plan
                                 </label>
@@ -1626,7 +1647,6 @@ export default function PrescriptionsPage() {
                                                     droppersToday: tp.droppersToday?.toString() || '',
                                                     medicineQuantity: tp.medicineQuantity?.toString() || '',
                                                     administration: treatment.administration || '',
-                                                    taken: true,
                                                     patientHasMedicine: false
                                                 }))
                                                 setPrescriptions(newPrescriptions) // Replace, not add
@@ -1639,6 +1659,7 @@ export default function PrescriptionsPage() {
                                             { value: '', label: '-- select treatment plan to load medicines --' },
                                             ...(Array.isArray(treatments) ? treatments : [])
                                                 .filter(t => !t.deleted) // Only show non-deleted treatments in dropdown
+                                                .filter(t => !(t.provDiagnosis === 'IMPORTED' && t.planNumber === '00')) // Hide imported treatment plan
                                                 .map(t => ({
                                                     value: String(t.id),
                                                     label: `${t.planNumber ? `Plan ${t.planNumber} - ` : ''}${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`} (${t.treatmentProducts?.length || 0} medicines)`
@@ -1717,9 +1738,9 @@ export default function PrescriptionsPage() {
                     </div>
 
                     {/* Selected Medicines List - Always visible */}
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3">
+                    <div className="bg-emerald-50/60 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 mb-3 backdrop-blur-sm">
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                            <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
                                 Selected Medicines ({selectedMedicines.length})
                             </span>
                             {selectedMedicines.length > 0 && (
@@ -1727,14 +1748,14 @@ export default function PrescriptionsPage() {
                                     <button 
                                         type="button" 
                                         onClick={removeAllSelectedMedicines}
-                                        className="btn btn-secondary text-sm"
+                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg transition-colors shadow-sm"
                                     >
                                         Remove All
                                     </button>
                                     <button 
                                         type="button" 
                                         onClick={addAllSelectedMedicinesToPrescription}
-                                        className="btn btn-primary text-sm"
+                                        className="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 rounded-lg transition-all shadow-sm hover:shadow-md"
                                     >
                                         Add All to Prescription
                                     </button>
@@ -1771,13 +1792,14 @@ export default function PrescriptionsPage() {
                         </div>
 
                         {/* Prescriptions Card */}
-                        <div className="card">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold">Prescriptions</h3>
-                                <button type="button" onClick={addEmptyPrescription} className="btn btn-secondary text-sm">+ Add Empty Row</button>
+                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
+                            <div className="relative flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Prescriptions</h3>
+                                <button type="button" onClick={addEmptyPrescription} className="px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-700 rounded-lg transition-colors shadow-sm hover:shadow-md">+ Add Empty Row</button>
                             </div>
                             {prescriptions.length === 0 ? (
-                                <div className="text-center py-8 text-muted">
+                                <div className="relative text-center py-8 text-gray-500 dark:text-gray-400">
                                     No prescriptions added yet. Use the medicine selector above or click "Add Empty Row".
                                 </div>
                             ) : (
@@ -1787,45 +1809,22 @@ export default function PrescriptionsPage() {
                                         const isDeleted = prescriptionTreatment?.deleted === true
                                         
                                         return (
-                                        <div key={i} className={`p-4 border rounded-lg ${isDeleted ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30'}`}>
+                                        <div key={i} className={`relative group transition-all duration-300 ${isDeleted ? 'border border-red-400/50 dark:border-red-600/50 bg-red-50/50 dark:bg-red-950/30 rounded-2xl' : 'border border-emerald-200/40 dark:border-emerald-700/40 bg-gradient-to-br from-white via-emerald-50/20 to-transparent dark:from-gray-900/80 dark:via-emerald-950/10 dark:to-gray-900/80 rounded-2xl hover:border-emerald-400/60 dark:hover:border-emerald-600/60 hover:shadow-xl hover:shadow-emerald-500/10'}`}>
+                                            {/* Futuristic glow effect on hover */}
+                                            {!isDeleted && (
+                                                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-400/0 via-green-400/0 to-emerald-500/0 group-hover:from-emerald-400/5 group-hover:via-green-400/5 group-hover:to-emerald-500/5 transition-all duration-500 pointer-events-none"></div>
+                                            )}
+                                            
                                             {isDeleted && (
-                                                <div className="mb-3 p-2 bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700 rounded text-sm">
-                                                    <span className="text-red-600 dark:text-red-400 font-bold">⚠ DELETED TREATMENT PLAN - Read Only</span>
+                                                <div className="mb-3 p-2.5 bg-red-100/80 dark:bg-red-900/50 border border-red-300/50 dark:border-red-700/50 rounded-xl text-sm backdrop-blur-sm">
+                                                    <span className="text-red-700 dark:text-red-300 font-semibold">⚠ DELETED TREATMENT PLAN - Read Only</span>
                                                 </div>
                                             )}
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            <div className="relative p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                                {/* Remove Treatment Plan field from individual rows - it's selected globally above */}
+                                                
                                                 <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Treatment Plan</label>
-                                                    {isDeleted ? (
-                                                        <div className="p-2 border rounded-lg bg-gray-100 dark:bg-gray-800 text-sm">
-                                                            <span className="text-red-600 dark:text-red-400 font-bold">(DELETED)</span> {prescriptionTreatment?.treatmentPlan || prescriptionTreatment?.provDiagnosis || `Treatment #${pr.treatmentId}`}
-                                                        </div>
-                                                    ) : pr.treatmentId ? (
-                                                        <div className="p-2 text-sm text-gray-700 dark:text-gray-300">
-                                                            {(() => {
-                                                                const treatment = Array.isArray(treatments) ? treatments.find(t => String(t.id) === String(pr.treatmentId)) : null
-                                                                return treatment ? `${treatment.planNumber ? `Plan ${treatment.planNumber} - ` : ''}${treatment.treatmentPlan || treatment.provDiagnosis || `Treatment #${pr.treatmentId}`}` : `Treatment #${pr.treatmentId}`
-                                                            })()}
-                                                        </div>
-                                                    ) : (
-                                                    <CustomSelect
-                                                        value={pr.treatmentId}
-                                                        onChange={(val) => !isDeleted && updatePrescription(i, { treatmentId: val })}
-                                                        options={[
-                                                            { value: '', label: '-- select treatment plan --' },
-                                                            ...(Array.isArray(treatments) ? treatments : [])
-                                                                .filter(t => !t.deleted)
-                                                                .map(t => ({
-                                                                    value: String(t.id),
-                                                                    label: `${t.planNumber ? `Plan ${t.planNumber} - ` : ''}${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`}`
-                                                                }))
-                                                        ]}
-                                                        placeholder="-- select treatment plan --"
-                                                    />
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">
+                                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
                                                         Medicine (from inventory)
                                                     </label>
                                                     {pr.productId ? (
@@ -2046,7 +2045,7 @@ export default function PrescriptionsPage() {
                                                                 placeholder="0" 
                                                                 value={pr.quantity || ''} 
                                                                 onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} 
-                                                                className="w-16 p-2 border rounded text-sm" 
+                                                                className="w-14 p-2 border rounded text-sm" 
                                                             />
                                                         </div>
                                                         
@@ -2158,33 +2157,34 @@ export default function PrescriptionsPage() {
                                                     />
                                                 </div>
                                                 
-                                                {/* Patient Already Has Medicine Checkbox */}
-                                                {/* Checkboxes in single line */}
-                                                <div className="flex items-center justify-between gap-4">
-                                                    <div className="flex items-center gap-4">
-                                                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={pr.patientHasMedicine || false}
-                                                                onChange={(e) => updatePrescription(i, { patientHasMedicine: e.target.checked })}
-                                                                className="w-4 h-4 rounded"
-                                                            />
-                                                            <span className="text-xs">Patient has this medicine</span>
-                                                        </label>
-                                                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                                {/* Taken Checkbox - Modern minimal design with green theme */}
+                                                <div className="col-span-full flex items-center justify-between pt-2 border-t border-emerald-200/30 dark:border-emerald-700/30 mt-2">
+                                                    <label className="flex items-center gap-2.5 cursor-pointer group/check">
+                                                        <div className="relative">
                                                             <input 
                                                                 type="checkbox" 
-                                                                checked={!!pr.taken} 
-                                                                onChange={e => updatePrescription(i, { taken: e.target.checked })} 
-                                                                className="w-4 h-4 rounded" 
+                                                                checked={pr.patientHasMedicine || false}
+                                                                onChange={(e) => updatePrescription(i, { patientHasMedicine: e.target.checked })}
+                                                                className="peer sr-only" 
                                                             />
-                                                            <span className="text-xs">Taken</span>
-                                                        </label>
-                                                    </div>
+                                                            <div className="w-5 h-5 border-2 border-emerald-300 dark:border-emerald-600 rounded-md peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-500 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-emerald-500/30">
+                                                                <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                                </svg>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover/check:text-emerald-600 dark:group-hover/check:text-emerald-400 transition-colors">Taken</span>
+                                                    </label>
+                                                    
+                                                    {/* Remove Button - Bottom right */}
                                                     {!isDeleted && (
-                                                    <button type="button" onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }} className="btn btn-danger text-sm">
-                                                        × Remove
-                                                    </button>
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }} 
+                                                            className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-600 border border-red-300 dark:border-red-700 rounded-lg transition-all duration-200 hover:shadow-md"
+                                                        >
+                                                            Remove
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>
@@ -2195,33 +2195,11 @@ export default function PrescriptionsPage() {
                             )}
                         </div>
                         
-                        {/* Next Visit & Tracking - Consolidated in single line */}
-                        <div className="card">
-                            <h3 className="text-lg font-semibold mb-4">Next Visit & Tracking</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1.5">Next Visit Date</label>
-                                    <DateInput type="date" placeholder="Select visit date" value={form.nextVisitDate} onChange={e => setForm({ ...form, nextVisitDate: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1.5">Next Visit Time</label>
-                                    <input type="time" placeholder="Select time" value={form.nextVisitTime} onChange={e => setForm({ ...form, nextVisitTime: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1.5">Visit Number (V)</label>
-                                    <input type="number" placeholder="1" value={form.visitNumber} onChange={e => setForm({ ...form, visitNumber: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1.5">Follow-Up Count (FU)</label>
-                                    <input type="number" placeholder="0" value={form.followUpCount} onChange={e => setForm({ ...form, followUpCount: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
-                            </div>
-                        </div>
-                        
                         {/* Financial Information Card */}
-                        <div className="card">
-                            <h3 className="text-lg font-semibold mb-4">Financial Information</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
+                            <h3 className="relative text-lg font-semibold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Financial Information</h3>
+                            <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Amount (₹)</label>
                                     <input type="number" step="0.01" placeholder="1000.00" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className="w-full p-2 border rounded" />
@@ -2242,19 +2220,20 @@ export default function PrescriptionsPage() {
                         </div>
 
                         {/* Submit Button */}
-                        <div className="card">
-                            <div className="flex items-center justify-between">
-                                <div className="text-sm text-muted">
+                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
+                            <div className="relative flex items-center justify-between">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
                                     {prescriptions.length > 0 && (
-                                        <span>{prescriptions.length} prescription(s) added</span>
+                                        <span className="font-medium">{prescriptions.length} prescription(s) added</span>
                                     )}
                                 </div>
                                 <div className="flex gap-3">
-                                    <button disabled={loading} className="btn btn-primary">
+                                    <button disabled={loading} className="px-6 py-3 text-base font-semibold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-300 transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed">
                                         {loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Visit & Prescriptions' : 'Save Visit & Prescriptions')}
                                     </button>
                                     {lastCreatedVisitId && (
-                                        <a href={`/visits/${lastCreatedVisitId}`} target="_blank" rel="noreferrer" className="btn btn-secondary">
+                                        <a href={`/visits/${lastCreatedVisitId}`} target="_blank" rel="noreferrer" className="px-6 py-3 text-base font-medium text-emerald-700 dark:text-emerald-300 bg-white dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-2 border-emerald-300 dark:border-emerald-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
                                             Open Last Visit
                                         </a>
                                     )}
@@ -2687,7 +2666,7 @@ function UserPrescriptionsContent({ user }: { user: any }) {
                                                 day: 'numeric'
                                             })}
                                         </h3>
-                                        <p className="text-sm text-muted">OPD No: {visit.opdNo}</p>
+                                        <p className="text-sm text-muted">OPD No: <span className="text-green-600 dark:text-green-400">{visit.opdNo}</span></p>
                                         {visit.diagnoses && (
                                             <p className="text-sm mt-2">
                                                 <span className="font-medium">Diagnosis:</span> {visit.diagnoses}

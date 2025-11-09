@@ -12,7 +12,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         console.log(`[Bulk Create Products] Received ${products.length} products to import`)
 
         try {
-            const BATCH_SIZE = 10
+            const BATCH_SIZE = 50 // Increased for better performance
             const results: any[] = []
             const errors: any[] = []
             

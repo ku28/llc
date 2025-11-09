@@ -47,15 +47,67 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         // Helper function to safely parse numbers
         const toNumber = (value: any): number | null => {
             if (value === null || value === undefined || value === '') return null
+            
+            // Handle weight history format like "69/70/71" - take the last value
+            if (typeof value === 'string' && value.includes('/')) {
+                const values = value.split('/').map(v => v.trim()).filter(v => v)
+                if (values.length > 0) {
+                    const lastValue = values[values.length - 1]
+                    const num = Number(lastValue)
+                    return isNaN(num) ? null : num
+                }
+                return null
+            }
+            
             const num = Number(value)
             if (isNaN(num)) return null
             return num
         }
+        
+        // Helper to extract weight history as string
+        const parseWeightHistory = (value: any): string | null => {
+            if (value === null || value === undefined || value === '') return null
+            const str = String(value).trim()
+            // If it contains "/" it's a history, otherwise just return the value
+            return str || null
+        }
 
         try {
-            const BATCH_SIZE = 10
+            const BATCH_SIZE = 50 // Increased from 10 for better performance
             const results: any[] = []
             const errors: any[] = []
+            
+            // ============ PERFORMANCE OPTIMIZATION: Pre-fetch all data ============
+            console.log('[Bulk Create Visits] Pre-fetching patients and products...')
+            
+            // Get all phones and names from visits data for batch lookup
+            const phones = [...new Set(visits.map((v: any) => v.phone).filter(Boolean))]
+            const productNames = [...new Set(
+                visits.flatMap((v: any) => (v.prescriptions || []).map((p: any) => p.productName).filter(Boolean))
+            )]
+            
+            // Fetch all existing patients by phone in one query
+            const existingPatientsByPhone = await prisma.patient.findMany({
+                where: { phone: { in: phones } }
+            })
+            const patientPhoneMap = new Map(existingPatientsByPhone.map((p: any) => [p.phone, p]))
+            
+            // Fetch all existing products in one query
+            const existingProducts = await prisma.product.findMany({
+                where: {
+                    name: { in: productNames }
+                }
+            })
+            const productNameMap = new Map(existingProducts.map((p: any) => [p.name.toLowerCase(), p]))
+            
+            // Fetch all existing visits by opdNo in one query
+            const opdNos = visits.map((v: any) => v.opdNo).filter(Boolean)
+            const existingVisits = await prisma.visit.findMany({
+                where: { opdNo: { in: opdNos } }
+            })
+            const visitOpdMap = new Map(existingVisits.map((v: any) => [v.opdNo, v]))
+            
+            console.log(`[Bulk Create Visits] Found ${existingPatientsByPhone.length} existing patients, ${existingProducts.length} products, ${existingVisits.length} visits`)
             
             // Find or create dummy treatment once for all imports
             let dummyTreatment = await prisma.treatment.findFirst({
@@ -75,6 +127,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                     }
                 })
             }
+            
+            // ============ END PRE-FETCH ============
             
             const chunks = []
             for (let i = 0; i < visits.length; i += BATCH_SIZE) {
@@ -98,17 +152,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                             ...visitFields 
                         } = visitData
 
-                        // Find or create patient by phone or name
+                        // Find or create patient using pre-fetched data
                         let patient = null
                         
-                        // Try to find by phone first
-                        if (phone) {
-                            patient = await prisma.patient.findFirst({
-                                where: { phone: phone }
-                            })
+                        // Try to find by phone first using map
+                        if (phone && patientPhoneMap.has(phone)) {
+                            patient = patientPhoneMap.get(phone)
                         }
                         
-                        // If not found and we have patient name, try to find by name
+                        // If not found and we have patient name, try to find by name (fallback query)
                         if (!patient && patientName) {
                             const nameParts = patientName.trim().split(' ')
                             const firstName = nameParts[0]
@@ -142,16 +194,80 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     age: visitFields.age || null
                                 }
                             })
+                            // Add to map for subsequent lookups
+                            if (phone) patientPhoneMap.set(phone, patient)
                         }
 
-                        // Create the visit
-                        const visit = await prisma.visit.create({
-                            data: {
-                                patientId: patient.id,
+                        // Check if visit with this opdNo already exists using pre-fetched map
+                        const existingVisit: any = visitOpdMap.get(opdNo)
+
+                        let visit
+                        if (existingVisit) {
+                            // Update existing visit
+                            visit = await prisma.visit.update({
+                                where: { id: existingVisit.id },
+                                data: {
+                                    patient: {
+                                        connect: { id: patient.id }
+                                    },
+                                    opdNo: opdNo,
+                                    date: parseDate(date) || new Date(),
+                                    visitNumber: toNumber(visitFields.visitNumber),
+                                    provisionalDiagnosis: toString(visitFields.provDiagnosis),
+                                    temperament: toString(visitFields.temperament),
+                                    pulseDiagnosis: toString(visitFields.pulseDiagnosis),
+                                    pulseDiagnosis2: toString(visitFields.pulseDiagnosis2),
+                                    majorComplaints: toString(visitFields.majorComplaints),
+                                    historyReports: toString(visitFields.historyReports),
+                                    investigations: toString(visitFields.investigations),
+                                    improvements: toString(visitFields.improvements),
+                                    nextVisit: parseDate(visitFields.nextVisit),
+                                    amount: toNumber(visitFields.amount),
+                                    discount: toNumber(discount),
+                                    payment: toNumber(payment),
+                                    balance: toNumber(visitFields.balance),
+                                    followUpCount: toNumber(visitFields.followUpCount),
+                                    address: toString(visitFields.address),
+                                    phone: toString(phone),
+                                    gender: toString(visitFields.gender),
+                                    dob: parseDate(visitFields.dob),
+                                    age: toNumber(visitFields.age),
+                                    weight: toNumber(visitFields.weight),
+                                    height: toNumber(visitFields.height),
+                                    procedureAdopted: toString(procedureAdopted),
+                                    discussion: toString(discussion),
+                                    extra: (() => {
+                                        const weightHistory = parseWeightHistory(visitFields.weight)
+                                        if (weightHistory && weightHistory.includes('/')) {
+                                            // Store weight history in extra as JSON
+                                            try {
+                                                const existingExtra = extra ? JSON.parse(extra) : {}
+                                                existingExtra.weightHistory = weightHistory
+                                                return JSON.stringify(existingExtra)
+                                            } catch {
+                                                return JSON.stringify({ weightHistory })
+                                            }
+                                        }
+                                        return toString(extra)
+                                    })()
+                                }
+                            })
+                            
+                            // Delete existing prescriptions for this visit before creating new ones
+                            await prisma.prescription.deleteMany({
+                                where: { visitId: visit.id }
+                            })
+                        } else {
+                            // Create new visit
+                            visit = await prisma.visit.create({
+                                data: {
+                                patient: {
+                                    connect: { id: patient.id }
+                                },
                                 opdNo: opdNo,
                                 date: parseDate(date) || new Date(),
                                 visitNumber: toNumber(visitFields.visitNumber),
-                                diagnoses: toString(visitFields.diagnoses),
+                                provisionalDiagnosis: toString(visitFields.provDiagnosis),
                                 temperament: toString(visitFields.temperament),
                                 pulseDiagnosis: toString(visitFields.pulseDiagnosis),
                                 pulseDiagnosis2: toString(visitFields.pulseDiagnosis2),
@@ -174,24 +290,33 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 height: toNumber(visitFields.height),
                                 procedureAdopted: toString(procedureAdopted),
                                 discussion: toString(discussion),
-                                extra: toString(extra)
+                                extra: (() => {
+                                    const weightHistory = parseWeightHistory(visitFields.weight)
+                                    if (weightHistory && weightHistory.includes('/')) {
+                                        // Store weight history in extra as JSON
+                                        try {
+                                            const existingExtra = extra ? JSON.parse(extra) : {}
+                                            existingExtra.weightHistory = weightHistory
+                                            return JSON.stringify(existingExtra)
+                                        } catch {
+                                            return JSON.stringify({ weightHistory })
+                                        }
+                                    }
+                                    return toString(extra)
+                                })()
                             }
                         })
+                        }
 
-                        // Create prescriptions if provided
+                        // Create prescriptions if provided - use batch creation for better performance
                         if (prescriptions && Array.isArray(prescriptions) && prescriptions.length > 0) {
+                            const prescriptionData = []
+                            
                             for (const prData of prescriptions) {
                                 if (!prData.productName) continue // Skip empty prescriptions
                                 
-                                // Try to find the product by name
-                                let product = await prisma.product.findFirst({
-                                    where: {
-                                        name: {
-                                            contains: prData.productName,
-                                            mode: 'insensitive'
-                                        }
-                                    }
-                                })
+                                // Try to find the product using pre-fetched map
+                                let product: any = productNameMap.get(prData.productName.toLowerCase())
                                 
                                 // If product not found, create it
                                 if (!product) {
@@ -202,25 +327,32 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                             quantity: 0
                                         }
                                     })
+                                    // Add to map for subsequent lookups
+                                    productNameMap.set(prData.productName.toLowerCase(), product)
                                 }
                                 
-                                // Create prescription
-                                await prisma.prescription.create({
-                                    data: {
-                                        visitId: visit.id,
-                                        productId: product.id,
-                                        treatmentId: dummyTreatment.id,
-                                        quantity: toNumber(prData.quantity) || 1,
-                                        comp1: toString(prData.comp1),
-                                        comp2: toString(prData.comp2),
-                                        comp3: toString(prData.comp3),
-                                        timing: toString(prData.timing),
-                                        dosage: toString(prData.dosage),
-                                        additions: toString(prData.additions),
-                                        procedure: toString(prData.procedure),
-                                        presentation: toString(prData.presentation),
-                                        droppersToday: toNumber(prData.droppersToday)
-                                    }
+                                // Add to batch
+                                prescriptionData.push({
+                                    visitId: visit.id,
+                                    productId: product.id,
+                                    treatmentId: dummyTreatment.id,
+                                    quantity: toNumber(prData.quantity) || 1,
+                                    comp1: toString(prData.comp1),
+                                    comp2: toString(prData.comp2),
+                                    comp3: toString(prData.comp3),
+                                    timing: toString(prData.timing),
+                                    dosage: toString(prData.dosage),
+                                    additions: toString(prData.additions),
+                                    procedure: toString(prData.procedure),
+                                    presentation: toString(prData.presentation),
+                                    droppersToday: toNumber(prData.droppersToday)
+                                })
+                            }
+                            
+                            // Batch create all prescriptions at once
+                            if (prescriptionData.length > 0) {
+                                await prisma.prescription.createMany({
+                                    data: prescriptionData
                                 })
                             }
                         }

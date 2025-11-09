@@ -15,7 +15,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         try {
             // Process in parallel batches
-            const BATCH_SIZE = 10
+            const BATCH_SIZE = 50 // Increased for better performance
             const results: any[] = []
             const errors: any[] = []
             

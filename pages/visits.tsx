@@ -861,7 +861,7 @@ export default function VisitsPage() {
                                                     <span className="badge">OPD: {v.opdNo}</span>
                                                 </div>
                                                 <div className="text-sm text-muted space-y-1">
-                                                    <div><span className="font-medium">Date:</span> {new Date(v.date).toLocaleString()}</div>
+                                                    <div><span className="font-medium">Date:</span> {new Date(v.date).toLocaleDateString()}</div>
                                                     {!isExpanded && v.diagnoses && (
                                                         <div className="truncate"><span className="font-medium">Diagnosis:</span> {v.diagnoses}</div>
                                                     )}
@@ -884,9 +884,9 @@ export default function VisitsPage() {
                                                                 <span className="font-medium">Prescriptions:</span> {v.prescriptions.length} item(s)
                                                             </div>
                                                         )}
-                                                        <div><span className="font-medium">Created:</span> {new Date(v.createdAt).toLocaleString()}</div>
+                                                        <div><span className="font-medium">Created:</span> {new Date(v.createdAt).toLocaleDateString()}</div>
                                                         {v.updatedAt && new Date(v.updatedAt).getTime() !== new Date(v.createdAt).getTime() && (
-                                                            <div><span className="font-medium">Last Updated:</span> {new Date(v.updatedAt).toLocaleString()}</div>
+                                                            <div><span className="font-medium">Last Updated:</span> {new Date(v.updatedAt).toLocaleDateString()}</div>
                                                         )}
                                                     </div>
                                                 )}
