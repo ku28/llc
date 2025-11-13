@@ -3,6 +3,7 @@ import LoadingModal from '../components/LoadingModal'
 import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
 import { useToast } from '../hooks/useToast'
+import * as XLSX from 'xlsx'
 
 export default function StockTransactionsPage() {
     const [transactions, setTransactions] = useState<any[]>([])
@@ -15,6 +16,16 @@ export default function StockTransactionsPage() {
     const [itemsPerPage] = useState(10)
     const [loading, setLoading] = useState(false)
     const [submitting, setSubmitting] = useState(false)
+    
+    // Set-based state for multi-select
+    const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<number>>(new Set())
+    const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+    
+    // Export and sorting state
+    const [showExportDropdown, setShowExportDropdown] = useState(false)
+    const [sortField, setSortField] = useState<string>('createdAt')
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+    
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     
     const [form, setForm] = useState({
@@ -136,21 +147,251 @@ export default function StockTransactionsPage() {
         }
     }
 
+    // Selection functions
+    function toggleSelectTransaction(id: number) {
+        const newSelected = new Set(selectedTransactionIds)
+        if (newSelected.has(id)) {
+            newSelected.delete(id)
+        } else {
+            newSelected.add(id)
+        }
+        setSelectedTransactionIds(newSelected)
+    }
+
+    function toggleSelectAll() {
+        const filtered = getFilteredAndSortedTransactions()
+        if (selectedTransactionIds.size === filtered.length && filtered.length > 0) {
+            setSelectedTransactionIds(new Set())
+        } else {
+            setSelectedTransactionIds(new Set(filtered.map(t => t.id)))
+        }
+    }
+
+    function toggleExpandRow(id: number) {
+        const newExpanded = new Set(expandedRows)
+        if (newExpanded.has(id)) {
+            newExpanded.delete(id)
+        } else {
+            newExpanded.add(id)
+        }
+        setExpandedRows(newExpanded)
+    }
+
+    function getFilteredAndSortedTransactions() {
+        let filtered = transactions
+
+        // Apply filters if needed (filterProduct and filterType are applied server-side via API)
+        
+        // Sort
+        filtered = [...filtered].sort((a, b) => {
+            let aVal = a[sortField]
+            let bVal = b[sortField]
+
+            // Handle different data types
+            if (sortField === 'createdAt') {
+                aVal = new Date(aVal).getTime()
+                bVal = new Date(bVal).getTime()
+            } else if (typeof aVal === 'string') {
+                aVal = aVal.toLowerCase()
+                bVal = bVal?.toLowerCase() || ''
+            }
+
+            if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1
+            if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1
+            return 0
+        })
+
+        return filtered
+    }
+
+    // Export functions
+    function exportData(format: 'csv' | 'json' | 'xlsx') {
+        const dataToExport = selectedTransactionIds.size > 0
+            ? transactions.filter(t => selectedTransactionIds.has(t.id))
+            : getFilteredAndSortedTransactions()
+
+        const exportData = dataToExport.map(t => {
+            const product = products.find(p => p.id === t.productId)
+            return {
+                'Date': new Date(t.createdAt).toLocaleString(),
+                'Product': product?.name || 'Unknown',
+                'Type': t.transactionType,
+                'Quantity': t.quantity,
+                'Unit Price': t.unitPrice || 0,
+                'Total Value': (t.quantity * (t.unitPrice || 0)).toFixed(2),
+                'Performed By': t.performedBy || 'System',
+                'Notes': t.notes || '',
+                'Reference': t.referenceType || ''
+            }
+        })
+
+        if (format === 'csv') {
+            exportToCSV(exportData)
+        } else if (format === 'json') {
+            exportToJSON(exportData)
+        } else if (format === 'xlsx') {
+            exportToExcel(exportData)
+        }
+
+        setShowExportDropdown(false)
+        showSuccess(`Exported ${exportData.length} transaction(s) as ${format.toUpperCase()}!`)
+    }
+
+    const exportToCSV = (data: any[]) => {
+        if (data.length === 0) {
+            showError('No data to export')
+            return
+        }
+
+        const headers = Object.keys(data[0])
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => headers.map(header => {
+                const value = row[header]?.toString() || ''
+                return value.includes(',') ? `"${value}"` : value
+            }).join(','))
+        ].join('\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `stock_transactions_${new Date().toISOString().split('T')[0]}.csv`
+        link.click()
+    }
+
+    const exportToJSON = (data: any[]) => {
+        if (data.length === 0) {
+            showError('No data to export')
+            return
+        }
+
+        const jsonContent = JSON.stringify(data, null, 2)
+        const blob = new Blob([jsonContent], { type: 'application/json' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `stock_transactions_${new Date().toISOString().split('T')[0]}.json`
+        link.click()
+    }
+
+    const exportToExcel = (data: any[]) => {
+        if (data.length === 0) {
+            showError('No data to export')
+            return
+        }
+
+        const worksheet = XLSX.utils.json_to_sheet(data)
+        const workbook = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Stock Transactions')
+        
+        // Auto-size columns
+        const maxWidth = 50
+        const colWidths = Object.keys(data[0]).map(key => {
+            const maxLen = Math.max(
+                key.length,
+                ...data.map(row => (row[key]?.toString() || '').length)
+            )
+            return { wch: Math.min(maxLen + 2, maxWidth) }
+        })
+        worksheet['!cols'] = colWidths
+
+        XLSX.writeFile(workbook, `stock_transactions_${new Date().toISOString().split('T')[0]}.xlsx`)
+    }
+
+    const filteredTransactions = getFilteredAndSortedTransactions()
+
     return (
         <div>
-            <div className="section-header flex justify-between items-center">
+            <div className="section-header flex justify-between items-center gap-3">
                 <h2 className="section-title">Inventory History</h2>
-                <button 
-                    onClick={() => {
-                        setIsModalOpen(true)
-                        setIsAnimating(false)
-                        setTimeout(() => setIsAnimating(true), 10)
-                    }}
-                    className="btn btn-primary"
-                >
-                    + Manual Adjustment
-                </button>
+                <div className="flex items-center gap-3">
+                    {/* Export Dropdown */}
+                    {user && (
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowExportDropdown(!showExportDropdown)}
+                                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all duration-200 font-medium"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                {selectedTransactionIds.size > 0 ? `Export (${selectedTransactionIds.size})` : 'Export All'}
+                            </button>
+
+                            {showExportDropdown && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                                    <button
+                                        onClick={() => exportData('csv')}
+                                        className="w-full px-4 py-3 text-left hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-3 transition-colors border-b border-gray-100 dark:border-gray-700"
+                                    >
+                                        <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        <div>
+                                            <div className="font-medium text-gray-900 dark:text-gray-100">Export CSV</div>
+                                            <div className="text-xs text-gray-500">Comma-separated</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() => exportData('json')}
+                                        className="w-full px-4 py-3 text-left hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-3 transition-colors border-b border-gray-100 dark:border-gray-700"
+                                    >
+                                        <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                        </svg>
+                                        <div>
+                                            <div className="font-medium text-gray-900 dark:text-gray-100">Export JSON</div>
+                                            <div className="text-xs text-gray-500">For developers</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() => exportData('xlsx')}
+                                        className="w-full px-4 py-3 text-left hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-3 transition-colors"
+                                    >
+                                        <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        <div>
+                                            <div className="font-medium text-gray-900 dark:text-gray-100">Export Excel</div>
+                                            <div className="text-xs text-gray-500">XLSX format</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <button 
+                        onClick={() => {
+                            setIsModalOpen(true)
+                            setIsAnimating(false)
+                            setTimeout(() => setIsAnimating(true), 10)
+                        }}
+                        className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg shadow-lg flex items-center gap-2 transition-all duration-200 font-medium"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Manual Adjustment
+                    </button>
+                </div>
             </div>
+
+            {/* Bulk Action Bar (for selection clarity - no delete for history) */}
+            {selectedTransactionIds.size > 0 && (
+                <div className="mb-4 p-4 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border border-emerald-200/30 dark:border-emerald-700/30 rounded-lg">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                            {selectedTransactionIds.size} transaction(s) selected
+                        </span>
+                        <button
+                            onClick={() => setSelectedTransactionIds(new Set())}
+                            className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-300 dark:border-gray-600"
+                        >
+                            Clear Selection
+                        </button>
+                    </div>
+                </div>
+            )}
 
                 {/* Info Card */}
                 <div className="card mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
@@ -341,14 +582,22 @@ export default function StockTransactionsPage() {
 
                 {/* Transactions Timeline */}
                 <div className="card">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
-                        <span>Transaction History</span>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                checked={selectedTransactionIds.size === filteredTransactions.length && filteredTransactions.length > 0}
+                                onChange={toggleSelectAll}
+                                className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                            />
+                            <span>Transaction History</span>
+                        </h3>
                         <span className="badge">
-                            {transactions.length} movements
+                            {filteredTransactions.length} movements
                         </span>
-                    </h3>
+                    </div>
 
-                    {transactions.length === 0 ? (
+                    {filteredTransactions.length === 0 ? (
                         <div className="text-center py-8 text-muted">
                             <p className="text-lg mb-2">
                                 {filterProduct || filterType ? 'No transactions match your filters' : 'No transactions yet'}
@@ -359,9 +608,17 @@ export default function StockTransactionsPage() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {transactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(txn => (
+                            {filteredTransactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(txn => (
                                 <div key={txn.id} className="border dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                     <div className="flex items-start gap-4">
+                                        {/* Checkbox */}
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedTransactionIds.has(txn.id)}
+                                            onChange={() => toggleSelectTransaction(txn.id)}
+                                            className="w-4 h-4 mt-1 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 flex-shrink-0"
+                                        />
+                                        
                                         {/* Icon */}
                                         <div className="text-3xl flex-shrink-0">
                                             {getTransactionIcon(txn.transactionType)}

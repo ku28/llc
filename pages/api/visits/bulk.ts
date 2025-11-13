@@ -323,7 +323,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     product = await prisma.product.create({
                                         data: {
                                             name: prData.productName,
-                                            priceCents: 0,
+                                            priceRupees: 0,
                                             quantity: 0
                                         }
                                     })

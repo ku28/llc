@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 // Order enough to reach 2x the reorder level
                 const quantityToOrder = Math.max(reorderLevel * 2 - currentQty, reorderLevel)
                 
-                const unitPrice = product.purchasePriceCents || product.priceCents || 0
+                const unitPrice = product.purchasePriceRupees || product.priceRupees || 0
                 const itemTotal = quantityToOrder * unitPrice
                 
                 subtotal += itemTotal

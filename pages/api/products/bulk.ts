@@ -22,19 +22,99 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             }
 
             for (const chunk of chunks) {
+                // Preload existing products for this chunk by name (case-insensitive)
+                const namesInChunk = chunk.map((p: any) => (p.name || '').trim()).filter((n: string) => n)
+                const existingProducts = await prisma.product.findMany({
+                    where: {
+                        name: {
+                            in: namesInChunk,
+                            mode: 'insensitive'
+                        }
+                    }
+                })
+
+                // Map existing products by lowercased name for quick lookup
+                const existingByName: Record<string, any> = {}
+                existingProducts.forEach((ep: any) => {
+                    if (ep && ep.name) existingByName[String(ep.name).toLowerCase()] = ep
+                })
+
                 const chunkPromises = chunk.map(async (productData: any) => {
                     try {
-                        const { name, priceCents, quantity, purchasePriceCents, unit } = productData
+                                const { name, priceRupees, quantity, purchasePriceRupees, unit, category,
+                                    actualInventory, inventoryValue, latestUpdate,
+                                    purchaseValue, salesValue, totalPurchased, totalSales } = productData
 
-                        return await prisma.product.create({
-                            data: {
-                                name,
-                                priceCents: priceCents || 0,
-                                quantity: quantity || 0,
-                                purchasePriceCents: purchasePriceCents || 0,
-                                unit: unit || null,
-                            }
-                        })
+                                // Ensure unit is a string or null (Prisma expects String | Null)
+                                const unitValue = unit === undefined || unit === null || unit === '' ? null : String(unit)
+
+                                // Handle category - find or create by name
+                                let categoryId: number | null = null
+                                if (category && String(category).trim()) {
+                                    const categoryName = String(category).trim()
+                                    let existingCategory = await prisma.category.findFirst({
+                                        where: {
+                                            name: {
+                                                equals: categoryName,
+                                                mode: 'insensitive'
+                                            }
+                                        }
+                                    })
+                                    if (!existingCategory) {
+                                        existingCategory = await prisma.category.create({
+                                            data: { name: categoryName }
+                                        })
+                                    }
+                                    categoryId = existingCategory.id
+                                }
+
+                                // Parse/normalize numeric fields
+                                const priceRupeesValue = Number(priceRupees) || 0
+                                const quantityValue = Number(quantity) || 0
+                                const purchasePriceRupeesValue = Number(purchasePriceRupees) || 0
+                                const actualInventoryValue = actualInventory !== undefined && actualInventory !== null ? Number(actualInventory) : undefined
+                                const inventoryValueFloat = inventoryValue !== undefined && inventoryValue !== null ? Number(inventoryValue) : undefined
+                                const purchaseValueFloat = purchaseValue !== undefined && purchaseValue !== null ? Number(purchaseValue) : undefined
+                                const salesValueFloat = salesValue !== undefined && salesValue !== null ? Number(salesValue) : undefined
+                                const totalPurchasedValue = totalPurchased !== undefined && totalPurchased !== null ? Number(totalPurchased) : undefined
+                                const totalSalesValue = totalSales !== undefined && totalSales !== null ? Number(totalSales) : undefined
+
+                                // Parse latestUpdate to Date if provided
+                                let latestUpdateValue: Date | undefined = undefined
+                                if (latestUpdate !== undefined && latestUpdate !== null && String(latestUpdate).trim() !== '') {
+                                    const d = new Date(String(latestUpdate))
+                                    if (!isNaN(d.getTime())) latestUpdateValue = d
+                                }
+
+                                const lowerName = String(name || '').trim().toLowerCase()
+                                const existing = existingByName[lowerName]
+
+                                const data = {
+                                    name,
+                                    priceRupees: priceRupeesValue,
+                                    quantity: quantityValue,
+                                    purchasePriceRupees: purchasePriceRupeesValue,
+                                    unit: unitValue,
+                                    categoryId,
+                                    actualInventory: actualInventoryValue,
+                                    inventoryValue: inventoryValueFloat,
+                                    latestUpdate: latestUpdateValue,
+                                    purchaseValue: purchaseValueFloat,
+                                    salesValue: salesValueFloat,
+                                    totalPurchased: totalPurchasedValue,
+                                    totalSales: totalSalesValue
+                                }
+
+                                if (existing) {
+                                    // Update existing product (overwrite with incoming data)
+                                    return await prisma.product.update({
+                                        where: { id: existing.id },
+                                        data
+                                    })
+                                } else {
+                                    // Create new product
+                                    return await prisma.product.create({ data })
+                                }
                     } catch (err: any) {
                         console.error(`[Bulk Create Products] Failed:`, err.message)
                         errors.push({

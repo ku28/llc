@@ -51,8 +51,8 @@ function ProductsPage() {
         name: '',
         categoryId: '',
         unit: '',
-        priceCents: '',
-        purchasePriceCents: '',
+        priceRupees: '',
+        purchasePriceRupees: '',
         totalPurchased: '',
         totalSales: '',
         quantity: '',
@@ -83,7 +83,7 @@ function ProductsPage() {
     // Auto-calculate all formula fields
     useEffect(() => {
         const unit = Number(form.unit) || 0
-        const ratePerUnit = Number(form.priceCents) || 0
+    const ratePerUnit = Number(form.priceRupees) || 0
         const purchase = Number(form.totalPurchased) || 0
         const sales = Number(form.totalSales) || 0
         
@@ -107,14 +107,14 @@ function ProductsPage() {
         
         setForm(prev => ({
             ...prev,
-            purchasePriceCents: calculatedPurchasePrice > 0 ? String(calculatedPurchasePrice) : prev.purchasePriceCents,
+            purchasePriceRupees: calculatedPurchasePrice > 0 ? String(calculatedPurchasePrice) : prev.purchasePriceRupees,
             quantity: String(calculatedInventory),
             inventoryValue: calculatedInventoryValue > 0 ? String(calculatedInventoryValue) : '',
             purchaseValue: calculatedPurchaseValue > 0 ? String(calculatedPurchaseValue) : '',
             salesValue: calculatedSalesValue > 0 ? String(calculatedSalesValue) : '',
             actualInventory: calculatedActualInventory > 0 ? String(calculatedActualInventory.toFixed(0)) : prev.actualInventory
         }))
-    }, [form.unit, form.priceCents, form.totalPurchased, form.totalSales])
+    }, [form.unit, form.priceRupees, form.totalPurchased, form.totalSales])
 
     async function create(e: any) {
         e.preventDefault()
@@ -123,8 +123,8 @@ function ProductsPage() {
                 name: form.name,
                 categoryId: form.categoryId ? Number(form.categoryId) : null,
                 unit: form.unit,
-                priceCents: Number(form.priceCents) || 0,
-                purchasePriceCents: Number(form.purchasePriceCents) || 0,
+                priceRupees: Number(form.priceRupees) || 0,
+                purchasePriceRupees: Number(form.purchasePriceRupees) || 0,
                 totalPurchased: Number(form.totalPurchased) || 0,
                 totalSales: Number(form.totalSales) || 0,
                 quantity: Number(form.quantity) || 0,
@@ -161,8 +161,8 @@ function ProductsPage() {
             name: form.name,
             categoryId: form.categoryId ? Number(form.categoryId) : null,
             unit: form.unit,
-            priceCents: Number(form.priceCents) || 0,
-            purchasePriceCents: Number(form.purchasePriceCents) || 0,
+            priceRupees: Number(form.priceRupees) || 0,
+            purchasePriceRupees: Number(form.purchasePriceRupees) || 0,
             totalPurchased: Number(form.totalPurchased) || 0,
             totalSales: Number(form.totalSales) || 0,
             quantity: Number(form.quantity) || 0,
@@ -195,8 +195,8 @@ function ProductsPage() {
             name: product.name,
             categoryId: product.categoryId ? String(product.categoryId) : '',
             unit: product.unit || '',
-            priceCents: String(product.priceCents || 0),
-            purchasePriceCents: String(product.purchasePriceCents || 0),
+            priceRupees: String(product.priceRupees || 0),
+            purchasePriceRupees: String(product.purchasePriceRupees || 0),
             totalPurchased: String(product.totalPurchased || 0),
             totalSales: String(product.totalSales || 0),
             quantity: String(product.quantity || 0),
@@ -365,7 +365,7 @@ function ProductsPage() {
             }
             // Price range filter
             if (filterPriceRange) {
-                const price = product.priceCents || 0
+                const price = product.priceRupees || 0
                 if (filterPriceRange === 'low' && price >= 5000) return false
                 if (filterPriceRange === 'medium' && (price < 5000 || price >= 20000)) return false
                 if (filterPriceRange === 'high' && price < 20000) return false
@@ -380,7 +380,7 @@ function ProductsPage() {
             if (sortBy === 'name') {
                 compareResult = (a.name || '').localeCompare(b.name || '')
             } else if (sortBy === 'price') {
-                compareResult = (a.priceCents || 0) - (b.priceCents || 0)
+                compareResult = (a.priceRupees || 0) - (b.priceRupees || 0)
             } else if (sortBy === 'quantity') {
                 compareResult = (a.quantity || 0) - (b.quantity || 0)
             }
@@ -439,7 +439,7 @@ function ProductsPage() {
                 // Order enough to reach 2x the reorder level
                 const quantityToOrder = Math.max(reorderLevel * 2 - currentQty, reorderLevel)
                 
-                const unitPrice = product.purchasePriceCents || product.priceCents || 0
+                const unitPrice = product.purchasePriceRupees || product.priceRupees || 0
                 const itemTotal = quantityToOrder * unitPrice
                 
                 subtotal += itemTotal
@@ -555,12 +555,22 @@ function ProductsPage() {
 
             const selectedProducts = items.filter((product: any) => selectedProductIds.has(product.id))
 
+            // Build rows matching the inventory CSV template headers/order
             const dataToExport = selectedProducts.map((p: any) => ({
-                'name': p.name || '',
-                'priceCents': p.priceCents || 0,
-                'quantity': p.quantity || 0,
-                'purchasePriceCents': p.purchasePriceCents || 0,
-                'unit': p.unit || ''
+                'ITEM': p.name || '',
+                'CATEGORY': p.category?.name || '',
+                'UINT': p.unit || '',
+                'RATE/U': p.priceRupees !== undefined ? (Number(p.priceRupees)).toFixed(2) : '',
+                'P/PRICE': p.purchasePriceRupees !== undefined ? (Number(p.purchasePriceRupees)).toFixed(2) : '',
+                'THRESH/IN': p.category?.reorderLevel ?? '',
+                'INVENTORY': p.quantity ?? 0,
+                'INV/VAL': p.inventoryValue ?? '',
+                'PURCHASE': p.totalPurchased ?? '',
+                'PUR/VAL': p.purchaseValue ?? '',
+                'SALES': p.totalSales ?? '',
+                'SALE/VAL': p.salesValue ?? '',
+                'LATEST': p.latestUpdate ? new Date(p.latestUpdate).toISOString() : '',
+                'ACTUAL INVENTORY': p.actualInventory ?? ''
             }))
 
             const timestamp = new Date().toISOString().split('T')[0]
@@ -574,19 +584,17 @@ function ProductsPage() {
                 a.click()
                 URL.revokeObjectURL(url)
             } else if (format === 'csv') {
-                const headers = Object.keys(dataToExport[0] || {})
-                const csvContent = [
+                // Ensure header order matches the template
+                const headers = ['ITEM','CATEGORY','UINT','RATE/U','P/PRICE','THRESH/IN','INVENTORY','INV/VAL','PURCHASE','PUR/VAL','SALES','SALE/VAL','LATEST','ACTUAL INVENTORY']
+                const csvRows = [
                     headers.join(','),
-                    ...dataToExport.map(row => 
-                        headers.map(header => {
-                            const value = row[header as keyof typeof row] || ''
-                            return String(value).includes(',') || String(value).includes('"') 
-                                ? `"${String(value).replace(/"/g, '""')}"` 
-                                : value
-                        }).join(',')
-                    )
-                ].join('\n')
-                
+                    ...dataToExport.map(row => headers.map(h => {
+                        const raw = row[h as keyof typeof row]
+                        const value = raw === null || raw === undefined ? '' : String(raw)
+                        return value.includes(',') || value.includes('"') ? `"${value.replace(/"/g, '""')}"` : value
+                    }).join(','))
+                ]
+                const csvContent = csvRows.join('\n')
                 const blob = new Blob([csvContent], { type: 'text/csv' })
                 const url = URL.createObjectURL(blob)
                 const a = document.createElement('a')
@@ -1113,7 +1121,7 @@ function ProductsPage() {
                             {/* Sale Price */}
                             <div>
                                 <label className="block text-xs font-medium mb-1">Sale Price (RATE/U) ₹</label>
-                                <input type="number" step="0.01" placeholder="5.00" value={form.priceCents} onChange={e => setForm({ ...form, priceCents: e.target.value })} className="p-1.5 text-sm border rounded w-full" />
+                                <input type="number" step="0.01" placeholder="5.00" value={form.priceRupees} onChange={e => setForm({ ...form, priceRupees: e.target.value })} className="p-1.5 text-sm border rounded w-full" />
                             </div>
 
                             {/* Purchase Qty */}
@@ -1227,7 +1235,7 @@ function ProductsPage() {
                                                     <div className="text-xs text-muted mt-0.5">
                                                         {p.category && <span className="mr-2">📦 {p.category.name}</span>}
                                                         <span className="mr-2">Unit: {p.unit || 'N/A'}</span>
-                                                        <span>₹{(p.priceCents || 0).toFixed(2)}</span>
+                                                        <span>₹{(p.priceRupees || 0).toFixed(2)}</span>
                                                     </div>
                                                 </div>
                                                 
@@ -1284,7 +1292,7 @@ function ProductsPage() {
                                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-sm">
                                                         <div>
                                                             <div className="text-xs text-muted mb-1">Purchase Price</div>
-                                                            <div className="text-sm font-medium">₹{(p.purchasePriceCents || 0).toFixed(2)}</div>
+                                                            <div className="text-sm font-medium">₹{(p.purchasePriceRupees || 0).toFixed(2)}</div>
                                                         </div>
                                                         <div>
                                                             <div className="text-xs text-muted mb-1">Reorder Level</div>
@@ -1456,7 +1464,7 @@ function ProductsPage() {
                                                     </div>
                                                     <div className="text-right">
                                                         <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                                            ₹{((product.purchasePriceCents || product.priceCents || 0) * orderQty).toFixed(2)}
+                                                            ₹{((product.purchasePriceRupees || product.priceRupees || 0) * orderQty).toFixed(2)}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1499,7 +1507,7 @@ function ProductsPage() {
                                                 const currentQty = p.quantity || 0
                                                 const reorderLevel = p.category?.reorderLevel || 10
                                                 const orderQty = Math.max(reorderLevel * 2 - currentQty, reorderLevel)
-                                                const price = p.purchasePriceCents || p.priceCents || 0
+                                                const price = p.purchasePriceRupees || p.priceRupees || 0
                                                 return sum + (orderQty * price)
                                             }, 0).toFixed(2)
                                         }

@@ -120,12 +120,12 @@ model Invoice {
 model Product {
   id                   Int                   @id @default(autoincrement())
   name                 String
-  priceCents           Int
+  priceRupees          Float
   quantity             Int                   @default(0)
   actualInventory      Int?
   inventoryValue       Float?
   latestUpdate         DateTime?
-  purchasePriceCents   Int                   @default(0)
+  purchasePriceRupees  Float                 @default(0)
   purchaseValue        Float?
   salesValue           Float?
   totalPurchased       Int                   @default(0)
@@ -238,15 +238,15 @@ model Visit {
 }
 
 model Prescription {
-  id               Int       @id @default(autoincrement())
+  id               Int        @id @default(autoincrement())
   visitId          Int
-  treatmentId      Int
+  treatmentId      Int?
   dosage           String?
   administration   String?
-  quantity         Int       @default(1)
-  taken            Boolean   @default(false)
-  dispensed        Boolean   @default(false)
-  createdAt        DateTime  @default(now())
+  quantity         Int        @default(1)
+  taken            Boolean    @default(false)
+  dispensed        Boolean    @default(false)
+  createdAt        DateTime   @default(now())
   additions        String?
   comp1            String?
   comp2            String?
@@ -257,9 +257,9 @@ model Prescription {
   procedure        String?
   productId        Int?
   timing           String?
-  product          Product?  @relation(fields: [productId], references: [id])
-  treatment        Treatment @relation(fields: [treatmentId], references: [id])
-  visit            Visit     @relation(fields: [visitId], references: [id])
+  product          Product?   @relation(fields: [productId], references: [id])
+  treatment        Treatment? @relation(fields: [treatmentId], references: [id])
+  visit            Visit      @relation(fields: [visitId], references: [id])
 }
 
 model ProductBatch {
@@ -267,8 +267,8 @@ model ProductBatch {
   productId          Int
   sku                String?
   quantity           Int
-  purchasePriceCents Int
-  salePriceCents     Int
+  purchasePriceRupees Float
+  salePriceRupees     Float
   expiry             DateTime?
   createdAt          DateTime   @default(now())
   product            Product    @relation(fields: [productId], references: [id])
@@ -397,10 +397,10 @@ model CustomerInvoiceItem {
   productId         Int?
   description       String
   quantity          Int
-  unitPrice         Int
+  unitPrice         Float
   taxRate           Float           @default(0)
   discount          Int             @default(0)
-  totalAmount       Int
+  totalAmount       Float
   createdAt         DateTime        @default(now())
   customerInvoice   CustomerInvoice @relation(fields: [customerInvoiceId], references: [id], onDelete: Cascade)
   product           Product?        @relation(fields: [productId], references: [id])
@@ -411,8 +411,8 @@ model StockTransaction {
   productId       Int
   transactionType String
   quantity        Int
-  unitPrice       Int      @default(0)
-  totalValue      Int      @default(0)
+  unitPrice       Float    @default(0)
+  totalValue      Float    @default(0)
   balanceQuantity Int
   referenceType   String?
   referenceId     Int?
@@ -446,7 +446,7 @@ model Payment {
   paymentType     String
   referenceType   String
   referenceId     Int
-  amount          Int
+  amount          Float
   paymentMethod   String
   paymentDate     DateTime        @default(now())
   transactionId   String?

@@ -18,9 +18,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-        const { productId, sku, quantity, purchasePriceCents, salePriceCents, expiry } = req.body
+        const { productId, sku, quantity, purchasePriceRupees, salePriceRupees, expiry } = req.body
         try {
-            const b = await prisma.productBatch.create({ data: { productId: Number(productId), sku, quantity: Number(quantity), purchasePriceCents: Number(purchasePriceCents), salePriceCents: Number(salePriceCents), expiry: expiry ? new Date(expiry) : null } })
+            const b = await prisma.productBatch.create({ data: { productId: Number(productId), sku, quantity: Number(quantity), purchasePriceRupees: Number(purchasePriceRupees), salePriceRupees: Number(salePriceRupees), expiry: expiry ? new Date(expiry) : null } })
             return res.status(201).json(b)
         } catch (err: any) {
             return res.status(500).json({ error: String(err?.message || err) })

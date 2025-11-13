@@ -64,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     const newProduct = await prisma.product.create({
                         data: {
                             name: productName,
-                            priceCents: 0,
+                            priceRupees: 0,
                             quantity: 0
                         }
                     })

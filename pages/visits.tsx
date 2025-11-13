@@ -335,7 +335,7 @@ export default function VisitsPage() {
                     'PulseD 1': v.pulseDiagnosis || '',
                     'PulseD 2': v.pulseDiagnosis2 || '',
                     'Investigations': v.investigations || '',
-                    'Diagnosis:': v.diagnoses || v.provisionalDiagnosis || '',
+                    'Diagnosis': v.diagnoses || v.provisionalDiagnosis || '',
                     'Hist/Reports': v.historyReports || '',
                     'Chief Complaints': v.majorComplaints || '',
                     'Imp': v.improvements || ''

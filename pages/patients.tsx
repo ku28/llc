@@ -493,7 +493,9 @@ export default function PatientsPage() {
 
     async function deletePatient(id: number) {
         setConfirmModal({ open: true, id, message: 'Are you sure you want to delete this patient?' })
-        setTimeout(() => setConfirmModalAnimating(true), 10)
+        // Set animating immediately to avoid a click-race where the overlay
+        // could receive the same click that opened the modal and close it.
+        setConfirmModalAnimating(true)
     }
 
     function closeConfirmModal() {
@@ -1243,7 +1245,11 @@ export default function PatientsPage() {
             {/* Floating Delete Selected Button */}
             {selectedPatientIds.size > 0 && (
                 <button
-                    onClick={() => setConfirmModal({ open: true, deleteMultiple: true, message: `Are you sure you want to delete ${selectedPatientIds.size} selected patient(s)?` })}
+                    onClick={() => {
+                        setConfirmModal({ open: true, deleteMultiple: true, message: `Are you sure you want to delete ${selectedPatientIds.size} selected patient(s)?` })
+                        // trigger animation immediately to avoid click/overlay race
+                        setConfirmModalAnimating(true)
+                    }}
                     className="fixed bottom-8 right-24 z-50 group"
                     title={`Delete ${selectedPatientIds.size} selected patient(s)`}
                 >

@@ -22,9 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-        const { name, categoryId, unit, priceCents, purchasePriceCents, totalPurchased, totalSales, quantity, actualInventory } = req.body
+        const { name, categoryId, unit, priceRupees, purchasePriceRupees, totalPurchased, totalSales, quantity, actualInventory } = req.body
         try {
-            const ratePerUnit = Number(priceCents || 0)
+            const ratePerUnit = Number(priceRupees || 0)
             const purchase = Number(totalPurchased || quantity || 0)
             const sales = Number(totalSales || 0)
             const inventory = Number(quantity || 0)
@@ -43,8 +43,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     name,
                     categoryId: categoryId ? Number(categoryId) : null,
                     unit,
-                    priceCents: ratePerUnit,
-                    purchasePriceCents: Number(purchasePriceCents || 0),
+                    priceRupees: ratePerUnit,
+                    purchasePriceRupees: Number(purchasePriceRupees || 0),
                     quantity: inventory,
                     actualInventory: actualInventory ? Number(actualInventory) : null,
                     inventoryValue: inventoryValue || null,
@@ -64,9 +64,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT') {
-        const { id, name, categoryId, unit, priceCents, purchasePriceCents, totalPurchased, totalSales, quantity, actualInventory } = req.body
+        const { id, name, categoryId, unit, priceRupees, purchasePriceRupees, totalPurchased, totalSales, quantity, actualInventory } = req.body
         try {
-            const ratePerUnit = Number(priceCents || 0)
+            const ratePerUnit = Number(priceRupees || 0)
             const purchase = Number(totalPurchased || 0)
             const sales = Number(totalSales || 0)
             const inventory = Number(quantity || 0)
@@ -86,8 +86,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     name,
                     categoryId: categoryId ? Number(categoryId) : null,
                     unit,
-                    priceCents: ratePerUnit,
-                    purchasePriceCents: Number(purchasePriceCents || 0),
+                    priceRupees: ratePerUnit,
+                    purchasePriceRupees: Number(purchasePriceRupees || 0),
                     totalPurchased: purchase,
                     totalSales: sales,
                     quantity: inventory,

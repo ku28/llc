@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
-import ConfirmModal from '../components/ConfirmModal'
 import LoadingModal from '../components/LoadingModal'
 import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
 import { useToast } from '../hooks/useToast'
+import * as XLSX from 'xlsx'
 
 export default function PurchaseOrdersPage() {
     const [sentDemands, setSentDemands] = useState<any[]>([])
@@ -31,6 +31,19 @@ export default function PurchaseOrdersPage() {
     const [receivedPODetails, setReceivedPODetails] = useState<any>(null)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const [user, setUser] = useState<any>(null)
+    
+    // Bulk operations and sorting
+    const [selectedPOIds, setSelectedPOIds] = useState<Set<number>>(new Set())
+    const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+    const [sortField, setSortField] = useState<string>('createdAt')
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+    const [showSortDropdown, setShowSortDropdown] = useState(false)
+    const [showExportDropdown, setShowExportDropdown] = useState(false)
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+    const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 })
+    const [isDeleteMinimized, setIsDeleteMinimized] = useState(false)
+    const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; deleteMultiple?: boolean; message?: string }>({ open: false })
+    const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
 
     useEffect(() => {
         fetchInitialData()
@@ -82,7 +95,7 @@ export default function PurchaseOrdersPage() {
                 currentStock: Number(p.actualInventory || p.quantity || 0),
                 requestedQuantity: Math.max(50, Number(p.minStockLevel || 10) * 5), // Order 5x min stock or 50, whichever is higher
                 unit: p.unit || 'pcs',
-                unitPrice: Number(p.purchasePriceCents || p.priceCents || 0), // Already in rupees
+                unitPrice: Number(p.purchasePriceRupees || p.priceRupees || 0), // Already in rupees
                 autoAdded: true
             }))
             setDemandList(prev => {
@@ -122,7 +135,7 @@ export default function PurchaseOrdersPage() {
                 newList[index].productName = product.name
                 newList[index].currentStock = Number(product.actualInventory || product.quantity || 0)
                 newList[index].unit = product.unit || 'pcs'
-                newList[index].unitPrice = Number(product.purchasePriceCents || product.priceCents || 0) // Already in rupees
+                newList[index].unitPrice = Number(product.purchasePriceRupees || product.priceRupees || 0) // Already in rupees
                 // Suggest order quantity
                 if (!newList[index].requestedQuantity) {
                     newList[index].requestedQuantity = Math.max(50, Number(product.minStockLevel || 10) * 5)
@@ -238,32 +251,6 @@ export default function PurchaseOrdersPage() {
         }
     }
 
-    const deleteDemand = async (id: number) => {
-        setDeleteId(id)
-        setShowDeleteConfirm(true)
-    }
-
-    const confirmDelete = async () => {
-        if (deleteId === null) return
-        setDeleting(true)
-        try {
-            const response = await fetch(`/api/purchase-orders?id=${deleteId}`, { method: 'DELETE' })
-            if (response.ok) {
-                await fetchSentDemands()
-                showSuccess('Demand deleted successfully!')
-            } else {
-                showError('Failed to delete demand')
-            }
-        } catch (error) {
-            console.error('Error deleting:', error)
-            showError('Failed to delete demand')
-        } finally {
-            setDeleting(false)
-            setShowDeleteConfirm(false)
-            setDeleteId(null)
-        }
-    }
-
     const openReceivingModal = (po: any) => {
         setReceivingPO({
             ...po,
@@ -354,23 +341,6 @@ export default function PurchaseOrdersPage() {
         }, 300)
     }
 
-    const filteredDemands = sentDemands.filter(demand => {
-        // Filter by active tab
-        if (activeTab === 'pending' && demand.status !== 'pending') return false
-        if (activeTab === 'received' && demand.status !== 'received') return false
-        
-        const matchesSearch = searchQuery ?
-            demand.poNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            demand.supplier?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-            : true
-        
-        const matchesSupplier = filterSupplier ?
-            demand.supplierId === Number(filterSupplier)
-            : true
-        
-        return matchesSearch && matchesSupplier
-    })
-
     // Get stock status for display
     const getStockStatus = (qty: number) => {
         if (qty <= 0) return { label: 'OUT', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' }
@@ -378,21 +348,329 @@ export default function PurchaseOrdersPage() {
         return { label: 'OK', color: 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30' }
     }
 
+    // Bulk selection handlers
+    function toggleSelectPO(id: number) {
+        const newSelected = new Set(selectedPOIds)
+        if (newSelected.has(id)) {
+            newSelected.delete(id)
+        } else {
+            newSelected.add(id)
+        }
+        setSelectedPOIds(newSelected)
+    }
+
+    function toggleSelectAll() {
+        const filteredPOs = getFilteredAndSortedDemands()
+        
+        if (selectedPOIds.size === filteredPOs.length) {
+            // Deselect all
+            setSelectedPOIds(new Set())
+        } else {
+            // Select all filtered POs
+            setSelectedPOIds(new Set(filteredPOs.map(d => d.id)))
+        }
+    }
+
+    function toggleExpandRow(id: number) {
+        const newExpanded = new Set(expandedRows)
+        if (newExpanded.has(id)) {
+            newExpanded.delete(id)
+        } else {
+            newExpanded.add(id)
+        }
+        setExpandedRows(newExpanded)
+    }
+
+    function getFilteredAndSortedDemands() {
+        // Filter
+        let filtered = sentDemands.filter(demand => {
+            const matchesTab = activeTab === 'pending' ?
+                demand.status === 'pending' :
+                demand.status === 'received'
+            
+            const matchesSearch = searchQuery ?
+                demand.poNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                demand.supplier?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+                : true
+            
+            const matchesSupplier = filterSupplier ?
+                demand.supplierId === Number(filterSupplier)
+                : true
+            
+            return matchesTab && matchesSearch && matchesSupplier
+        })
+
+        // Sort
+        filtered.sort((a, b) => {
+            let compareResult = 0
+            
+            if (sortField === 'createdAt') {
+                const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+                const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+                compareResult = dateA - dateB
+            } else if (sortField === 'poNumber') {
+                compareResult = (a.poNumber || '').localeCompare(b.poNumber || '')
+            } else if (sortField === 'supplier') {
+                compareResult = (a.supplier?.name || '').localeCompare(b.supplier?.name || '')
+            } else if (sortField === 'status') {
+                compareResult = (a.status || '').localeCompare(b.status || '')
+            }
+            
+            return sortOrder === 'asc' ? compareResult : -compareResult
+        })
+
+        return filtered
+    }
+
+    // Delete functions
+    async function deleteDemand(id: number) {
+        setConfirmModal({ open: true, id, message: 'Are you sure you want to delete this purchase order?' })
+        setTimeout(() => setConfirmModalAnimating(true), 10)
+    }
+
+    function openBulkDeleteConfirm() {
+        setConfirmModal({
+            open: true,
+            deleteMultiple: true,
+            message: `Are you sure you want to delete ${selectedPOIds.size} selected purchase order(s)?`
+        })
+        setTimeout(() => setConfirmModalAnimating(true), 10)
+    }
+
+    function closeConfirmModal() {
+        setConfirmModalAnimating(false)
+        setTimeout(() => setConfirmModal({ open: false }), 300)
+    }
+
+    async function handleConfirmDelete(id?: number) {
+        if (!id && !confirmModal.deleteMultiple) {
+            closeConfirmModal()
+            return
+        }
+        
+        closeConfirmModal()
+        setDeleting(true)
+        
+        try {
+            if (confirmModal.deleteMultiple) {
+                // Delete multiple POs with progress tracking
+                const idsArray = Array.from(selectedPOIds)
+                const total = idsArray.length
+                setDeleteProgress({ current: 0, total })
+                
+                // Delete in chunks for better progress tracking
+                const CHUNK_SIZE = 10
+                let completed = 0
+                
+                for (let i = 0; i < idsArray.length; i += CHUNK_SIZE) {
+                    const chunk = idsArray.slice(i, i + CHUNK_SIZE)
+                    const deletePromises = chunk.map(poId =>
+                        fetch(`/api/purchase-demands/${poId}`, { method: 'DELETE' })
+                    )
+                    await Promise.all(deletePromises)
+                    
+                    completed += chunk.length
+                    setDeleteProgress({ current: completed, total })
+                }
+                
+                await fetchSentDemands()
+                setSelectedPOIds(new Set())
+                showSuccess(`Successfully deleted ${completed} purchase order(s)`)
+                setDeleteProgress({ current: 0, total: 0 })
+            } else {
+                // Single delete
+                const res = await fetch(`/api/purchase-demands/${id}`, { method: 'DELETE' })
+                if (!res.ok) throw new Error('Delete failed')
+                await fetchSentDemands()
+                showSuccess('Purchase order deleted successfully')
+            }
+        } catch (error: any) {
+            console.error('Delete error:', error)
+            showError(error.message || 'Failed to delete purchase order(s)')
+        } finally {
+            setDeleting(false)
+        }
+    }
+
+    // Export functions
+    function exportData(format: 'csv' | 'json' | 'xlsx') {
+        const dataToExport = selectedPOIds.size > 0
+            ? sentDemands.filter(d => selectedPOIds.has(d.id))
+            : getFilteredAndSortedDemands()
+
+        if (dataToExport.length === 0) {
+            showError('No data to export')
+            return
+        }
+
+        if (format === 'csv') {
+            exportToCSV(dataToExport)
+        } else if (format === 'json') {
+            exportToJSON(dataToExport)
+        } else if (format === 'xlsx') {
+            exportToExcel(dataToExport)
+        }
+        
+        setShowExportDropdown(false)
+    }
+
+    const exportToCSV = (data: any[]) => {
+        const headers = ['PO Number', 'Supplier', 'Order Date', 'Items Count', 'Total Amount', 'Status']
+        const rows = data.map(d => [
+            d.poNumber || '',
+            d.supplier?.name || '',
+            d.orderDate ? new Date(d.orderDate).toLocaleDateString() : '',
+            d.items?.length || 0,
+            d.totalAmount?.toFixed(2) || '0.00',
+            d.status || ''
+        ])
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `purchase-orders_${new Date().toISOString().split('T')[0]}.csv`
+        link.click()
+        
+        showSuccess(`Exported ${data.length} purchase order(s) to CSV`)
+    }
+
+    const exportToJSON = (data: any[]) => {
+        const jsonData = JSON.stringify(data, null, 2)
+        const blob = new Blob([jsonData], { type: 'application/json' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `purchase-orders_${new Date().toISOString().split('T')[0]}.json`
+        link.click()
+        
+        showSuccess(`Exported ${data.length} purchase order(s) to JSON`)
+    }
+
+    const exportToExcel = (data: any[]) => {
+        const worksheet = XLSX.utils.json_to_sheet(data.map(d => ({
+            'PO Number': d.poNumber || '',
+            'Supplier': d.supplier?.name || '',
+            'Order Date': d.orderDate ? new Date(d.orderDate).toLocaleDateString() : '',
+            'Items Count': d.items?.length || 0,
+            'Total Amount': d.totalAmount || 0,
+            'Status': d.status || ''
+        })))
+        
+        const workbook = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchase Orders')
+        XLSX.writeFile(workbook, `purchase-orders_${new Date().toISOString().split('T')[0]}.xlsx`)
+        
+        showSuccess(`Exported ${data.length} purchase order(s) to Excel`)
+    }
+
+    const filteredDemands = getFilteredAndSortedDemands()
+
     return (
         <>
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Page Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Purchase Demands</h1>
+                        <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                            Purchase Demands
+                        </h1>
                         <p className="text-gray-600 dark:text-gray-400 mt-1">Build demand list and send to suppliers</p>
                     </div>
+                    {user && (
+                        <div className="flex gap-2">
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setShowExportDropdown(!showExportDropdown)}
+                                    className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                                    </svg>
+                                    <span className="font-semibold">{selectedPOIds.size > 0 ? `Export (${selectedPOIds.size})` : 'Export All'}</span>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+                                {showExportDropdown && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-50 overflow-hidden">
+                                        <button
+                                            onClick={() => exportData('csv')}
+                                            className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                        >
+                                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            <span className="font-medium">CSV Format</span>
+                                        </button>
+                                        <button
+                                            onClick={() => exportData('json')}
+                                            className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                        >
+                                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                            </svg>
+                                            <span className="font-medium">JSON Format</span>
+                                        </button>
+                                        <button
+                                            onClick={() => exportData('xlsx')}
+                                            className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
+                                        >
+                                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            <span className="font-medium">Excel Format</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            <button 
+                                onClick={() => setIsImportModalOpen(true)} 
+                                className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <span className="font-semibold">Import</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
 
+                {/* Bulk Action Bar */}
+                {selectedPOIds.size > 0 && (
+                    <div className="p-4 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 border border-emerald-200 dark:border-emerald-700 rounded-xl backdrop-blur-sm">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                                {selectedPOIds.size} purchase order(s) selected
+                            </span>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setSelectedPOIds(new Set())}
+                                    className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 rounded-lg transition-colors"
+                                >
+                                    Clear Selection
+                                </button>
+                                <button
+                                    onClick={openBulkDeleteConfirm}
+                                    disabled={deleting}
+                                    className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 rounded-lg transition-colors"
+                                >
+                                    {deleting ? 'Deleting...' : '🗑️ Delete Selected'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Demand List Builder */}
-                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                    <div className="relative flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
                             Current Demand List ({demandList.length} items)
                         </h2>
                         <div className="flex gap-2">
@@ -522,23 +800,26 @@ export default function PurchaseOrdersPage() {
                 </div>
 
                 {/* Sent Demands History */}
-                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Sent Demands</h2>
+                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                    <h2 className="relative text-xl font-semibold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                        Sent Demands
+                    </h2>
                     
                     {/* Tabs */}
-                    <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-700">
+                    <div className="relative flex gap-2 mb-6 border-b border-emerald-200 dark:border-emerald-700">
                         <button
                             onClick={() => setActiveTab('pending')}
                             className={`px-6 py-3 font-medium transition-all ${
                                 activeTab === 'pending'
-                                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                    ? 'text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400'
+                                    : 'text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400'
                             }`}
                         >
                             Pending Demands
                             <span className={`ml-2 px-2 py-1 rounded text-xs ${
                                 activeTab === 'pending'
-                                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                                    ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
                                     : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
                             }`}>
                                 {sentDemands.filter(d => d.status === 'pending').length}
@@ -549,7 +830,7 @@ export default function PurchaseOrdersPage() {
                             className={`px-6 py-3 font-medium transition-all ${
                                 activeTab === 'received'
                                     ? 'text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                    : 'text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400'
                             }`}
                         >
                             Received Orders
@@ -564,13 +845,13 @@ export default function PurchaseOrdersPage() {
                     </div>
                     
                     {/* Search and Filter */}
-                    <div className="flex gap-4 mb-4">
+                    <div className="relative flex gap-4 mb-4">
                         <input
                             type="text"
-                            placeholder="Search by PO Number or Supplier..."
+                            placeholder="🔍 Search by PO Number or Supplier..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                            className="flex-1 px-4 py-2 border border-emerald-200 dark:border-emerald-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
                         <CustomSelect
                             value={filterSupplier}
@@ -582,33 +863,61 @@ export default function PurchaseOrdersPage() {
                     </div>
 
                     {filteredDemands.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                        <div className="relative text-center py-12 text-gray-500 dark:text-gray-400">
                             <p className="text-lg">No demands sent yet</p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 dark:bg-gray-800">
+                        <div className="relative overflow-x-auto rounded-lg border border-emerald-100 dark:border-emerald-800">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/50 dark:to-green-950/50 border-b border-emerald-200 dark:border-emerald-700">
                                     <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">PO Number</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Supplier</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Items</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Amount</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
+                                        <th className="px-4 py-3 text-left">
+                                            <label className="flex items-center cursor-pointer group">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedPOIds.size === filteredDemands.length && filteredDemands.length > 0}
+                                                    onChange={toggleSelectAll}
+                                                    className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                                />
+                                            </label>
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('poNumber')}>
+                                            PO Number {sortField === 'poNumber' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('supplier')}>
+                                            Supplier {sortField === 'supplier' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('createdAt')}>
+                                            Date {sortField === 'createdAt' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-semibold">Items</th>
+                                        <th className="px-4 py-3 text-left font-semibold">Total Amount</th>
+                                        <th className="px-4 py-3 text-center font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('status')}>
+                                            Status {sortField === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-4 py-3 text-center font-semibold">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                <tbody className="divide-y divide-emerald-100 dark:divide-emerald-900/30">
                                     {filteredDemands.map((demand) => (
-                                        <tr key={demand.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{demand.poNumber}</td>
-                                            <td className="px-4 py-3 text-gray-900 dark:text-white">{demand.supplier?.name}</td>
-                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                                        <tr key={demand.id} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <label className="flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedPOIds.has(demand.id)}
+                                                        onChange={() => toggleSelectPO(demand.id)}
+                                                        className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                                    />
+                                                </label>
+                                            </td>
+                                            <td className="px-4 py-3 font-medium font-mono">{demand.poNumber}</td>
+                                            <td className="px-4 py-3">{demand.supplier?.name}</td>
+                                            <td className="px-4 py-3 text-xs">
                                                 {demand.orderDate ? new Date(demand.orderDate).toLocaleDateString() : '-'}
                                             </td>
-                                            <td className="px-4 py-3 text-gray-900 dark:text-white">{demand.items?.length || 0}</td>
-                                            <td className="px-4 py-3 text-gray-900 dark:text-white font-medium">
+                                            <td className="px-4 py-3">{demand.items?.length || 0}</td>
+                                            <td className="px-4 py-3 font-semibold">
                                                 ₹{(demand.totalAmount || 0).toFixed(2)}
                                             </td>
                                             <td className="px-4 py-3">
@@ -877,23 +1186,107 @@ export default function PurchaseOrdersPage() {
                 </div>
             )}
 
-            <ConfirmModal
-                isOpen={showDeleteConfirm}
-                title="Delete Demand"
-                message="Are you sure you want to delete this demand? This action cannot be undone."
-                confirmText="Delete"
-                cancelText="Cancel"
-                variant="danger"
-                onConfirm={confirmDelete}
-                onCancel={() => {
-                    setShowDeleteConfirm(false)
-                    setDeleteId(null)
-                }}
-            />
+            {/* Confirm Delete Modal */}
+            {confirmModal.open && (
+                <div className={`fixed inset-0 bg-black transition-opacity duration-300 z-50 ${confirmModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} onClick={closeConfirmModal}>
+                    <div className={`fixed inset-0 flex items-center justify-center p-4 z-50 transition-all duration-300 ${confirmModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 rounded-full">
+                                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-lg font-semibold text-center mb-2 text-gray-900 dark:text-gray-100">
+                                Confirm Delete
+                            </h3>
+                            <p className="text-sm text-center text-gray-600 dark:text-gray-400 mb-6">
+                                {confirmModal.message}
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={closeConfirmModal}
+                                    className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={() => handleConfirmDelete(confirmModal.id)} 
+                                    disabled={deleting} 
+                                    className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors font-medium"
+                                >
+                                    {deleting && (
+                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    )}
+                                    {deleting ? 'Deleting...' : 'Yes, Delete'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Progress Modal (for bulk deletes) */}
+            {deleting && deleteProgress.total > 0 && !isDeleteMinimized && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-md w-full">
+                        <div className="p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Deleting Purchase Orders</h3>
+                                <button
+                                    onClick={() => setIsDeleteMinimized(true)}
+                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <div className="flex items-center justify-center mb-6">
+                                <svg className="w-16 h-16 mx-auto text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            
+                            <div className="text-3xl font-bold text-red-600 dark:text-red-400 mb-2 text-center">
+                                {deleteProgress.current} / {deleteProgress.total}
+                            </div>
+                            
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 text-center">
+                                {Math.round((deleteProgress.current / deleteProgress.total) * 100)}% Complete
+                            </p>
+                            
+                            {/* Progress Bar */}
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+                                <div 
+                                    className="bg-red-600 h-4 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-2"
+                                    style={{ width: `${(deleteProgress.current / deleteProgress.total) * 100}%` }}
+                                >
+                                    <span className="text-xs text-white font-medium">
+                                        {deleteProgress.current > 0 && `${Math.round((deleteProgress.current / deleteProgress.total) * 100)}%`}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-4 text-center">
+                                Please wait, deleting purchase order {deleteProgress.current} of {deleteProgress.total}...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Loading Modal (for single deletes or when minimized) */}
+            {((deleting && deleteProgress.total === 0) || (deleting && isDeleteMinimized)) && (
+                <LoadingModal isOpen={true} message="Deleting purchase order..." />
+            )}
 
             <LoadingModal 
-                isOpen={loading || sendingEmail || deleting || receiving} 
-                message={loading ? 'Loading...' : sendingEmail ? 'Sending demand...' : receiving ? 'Receiving goods...' : 'Deleting...'}
+                isOpen={loading || sendingEmail || receiving} 
+                message={loading ? 'Loading...' : sendingEmail ? 'Sending demand...' : receiving ? 'Receiving goods...' : 'Processing...'}
             />
 
             <ToastNotification toasts={toasts} removeToast={removeToast} />

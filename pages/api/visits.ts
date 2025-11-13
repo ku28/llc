@@ -233,7 +233,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     for (const pr of prescriptions) {
                         const prescriptionData: any = {
                             visitId: visit.id,
-                            treatmentId: pr.treatmentId ? Number(pr.treatmentId) : undefined,
                             productId: pr.productId ? Number(pr.productId) : undefined,
                             comp1: pr.comp1 || null,
                             comp2: pr.comp2 || null,
@@ -249,6 +248,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             administration: pr.administration || null,
                             taken: !!pr.taken,
                             dispensed: !!pr.dispensed
+                        }
+
+                        // Only add treatmentId if it's provided and valid
+                        if (pr.treatmentId && String(pr.treatmentId).trim() !== '') {
+                            prescriptionData.treatmentId = Number(pr.treatmentId)
                         }
 
                         // Create prescription
@@ -281,8 +285,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                         productId: pid,
                                         transactionType: 'OUT',
                                         quantity: qtyToConsume,
-                                        unitPrice: prod.priceCents,
-                                        totalValue: qtyToConsume * prod.priceCents,
+                                        unitPrice: prod.priceRupees,
+                                        totalValue: qtyToConsume * (prod.priceRupees || 0),
                                         balanceQuantity: Math.max(0, newQty),
                                         referenceType: 'Visit',
                                         referenceId: visit.id,
@@ -322,10 +326,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                         productId: pid,
                                         description: prod.name,
                                         quantity: qtyToConsume,
-                                        unitPrice: prod.priceCents,
+                                        unitPrice: prod.priceRupees,
                                         taxRate: 0, // Can be configured
                                         discount: 0,
-                                        totalAmount: qtyToConsume * prod.priceCents
+                                        totalAmount: qtyToConsume * (prod.priceRupees || 0)
                                     })
                                 }
                             }

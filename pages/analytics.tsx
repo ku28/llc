@@ -47,7 +47,7 @@ export default function AnalyticsPage() {
 
     // Calculate metrics
     const totalProducts = products.length
-    const totalStockValue = products.reduce((sum, p) => sum + (p.quantity * (p.priceCents / 100)), 0)
+    const totalStockValue = products.reduce((sum, p) => sum + (p.quantity * (p.priceRupees || 0)), 0)
     const lowStockProducts = products.filter(p => p.quantity > 0 && p.quantity <= (p.threshold || 10))
     const outOfStockProducts = products.filter(p => p.quantity === 0)
 

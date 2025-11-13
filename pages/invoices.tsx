@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
-import Layout from '../components/Layout'
-import ConfirmModal from '../components/ConfirmModal'
 import LoadingModal from '../components/LoadingModal'
 import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
 import { useToast } from '../hooks/useToast'
+import * as XLSX from 'xlsx'
 
 export default function InvoicesPage() {
     const [invoices, setInvoices] = useState<any[]>([])
@@ -24,6 +23,18 @@ export default function InvoicesPage() {
     const [loading, setLoading] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [deleting, setDeleting] = useState(false)
+    const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<number>>(new Set())
+    const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+    const [sortField, setSortField] = useState<string>('createdAt')
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+    const [showSortDropdown, setShowSortDropdown] = useState(false)
+    const [showExportDropdown, setShowExportDropdown] = useState(false)
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+    const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 })
+    const [isDeleteMinimized, setIsDeleteMinimized] = useState(false)
+    const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; deleteMultiple?: boolean; message?: string }>({ open: false })
+    const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
+    const [user, setUser] = useState<any>(null)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
 
     const emptyForm = {
@@ -47,7 +58,6 @@ export default function InvoicesPage() {
         paymentMethod: 'CASH',
         transactionId: ''
     })
-    const [user, setUser] = useState<any>(null)
 
     useEffect(() => {
         fetchInitialData()
@@ -163,7 +173,7 @@ export default function InvoicesPage() {
             const product = products.find(p => p.id === Number(value))
             if (product) {
                 newItems[index].description = product.name
-                newItems[index].unitPrice = (product.priceCents / 100).toString()
+                newItems[index].unitPrice = (product.priceRupees || 0).toString()
             }
         }
 
@@ -181,32 +191,6 @@ export default function InvoicesPage() {
                 customerEmail: patient.email || '',
                 customerAddress: patient.address || ''
             })
-        }
-    }
-
-    async function deleteInvoice(id: number) {
-        setDeleteId(id)
-        setShowDeleteConfirm(true)
-    }
-
-    async function confirmDelete() {
-        if (deleteId === null) return
-        setDeleting(true)
-        try {
-            const response = await fetch(`/api/customer-invoices?id=${deleteId}`, { method: 'DELETE' })
-            if (response.ok) {
-                await fetchInvoices()
-                showSuccess('Invoice deleted successfully!')
-            } else {
-                showError('Failed to delete invoice')
-            }
-        } catch (error) {
-            console.error('Error deleting:', error)
-            showError('Failed to delete invoice')
-        } finally {
-            setDeleting(false)
-            setShowDeleteConfirm(false)
-            setDeleteId(null)
         }
     }
 
@@ -271,17 +255,237 @@ export default function InvoicesPage() {
         }, 200)
     }
 
-    const filteredInvoices = invoices.filter(inv => {
-        const matchesSearch = searchQuery ?
-            inv.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            inv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (inv.customerPhone || '').toLowerCase().includes(searchQuery.toLowerCase())
-            : true
+    // Bulk selection handlers
+    function toggleSelectInvoice(id: number) {
+        const newSelected = new Set(selectedInvoiceIds)
+        if (newSelected.has(id)) {
+            newSelected.delete(id)
+        } else {
+            newSelected.add(id)
+        }
+        setSelectedInvoiceIds(newSelected)
+    }
 
-        const matchesStatus = filterStatus ? inv.status === filterStatus : true
+    function toggleSelectAll() {
+        const filteredInvs = getFilteredAndSortedInvoices()
+        
+        if (selectedInvoiceIds.size === filteredInvs.length) {
+            // Deselect all
+            setSelectedInvoiceIds(new Set())
+        } else {
+            // Select all filtered invoices
+            setSelectedInvoiceIds(new Set(filteredInvs.map(inv => inv.id)))
+        }
+    }
 
-        return matchesSearch && matchesStatus
-    })
+    function toggleExpandRow(id: number) {
+        const newExpanded = new Set(expandedRows)
+        if (newExpanded.has(id)) {
+            newExpanded.delete(id)
+        } else {
+            newExpanded.add(id)
+        }
+        setExpandedRows(newExpanded)
+    }
+
+    function getFilteredAndSortedInvoices() {
+        // Filter invoices
+        let filtered = invoices.filter(inv => {
+            const matchesSearch = searchQuery ?
+                inv.invoiceNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                inv.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                inv.customerPhone?.toLowerCase().includes(searchQuery.toLowerCase())
+                : true
+            
+            const matchesStatus = filterStatus ?
+                inv.status === filterStatus
+                : true
+            
+            return matchesSearch && matchesStatus
+        })
+
+        // Sort invoices
+        filtered.sort((a, b) => {
+            let compareResult = 0
+            
+            if (sortField === 'invoiceNumber') {
+                compareResult = (a.invoiceNumber || '').localeCompare(b.invoiceNumber || '')
+            } else if (sortField === 'customerName') {
+                compareResult = (a.customerName || '').localeCompare(b.customerName || '')
+            } else if (sortField === 'invoiceDate') {
+                const dateA = a.invoiceDate ? new Date(a.invoiceDate).getTime() : 0
+                const dateB = b.invoiceDate ? new Date(b.invoiceDate).getTime() : 0
+                compareResult = dateA - dateB
+            } else if (sortField === 'totalAmount') {
+                compareResult = (a.totalAmount || 0) - (b.totalAmount || 0)
+            } else if (sortField === 'balanceAmount') {
+                compareResult = (a.balanceAmount || 0) - (b.balanceAmount || 0)
+            } else if (sortField === 'status') {
+                compareResult = (a.status || '').localeCompare(b.status || '')
+            } else if (sortField === 'createdAt') {
+                const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+                const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+                compareResult = dateA - dateB
+            }
+            
+            return sortOrder === 'asc' ? compareResult : -compareResult
+        })
+
+        return filtered
+    }
+
+    // Delete functions
+    async function deleteInvoice(id: number) {
+        setConfirmModal({ open: true, id, message: 'Are you sure you want to delete this invoice?' })
+        setTimeout(() => setConfirmModalAnimating(true), 10)
+    }
+
+    function openBulkDeleteConfirm() {
+        setConfirmModal({
+            open: true,
+            deleteMultiple: true,
+            message: `Are you sure you want to delete ${selectedInvoiceIds.size} selected invoice(s)?`
+        })
+        setTimeout(() => setConfirmModalAnimating(true), 10)
+    }
+
+    function closeConfirmModal() {
+        setConfirmModalAnimating(false)
+        setTimeout(() => setConfirmModal({ open: false }), 300)
+    }
+
+    async function handleConfirmDelete(id?: number) {
+        if (!id && !confirmModal.deleteMultiple) {
+            closeConfirmModal()
+            return
+        }
+        
+        closeConfirmModal()
+        setDeleting(true)
+        
+        try {
+            if (confirmModal.deleteMultiple) {
+                // Delete multiple invoices with progress tracking
+                const idsArray = Array.from(selectedInvoiceIds)
+                const total = idsArray.length
+                setDeleteProgress({ current: 0, total })
+                
+                // Delete in chunks for better progress tracking
+                const CHUNK_SIZE = 10
+                let completed = 0
+                
+                for (let i = 0; i < idsArray.length; i += CHUNK_SIZE) {
+                    const chunk = idsArray.slice(i, i + CHUNK_SIZE)
+                    const deletePromises = chunk.map(invoiceId =>
+                        fetch(`/api/customer-invoices/${invoiceId}`, { method: 'DELETE' })
+                    )
+                    await Promise.all(deletePromises)
+                    
+                    completed += chunk.length
+                    setDeleteProgress({ current: completed, total })
+                }
+                
+                await fetchInvoices()
+                setSelectedInvoiceIds(new Set())
+                showSuccess(`Successfully deleted ${completed} invoice(s)`)
+                setDeleteProgress({ current: 0, total: 0 })
+            } else {
+                // Single delete
+                const res = await fetch(`/api/customer-invoices/${id}`, { method: 'DELETE' })
+                if (!res.ok) throw new Error('Delete failed')
+                await fetchInvoices()
+                showSuccess('Invoice deleted successfully')
+            }
+        } catch (error: any) {
+            console.error('Delete error:', error)
+            showError(error.message || 'Failed to delete invoice(s)')
+        } finally {
+            setDeleting(false)
+        }
+    }
+
+    // Export functions
+    function exportData(format: 'csv' | 'json' | 'xlsx') {
+        const dataToExport = selectedInvoiceIds.size > 0
+            ? invoices.filter(inv => selectedInvoiceIds.has(inv.id))
+            : getFilteredAndSortedInvoices()
+
+        if (dataToExport.length === 0) {
+            showError('No data to export')
+            return
+        }
+
+        if (format === 'csv') {
+            exportToCSV(dataToExport)
+        } else if (format === 'json') {
+            exportToJSON(dataToExport)
+        } else if (format === 'xlsx') {
+            exportToExcel(dataToExport)
+        }
+        
+        setShowExportDropdown(false)
+    }
+
+    const exportToCSV = (data: any[]) => {
+        const headers = ['Invoice Number', 'Customer', 'Phone', 'Email', 'Date', 'Due Date', 'Total Amount', 'Paid Amount', 'Balance', 'Status']
+        const rows = data.map(inv => [
+            inv.invoiceNumber || '',
+            inv.customerName || '',
+            inv.customerPhone || '',
+            inv.customerEmail || '',
+            inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : '',
+            inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '',
+            inv.totalAmount?.toFixed(2) || '0.00',
+            inv.paidAmount?.toFixed(2) || '0.00',
+            inv.balanceAmount?.toFixed(2) || '0.00',
+            inv.status || ''
+        ])
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `invoices_${new Date().toISOString().split('T')[0]}.csv`
+        link.click()
+        
+        showSuccess(`Exported ${data.length} invoice(s) to CSV`)
+    }
+
+    const exportToJSON = (data: any[]) => {
+        const jsonData = JSON.stringify(data, null, 2)
+        const blob = new Blob([jsonData], { type: 'application/json' })
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(blob)
+        link.download = `invoices_${new Date().toISOString().split('T')[0]}.json`
+        link.click()
+        
+        showSuccess(`Exported ${data.length} invoice(s) to JSON`)
+    }
+
+    const exportToExcel = (data: any[]) => {
+        const worksheet = XLSX.utils.json_to_sheet(data.map(inv => ({
+            'Invoice Number': inv.invoiceNumber || '',
+            'Customer': inv.customerName || '',
+            'Phone': inv.customerPhone || '',
+            'Email': inv.customerEmail || '',
+            'Invoice Date': inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString() : '',
+            'Due Date': inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '',
+            'Total Amount': inv.totalAmount || 0,
+            'Paid Amount': inv.paidAmount || 0,
+            'Balance': inv.balanceAmount || 0,
+            'Status': inv.status || ''
+        })))
+        
+        const workbook = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Invoices')
+        XLSX.writeFile(workbook, `invoices_${new Date().toISOString().split('T')[0]}.xlsx`)
+        
+        showSuccess(`Exported ${data.length} invoice(s) to Excel`)
+    }
 
     function calculateItemTotal(item: any) {
         const quantity = Number(item.quantity) || 0
@@ -303,32 +507,120 @@ export default function InvoicesPage() {
         return itemsTotal - discount
     }
 
+    const filteredInvoices = getFilteredAndSortedInvoices()
+    const paginatedInvoices = filteredInvoices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
     return (
         <div>
             <div className="section-header flex justify-between items-center">
                 <h2 className="section-title">Customer Invoices</h2>
-                <button
-                    onClick={() => {
-                        setIsModalOpen(true)
-                        setIsAnimating(false)
-                        setTimeout(() => setIsAnimating(true), 10)
-                    }}
-                    className="btn btn-primary"
-                >
-                    + Create Invoice
-                </button>
+                {user && (
+                    <div className="flex gap-2">
+                        <div className="relative">
+                            <button 
+                                onClick={() => setShowExportDropdown(!showExportDropdown)}
+                                className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                                </svg>
+                                <span className="font-semibold">{selectedInvoiceIds.size > 0 ? `Export (${selectedInvoiceIds.size})` : 'Export All'}</span>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            {showExportDropdown && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-50 overflow-hidden">
+                                    <button
+                                        onClick={() => exportData('csv')}
+                                        className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                    >
+                                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        <span className="font-medium">CSV Format</span>
+                                    </button>
+                                    <button
+                                        onClick={() => exportData('json')}
+                                        className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                    >
+                                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                        </svg>
+                                        <span className="font-medium">JSON Format</span>
+                                    </button>
+                                    <button
+                                        onClick={() => exportData('xlsx')}
+                                        className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
+                                    >
+                                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        <span className="font-medium">Excel Format</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <button 
+                            onClick={() => setIsImportModalOpen(true)} 
+                            className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <span className="font-semibold">Import</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setIsModalOpen(true)
+                                setIsAnimating(false)
+                                setTimeout(() => setIsAnimating(true), 10)
+                            }}
+                            className="btn btn-primary"
+                        >
+                            + Create Invoice
+                        </button>
+                    </div>
+                )}
             </div>
 
+            {/* Bulk Action Bar */}
+            {selectedInvoiceIds.size > 0 && (
+                <div className="mb-4 p-4 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 border border-emerald-200 dark:border-emerald-700 rounded-xl backdrop-blur-sm">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                            {selectedInvoiceIds.size} invoice(s) selected
+                        </span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setSelectedInvoiceIds(new Set())}
+                                className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 rounded-lg transition-colors"
+                            >
+                                Clear Selection
+                            </button>
+                            <button
+                                onClick={openBulkDeleteConfirm}
+                                disabled={deleting}
+                                className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 rounded-lg transition-colors"
+                            >
+                                {deleting ? 'Deleting...' : '🗑️ Delete Selected'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Search and Filter Bar */}
-            <div className="card mb-4">
-                <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 mb-4">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                <div className="relative flex items-center gap-3 flex-wrap">
                     <div className="flex-1 relative min-w-[250px]">
                         <input
                             type="text"
                             placeholder="🔍 Search invoices..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                            className="w-full p-3 pr-10 border border-emerald-200 dark:border-emerald-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
                         />
                     </div>
                     <div className="w-48">
@@ -359,35 +651,69 @@ export default function InvoicesPage() {
             </div>
 
             {/* Invoices Table */}
-            <div className="card">
-                <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
+            <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                <h3 className="relative text-lg font-semibold mb-4 flex items-center justify-between text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
                     <span>Invoices</span>
-                    <span className="badge">
-                        {filteredInvoices.length} of {invoices.length} invoices
+                    <span className="px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30 rounded-full">
+                        {filteredInvoices.length} of {invoices.length}
                     </span>
                 </h3>
 
                 {filteredInvoices.length === 0 ? (
-                    <div className="text-center py-8 text-muted">
+                    <div className="relative text-center py-8 text-gray-500 dark:text-gray-400">
                         <p className="text-lg mb-2">No invoices yet</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
-                                <tr>
-                                    <th className="px-4 py-3 text-left font-semibold">Invoice #</th>
-                                    <th className="px-4 py-3 text-left font-semibold">Customer</th>
-                                    <th className="px-4 py-3 text-left font-semibold">Date</th>
-                                    <th className="px-4 py-3 text-right font-semibold">Total</th>
-                                    <th className="px-4 py-3 text-right font-semibold">Balance</th>
-                                    <th className="px-4 py-3 text-center font-semibold">Status</th>
-                                    <th className="px-4 py-3 text-center font-semibold">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                {filteredInvoices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(inv => (
-                                    <tr key={inv.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <>
+                        <div className="relative overflow-x-auto rounded-lg border border-emerald-100 dark:border-emerald-800">
+                            <table className="w-full text-sm">
+                                <thead className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/50 dark:to-green-950/50 border-b border-emerald-200 dark:border-emerald-700">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left">
+                                            <label className="flex items-center cursor-pointer group">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedInvoiceIds.size === filteredInvoices.length && filteredInvoices.length > 0}
+                                                    onChange={toggleSelectAll}
+                                                    className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                                />
+                                            </label>
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('invoiceNumber')}>
+                                            Invoice # {sortField === 'invoiceNumber' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('customerName')}>
+                                            Customer {sortField === 'customerName' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('invoiceDate')}>
+                                            Date {sortField === 'invoiceDate' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('totalAmount')}>
+                                            Total {sortField === 'totalAmount' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('balanceAmount')}>
+                                            Balance {sortField === 'balanceAmount' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-4 py-3 text-center font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('status')}>
+                                            Status {sortField === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+                                        </th>
+                                        <th className="px-4 py-3 text-center font-semibold">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-emerald-100 dark:divide-emerald-900/30">
+                                    {paginatedInvoices.map(inv => (
+                                        <tr key={inv.id} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <label className="flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedInvoiceIds.has(inv.id)}
+                                                        onChange={() => toggleSelectInvoice(inv.id)}
+                                                        className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                                    />
+                                                </label>
+                                            </td>
                                         <td className="px-4 py-3 font-mono font-semibold">{inv.invoiceNumber}</td>
                                         <td className="px-4 py-3">
                                             <div className="font-medium">{inv.customerName}</div>
@@ -467,7 +793,8 @@ export default function InvoicesPage() {
                                 </button>
                             </div>
                         )}
-                    </div>
+                        </div>
+                    </>
                 )}
             </div>
 
@@ -801,23 +1128,107 @@ export default function InvoicesPage() {
                 </div>
             )}
 
-            <ConfirmModal
-                isOpen={showDeleteConfirm}
-                title="Delete Invoice"
-                message="Are you sure you want to delete this invoice? This action cannot be undone."
-                confirmText="Delete"
-                cancelText="Cancel"
-                variant="danger"
-                onConfirm={confirmDelete}
-                onCancel={() => {
-                    setShowDeleteConfirm(false)
-                    setDeleteId(null)
-                }}
-            />
+            {/* Confirm Delete Modal */}
+            {confirmModal.open && (
+                <div className={`fixed inset-0 bg-black transition-opacity duration-300 z-50 ${confirmModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} onClick={closeConfirmModal}>
+                    <div className={`fixed inset-0 flex items-center justify-center p-4 z-50 transition-all duration-300 ${confirmModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 rounded-full">
+                                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-lg font-semibold text-center mb-2 text-gray-900 dark:text-gray-100">
+                                Confirm Delete
+                            </h3>
+                            <p className="text-sm text-center text-gray-600 dark:text-gray-400 mb-6">
+                                {confirmModal.message}
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={closeConfirmModal}
+                                    className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={() => handleConfirmDelete(confirmModal.id)} 
+                                    disabled={deleting} 
+                                    className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors font-medium"
+                                >
+                                    {deleting && (
+                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    )}
+                                    {deleting ? 'Deleting...' : 'Yes, Delete'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Progress Modal (for bulk deletes) */}
+            {deleting && deleteProgress.total > 0 && !isDeleteMinimized && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-md w-full">
+                        <div className="p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Deleting Invoices</h3>
+                                <button
+                                    onClick={() => setIsDeleteMinimized(true)}
+                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <div className="flex items-center justify-center mb-6">
+                                <svg className="w-16 h-16 mx-auto text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            
+                            <div className="text-3xl font-bold text-red-600 dark:text-red-400 mb-2 text-center">
+                                {deleteProgress.current} / {deleteProgress.total}
+                            </div>
+                            
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 text-center">
+                                {Math.round((deleteProgress.current / deleteProgress.total) * 100)}% Complete
+                            </p>
+                            
+                            {/* Progress Bar */}
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+                                <div 
+                                    className="bg-red-600 h-4 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-2"
+                                    style={{ width: `${(deleteProgress.current / deleteProgress.total) * 100}%` }}
+                                >
+                                    <span className="text-xs text-white font-medium">
+                                        {deleteProgress.current > 0 && `${Math.round((deleteProgress.current / deleteProgress.total) * 100)}%`}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-4 text-center">
+                                Please wait, deleting invoice {deleteProgress.current} of {deleteProgress.total}...
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Loading Modal (for single deletes or when minimized) */}
+            {((deleting && deleteProgress.total === 0) || (deleting && isDeleteMinimized)) && (
+                <LoadingModal isOpen={true} message="Deleting invoice..." />
+            )}
 
             <LoadingModal 
-                isOpen={loading || submitting || deleting} 
-                message={loading ? 'Loading invoices...' : submitting ? 'Processing...' : 'Deleting invoice...'}
+                isOpen={loading || submitting} 
+                message={loading ? 'Loading invoices...' : 'Processing...'}
             />
 
             <ToastNotification toasts={toasts} removeToast={removeToast} />

@@ -239,7 +239,7 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                 pulseDiagnosis: row['PulseD 1'] || row.pulseDiagnosis || undefined,
                 pulseDiagnosis2: row['PulseD 2'] || row.pulseDiagnosis2 || undefined,
                 investigations: row.Investigations || row.investigations || undefined,
-                provDiagnosis: row.Diagnosis || row['Diagnosis:'] || row.provDiagnosis || undefined,
+                provDiagnosis: row.Diagnosis || row['Diagnosis'] || row.provDiagnosis || undefined,
                 historyReports: row['Hist/Reports'] || row.historyReports || undefined,
                 majorComplaints: row['Chief Complaints'] || row.majorComplaints || undefined,
                 improvements: row.Imp || row.improvements || undefined,

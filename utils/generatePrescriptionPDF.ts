@@ -192,7 +192,7 @@ export const generatePrescriptionPDF = async (data: PrescriptionData) => {
 
     const tableData = prescriptions.map((pr: any, index: number) => {
         const product = products.find((p: any) => String(p.id) === String(pr.productId));
-        return [
+            return [
             String(index + 1),
             product?.name?.toUpperCase() || 'MEDICINE',
             pr.dosage || '-',
@@ -201,8 +201,8 @@ export const generatePrescriptionPDF = async (data: PrescriptionData) => {
             pr.route || '-',
             pr.timing?.toUpperCase() || '-',
             pr.quantity || '1',
-            product?.priceCents ? `₹${(product.priceCents / 100).toFixed(2)}` : '-',
-            product?.priceCents ? `₹${((product.priceCents / 100) * (parseInt(pr.quantity) || 1)).toFixed(2)}` : '-'
+            product?.priceRupees ? `₹${Number(product.priceRupees).toFixed(2)}` : '-',
+            product?.priceRupees ? `₹${(Number(product.priceRupees) * (parseInt(pr.quantity) || 1)).toFixed(2)}` : '-'
         ];
     });
 

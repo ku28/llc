@@ -10,10 +10,18 @@ interface ImportProductsModalProps {
 
 interface ProductRow {
     name: string
-    priceCents: number
+    priceRupees: number
     quantity: number
-    purchasePriceCents?: number
+    purchasePriceRupees?: number
     unit?: string
+    category?: string
+    actualInventory?: number
+    inventoryValue?: number
+    latestUpdate?: string
+    purchaseValue?: number
+    salesValue?: number
+    totalPurchased?: number
+    totalSales?: number
 }
 
 export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }: ImportProductsModalProps) {
@@ -83,19 +91,117 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
             return
         }
 
-        const products: ProductRow[] = data.map((row: any) => ({
-            name: String(row.name || row.Name || row.productName || '').trim(),
-            priceCents: row.price || row.Price ? Math.round((parseFloat(row.price || row.Price) || 0) * 100) : 
-                        row.priceCents || row.PriceCents ? parseInt(row.priceCents || row.PriceCents) : 0,
-            quantity: row.quantity || row.Quantity ? parseInt(row.quantity || row.Quantity) : 0,
-            purchasePriceCents: row.purchasePrice || row.PurchasePrice ? Math.round((parseFloat(row.purchasePrice || row.PurchasePrice) || 0) * 100) :
-                               row.purchasePriceCents || row.PurchasePriceCents ? parseInt(row.purchasePriceCents || row.PurchasePriceCents) : undefined,
-            unit: row.unit || row.Unit || undefined,
-        }))
+        // Helper: normalize header keys to simple uppercase tokens (remove non-alphanum)
+        const normalizeKey = (k: string) => String(k || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase()
 
+        const parsedRows: ProductRow[] = data.map((row: any, rowIndex: number) => {
+            // Build normalized map from normalizedKey -> value
+            const normMap: Record<string, any> = {}
+            Object.keys(row).forEach(k => {
+                const nk = normalizeKey(k)
+                normMap[nk] = row[k]
+            })
+
+            const getRaw = (...keys: string[]) => {
+                for (const k of keys) {
+                    const nk = normalizeKey(k)
+                    if (nk in normMap) return normMap[nk]
+                }
+                return undefined
+            }
+
+            const parseNumber = (v: any) => {
+                if (v === undefined || v === null || v === '') return undefined
+                // Normalize to string and strip any non-numeric characters except dot and minus.
+                // This removes currency symbols (e.g. ₹, $), commas, spaces and other noise.
+                let s = String(v).trim()
+                s = s.replace(/[^0-9.\-]/g, '')
+                if (s === '') return undefined
+                const n = Number(s)
+                if (isNaN(n)) return undefined
+                return n
+            }
+
+            const rawName = getRaw('ITEM', 'NAME', 'PRODUCTNAME') || ''
+            const name = String(rawName).trim()
+
+            // RATE/U or RATE or PRICE (now stored as rupees)
+            const rawRate = getRaw('RATE/U', 'RATE', 'PRICE', 'PRICECENTS')
+            let priceRupees = 0
+            if (rawRate !== undefined && rawRate !== null && String(rawRate).trim() !== '') {
+                const n = parseNumber(rawRate)
+                if (n !== undefined) {
+                    // Treat parsed number as rupees directly
+                    priceRupees = n
+                }
+            }
+
+            const rawInventory = getRaw('INVENTORY', 'INV', 'QUANTITY')
+            const quantity = parseNumber(rawInventory) ?? 0
+
+            const rawPPrice = getRaw('P/PRICE', 'PPRICE', 'PURCHASEPRICE', 'PURCHASEPRICECENTS')
+            let purchasePriceRupees: number | undefined = undefined
+            if (rawPPrice !== undefined && rawPPrice !== null && String(rawPPrice).trim() !== '') {
+                const n = parseNumber(rawPPrice)
+                if (n !== undefined) {
+                    purchasePriceRupees = n
+                }
+            }
+
+            const rawUnit = getRaw('UINT', 'UNIT')
+            const unit = rawUnit === undefined || rawUnit === null || String(rawUnit).trim() === '' ? undefined : String(rawUnit).trim()
+
+            // Category field
+            const rawCategory = getRaw('CATEGORY', 'CAT', 'CATEGORYNAME', 'CATEGORY NAME')
+            const category = rawCategory === undefined || rawCategory === null || String(rawCategory).trim() === '' ? undefined : String(rawCategory).trim()
+
+            // Additional template fields
+            const rawActualInventory = getRaw('ACTUALINVENTORY', 'ACTUAL INVENTORY', 'ACTUAL', 'ACTUALQTY')
+            const actualInventory = parseNumber(rawActualInventory)
+
+            const rawInventoryValue = getRaw('INVVAL', 'INV/VAL', 'INVENTORYVALUE', 'INVVALUE')
+            const inventoryValue = parseNumber(rawInventoryValue)
+
+            const rawLatest = getRaw('LATEST', 'LATESTUPDATE', 'UPDATED', 'LASTUPDATE', 'LATEST UPDATE')
+            let latestUpdate: string | undefined = undefined
+            if (rawLatest !== undefined && rawLatest !== null && String(rawLatest).trim() !== '') {
+                const d = new Date(String(rawLatest).trim())
+                if (!isNaN(d.getTime())) latestUpdate = d.toISOString()
+            }
+
+            const rawPurchaseValue = getRaw('PUR/VAL', 'PURVAL', 'PURCHASEVALUE', 'PURCHASE VALUE', 'PURCHASE')
+            const purchaseValue = parseNumber(rawPurchaseValue)
+
+            const rawSalesValue = getRaw('SALE/VAL', 'SALEVAL', 'SALESVALUE', 'SALES VALUE', 'SALES')
+            const salesValue = parseNumber(rawSalesValue)
+
+            // Accept singular "PURCHASE" from CSV templates as well as other variants
+            const rawTotalPurchased = getRaw('TOTALPURCHASED', 'TOTAL PURCHASED', 'TOTALPUR', 'PURCHASED', 'PURCHASE')
+            const totalPurchased = parseNumber(rawTotalPurchased)
+
+            // Accept singular "SALES" from CSV templates as well as other variants
+            const rawTotalSales = getRaw('TOTALSALES', 'TOTAL SALES', 'TOTAL_SALES', 'SALES_TOTAL', 'SALES')
+            const totalSales = parseNumber(rawTotalSales)
+
+            return {
+                name,
+                priceRupees,
+                quantity: quantity || 0,
+                purchasePriceRupees,
+                unit,
+                category,
+                actualInventory: actualInventory !== undefined ? Math.round(actualInventory) : undefined,
+                inventoryValue: inventoryValue !== undefined ? Number(inventoryValue) : undefined,
+                latestUpdate,
+                purchaseValue: purchaseValue !== undefined ? Number(purchaseValue) : undefined,
+                salesValue: salesValue !== undefined ? Number(salesValue) : undefined,
+                totalPurchased: totalPurchased !== undefined ? Math.round(totalPurchased) : undefined,
+                totalSales: totalSales !== undefined ? Math.round(totalSales) : undefined
+            }
+        })
         // Validate required fields
         const errors: string[] = []
-        products.forEach((p, index) => {
+        parsedRows.forEach((p, index) => {
             if (!p.name) errors.push(`Row ${index + 1}: Missing name`)
         })
 
@@ -104,8 +210,8 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
             return
         }
 
-        setParsedData(products)
-        setPreviewData(products.slice(0, 10))
+        setParsedData(parsedRows)
+        setPreviewData(parsedRows.slice(0, 10))
         setStep('preview')
     }
 
@@ -372,7 +478,7 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
                                     <li className="ml-4">• Duplicate names will be skipped (keeps existing)</li>
                                     <li className="ml-4">• Missing prices default to ₹0.00</li>
                                     
-                                    <li className="mt-2">• 📥 <a href="/templates/products_import_template.csv" download className="underline hover:text-blue-600 font-semibold">Download CSV Template</a></li>
+                                    <li className="mt-2">• 📥 <a href="/templates/inventory.csv" download className="underline hover:text-blue-600 font-semibold">Download CSV Template</a></li>
                                 </ul>
                             </div>
 
@@ -397,6 +503,7 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
                                     <thead>
                                         <tr>
                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Name</th>
+                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Category</th>
                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Price</th>
                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Quantity</th>
                                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Unit</th>
@@ -406,7 +513,8 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
                                         {previewData.map((p, i) => (
                                             <tr key={i}>
                                                 <td className="px-4 py-2 text-sm">{p.name}</td>
-                                                <td className="px-4 py-2 text-sm">₹{(p.priceCents / 100).toFixed(2)}</td>
+                                                <td className="px-4 py-2 text-sm">{p.category || '-'}</td>
+                                                <td className="px-4 py-2 text-sm">₹{(Number(p.priceRupees) || 0).toFixed(2)}</td>
                                                 <td className="px-4 py-2 text-sm">{p.quantity}</td>
                                                 <td className="px-4 py-2 text-sm">{p.unit || '-'}</td>
                                             </tr>
