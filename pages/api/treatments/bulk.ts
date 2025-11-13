@@ -104,8 +104,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             console.log(`[Bulk Create] Found ${existingTreatments.length} existing treatments`)
 
-            // Process 100 treatments per batch
+            // Process treatments with controlled concurrency to avoid connection pool exhaustion
             const BATCH_SIZE = 100
+            const CONCURRENCY_LIMIT = 25 // Process 25 at a time (matches connection pool limit)
             const results: any[] = []
             const errors: any[] = []
             
@@ -115,9 +116,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 chunks.push(treatments.slice(i, i + BATCH_SIZE))
             }
 
-            // Process each chunk in parallel
+            // Process each chunk with limited concurrency
             for (const chunk of chunks) {
-                const chunkPromises = chunk.map(async (treatmentData: any, index: number) => {
+                // Further split chunk into smaller concurrent batches
+                for (let i = 0; i < chunk.length; i += CONCURRENCY_LIMIT) {
+                    const concurrentBatch = chunk.slice(i, i + CONCURRENCY_LIMIT)
+                    
+                    const chunkPromises = concurrentBatch.map(async (treatmentData: any, index: number) => {
                     try {
                         const { 
                             provDiagnosis, planNumber, speciality, organ, diseaseAction, 
@@ -213,9 +218,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     }
                 })
 
-                // Wait for current chunk to complete before moving to next
-                const chunkResults = await Promise.all(chunkPromises)
-                results.push(...chunkResults.filter(r => r !== null))
+                // Wait for current concurrent batch to complete
+                const batchResults = await Promise.all(chunkPromises)
+                results.push(...batchResults.filter(r => r !== null))
+                }
             }
 
             console.log(`[Bulk Create] Completed: ${results.length} successful, ${errors.length} errors`)
