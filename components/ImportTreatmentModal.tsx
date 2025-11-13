@@ -235,8 +235,8 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                 }
             })
 
-            // Split into chunks for better progress tracking and avoid timeouts
-            const CHUNK_SIZE = 50
+            // Send 100 treatment plans per batch to backend
+            const CHUNK_SIZE = 100
             const chunks = []
             for (let i = 0; i < treatmentsToCreate.length; i += CHUNK_SIZE) {
                 chunks.push(treatmentsToCreate.slice(i, i + CHUNK_SIZE))
