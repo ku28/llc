@@ -12,7 +12,49 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         console.log(`[Bulk Create Products] Received ${products.length} products to import`)
 
         try {
-            const BATCH_SIZE = 50 // Increased for better performance
+            // Step 1: Collect all unique category names
+            const uniqueCategoryNames = new Set<string>()
+            products.forEach((p: any) => {
+                if (p.category && String(p.category).trim()) {
+                    uniqueCategoryNames.add(String(p.category).trim())
+                }
+            })
+
+            // Step 2: Bulk upsert all categories first
+            const categoryMap = new Map<string, number>()
+            if (uniqueCategoryNames.size > 0) {
+                console.log(`[Bulk Create Products] Upserting ${uniqueCategoryNames.size} unique categories`)
+                
+                for (const categoryName of uniqueCategoryNames) {
+                    const existingCategory = await prisma.category.upsert({
+                        where: { name: categoryName },
+                        create: { name: categoryName },
+                        update: {}
+                    })
+                    categoryMap.set(categoryName, existingCategory.id)
+                }
+            }
+
+            // Step 3: Preload all existing products by name
+            const allProductNames = products.map((p: any) => (p.name || '').trim()).filter((n: string) => n)
+            const existingProducts = await prisma.product.findMany({
+                where: {
+                    name: {
+                        in: allProductNames,
+                        mode: 'insensitive'
+                    }
+                }
+            })
+
+            const existingByName: Record<string, any> = {}
+            existingProducts.forEach((ep: any) => {
+                if (ep && ep.name) existingByName[String(ep.name).toLowerCase()] = ep
+            })
+
+            console.log(`[Bulk Create Products] Found ${existingProducts.length} existing products`)
+
+            // Step 4: Process products in larger batches
+            const BATCH_SIZE = 100
             const results: any[] = []
             const errors: any[] = []
             
@@ -22,23 +64,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             }
 
             for (const chunk of chunks) {
-                // Preload existing products for this chunk by name (case-insensitive)
-                const namesInChunk = chunk.map((p: any) => (p.name || '').trim()).filter((n: string) => n)
-                const existingProducts = await prisma.product.findMany({
-                    where: {
-                        name: {
-                            in: namesInChunk,
-                            mode: 'insensitive'
-                        }
-                    }
-                })
-
-                // Map existing products by lowercased name for quick lookup
-                const existingByName: Record<string, any> = {}
-                existingProducts.forEach((ep: any) => {
-                    if (ep && ep.name) existingByName[String(ep.name).toLowerCase()] = ep
-                })
-
                 const chunkPromises = chunk.map(async (productData: any) => {
                     try {
                                 const { name, priceRupees, quantity, purchasePriceRupees, unit, category,
@@ -48,24 +73,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 // Ensure unit is a string or null (Prisma expects String | Null)
                                 const unitValue = unit === undefined || unit === null || unit === '' ? null : String(unit)
 
-                                // Handle category - find or create by name
+                                // Get categoryId from preloaded map
                                 let categoryId: number | null = null
                                 if (category && String(category).trim()) {
-                                    const categoryName = String(category).trim()
-                                    let existingCategory = await prisma.category.findFirst({
-                                        where: {
-                                            name: {
-                                                equals: categoryName,
-                                                mode: 'insensitive'
-                                            }
-                                        }
-                                    })
-                                    if (!existingCategory) {
-                                        existingCategory = await prisma.category.create({
-                                            data: { name: categoryName }
-                                        })
-                                    }
-                                    categoryId = existingCategory.id
+                                    categoryId = categoryMap.get(String(category).trim()) || null
                                 }
 
                                 // Parse/normalize numeric fields

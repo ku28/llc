@@ -861,17 +861,17 @@ export default function VisitsPage() {
                                                     <span className="badge">OPD: {v.opdNo}</span>
                                                 </div>
                                                 <div className="text-sm text-muted space-y-1">
-                                                    <div><span className="font-medium">Date:</span> {new Date(v.date).toLocaleDateString()}</div>
-                                                    {!isExpanded && v.diagnoses && (
-                                                        <div className="truncate"><span className="font-medium">Diagnosis:</span> {v.diagnoses}</div>
+                                                    <div><span className="font-medium">Date:</span> {v.date ? new Date(v.date).toLocaleDateString('en-GB') : '-'}</div>
+                                                    {!isExpanded && v.provisionalDiagnosis && (
+                                                        <div className="truncate"><span className="font-medium">Diagnosis:</span> {v.provisionalDiagnosis}</div>
                                                     )}
                                                 </div>
                                                 
                                                 {/* Expanded Details */}
                                                 {isExpanded && (
                                                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2 text-sm">
-                                                        {v.diagnoses && (
-                                                            <div><span className="font-medium">Diagnosis:</span> {v.diagnoses}</div>
+                                                        {v.provisionalDiagnosis && (
+                                                            <div><span className="font-medium">Diagnosis:</span> {v.provisionalDiagnosis}</div>
                                                         )}
                                                         {v.patient?.email && (
                                                             <div><span className="font-medium">Patient Email:</span> {v.patient.email}</div>

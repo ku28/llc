@@ -75,10 +75,24 @@ function ProductsPage() {
             setCategories(Array.isArray(categoriesData) ? categoriesData : [])
             setSuppliers(Array.isArray(suppliersData) ? suppliersData.filter((s: any) => s.status === 'active') : [])
             setLoading(false)
-        }).catch(() => setLoading(false))
+        }).catch((error) => {
+            console.error('Error loading data:', error)
+            setLoading(false)
+        })
     }, [])
     const [user, setUser] = useState<any>(null)
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
+
+    // Listen for maximize events from notification dropdown
+    useEffect(() => {
+        const handleMaximize = (e: any) => {
+            if (e.detail.type === 'products' && e.detail.operation === 'delete' && e.detail.taskId === deleteTaskId) {
+                setIsDeleteMinimized(false)
+            }
+        }
+        window.addEventListener('maximizeTask', handleMaximize)
+        return () => window.removeEventListener('maximizeTask', handleMaximize)
+    }, [deleteTaskId])
 
     // Auto-calculate all formula fields
     useEffect(() => {
@@ -284,7 +298,7 @@ function ProductsPage() {
         })
         setDeleteTaskId(id)
 
-        const CHUNK_SIZE = 10
+        const CHUNK_SIZE = 500
         let deletedCount = 0
 
         try {
@@ -292,14 +306,12 @@ function ProductsPage() {
             for (let i = 0; i < idsToDelete.length; i += CHUNK_SIZE) {
                 const chunk = idsToDelete.slice(i, i + CHUNK_SIZE)
                 
-                // Delete chunk
-                await Promise.all(chunk.map(productId =>
-                    fetch('/api/products', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: productId })
-                    })
-                ))
+                // Delete entire chunk in one request
+                await fetch('/api/products', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: chunk })
+                })
 
                 deletedCount += chunk.length
                 setDeleteProgress({ current: deletedCount, total })
@@ -308,11 +320,6 @@ function ProductsPage() {
                 updateTask(id, {
                     progress: { current: deletedCount, total }
                 })
-
-                // Small delay between chunks for better UX
-                if (i + CHUNK_SIZE < idsToDelete.length) {
-                    await new Promise(resolve => setTimeout(resolve, 100))
-                }
             }
 
             // Refresh data
@@ -851,7 +858,7 @@ function ProductsPage() {
             </div>
 
             {/* Search Bar */}
-            <div className="card mb-4">
+            <div className="card mb-4" style={{ overflow: 'visible', zIndex: 1 }}>
                 <div className="flex items-center gap-3 mb-3">
                     <div className="flex-1 relative">
                         <input
@@ -985,52 +992,56 @@ function ProductsPage() {
                 {/* Filter Panel */}
                 {showFilters && (
                     <div className="border-t dark:border-gray-700 pt-4 mt-2">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ overflow: 'visible' }}>
                             {/* Category Filter */}
                             <div>
                                 <label className="block text-sm font-medium mb-2">Category</label>
-                                <select
+                                <CustomSelect
                                     value={filterCategory}
-                                    onChange={(e) => setFilterCategory(e.target.value)}
-                                    className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                >
-                                    <option value="">All Categories</option>
-                                    {categories.map(cat => (
-                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                    ))}
-                                </select>
+                                    onChange={(value) => setFilterCategory(value)}
+                                    options={[
+                                        { value: '', label: 'All Categories' },
+                                        ...categories.map(cat => ({
+                                            value: cat.id.toString(),
+                                            label: cat.name
+                                        }))
+                                    ]}
+                                    placeholder="All Categories"
+                                />
                             </div>
 
                             {/* Stock Status Filter */}
                             <div>
                                 <label className="block text-sm font-medium mb-2">Stock Status</label>
-                                <select
+                                <CustomSelect
                                     value={filterStockStatus}
-                                    onChange={(e) => setFilterStockStatus(e.target.value)}
-                                    className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                >
-                                    <option value="">All Stock Levels</option>
-                                    <option value="in-stock">In Stock</option>
-                                    <option value="low-stock">Low Stock (Below Threshold)</option>
-                                    <option value="out-of-stock">Out of Stock</option>
-                                </select>
+                                    onChange={(value) => setFilterStockStatus(value)}
+                                    options={[
+                                        { value: '', label: 'All Stock Levels' },
+                                        { value: 'in-stock', label: 'In Stock' },
+                                        { value: 'low-stock', label: 'Low Stock (Below Threshold)' },
+                                        { value: 'out-of-stock', label: 'Out of Stock' }
+                                    ]}
+                                    placeholder="All Stock Levels"
+                                />
                             </div>
 
                             {/* Price Range Filter */}
                             <div>
                                 <label className="block text-sm font-medium mb-2">Price Range</label>
-                                <select
+                                <CustomSelect
                                     value={filterPriceRange}
-                                    onChange={(e) => setFilterPriceRange(e.target.value)}
-                                    className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                                >
-                                    <option value="">All Prices</option>
-                                    <option value="0-100">₹0 - ₹100</option>
-                                    <option value="100-500">₹100 - ₹500</option>
-                                    <option value="500-1000">₹500 - ₹1,000</option>
-                                    <option value="1000-5000">₹1,000 - ₹5,000</option>
-                                    <option value="5000+">₹5,000+</option>
-                                </select>
+                                    onChange={(value) => setFilterPriceRange(value)}
+                                    options={[
+                                        { value: '', label: 'All Prices' },
+                                        { value: '0-100', label: '₹0 - ₹100' },
+                                        { value: '100-500', label: '₹100 - ₹500' },
+                                        { value: '500-1000', label: '₹500 - ₹1,000' },
+                                        { value: '1000-5000', label: '₹1,000 - ₹5,000' },
+                                        { value: '5000+', label: '₹5,000+' }
+                                    ]}
+                                    placeholder="All Prices"
+                                />
                             </div>
                         </div>
 
@@ -1163,7 +1174,7 @@ function ProductsPage() {
             )}
 
             {/* Products Table */}
-            <div className="card">
+            <div className="card" style={{ position: 'relative', zIndex: 0 }}>
                 <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
                     <span className="flex items-center gap-3">
                         <label className="relative group/checkbox cursor-pointer flex-shrink-0">
@@ -1396,8 +1407,12 @@ function ProductsPage() {
                 onClose={() => setShowImportModal(false)}
                 onImportSuccess={() => {
                     setLoading(true)
-                    fetch('/api/products').then(r => r.json()).then(productsData => {
+                    Promise.all([
+                        fetch('/api/products').then(r => r.json()),
+                        fetch('/api/categories').then(r => r.json())
+                    ]).then(([productsData, categoriesData]) => {
                         setItems(Array.isArray(productsData) ? productsData : [])
+                        setCategories(Array.isArray(categoriesData) ? categoriesData : [])
                         setLoading(false)
                     }).catch(() => setLoading(false))
                 }}

@@ -107,6 +107,17 @@ export default function PatientsPage() {
             .catch(() => setUserLoading(false))
     }, [])
 
+    // Listen for maximize events from notification dropdown
+    useEffect(() => {
+        const handleMaximize = (e: any) => {
+            if (e.detail.type === 'patients' && e.detail.operation === 'delete' && e.detail.taskId === deleteTaskId) {
+                setIsDeleteMinimized(false)
+            }
+        }
+        window.addEventListener('maximizeTask', handleMaximize)
+        return () => window.removeEventListener('maximizeTask', handleMaximize)
+    }, [deleteTaskId])
+
     // Handle pre-filled data from appointment request
     useEffect(() => {
         if (router.isReady && router.query.requestId) {
@@ -529,7 +540,7 @@ export default function PatientsPage() {
                 setDeleteTaskId(taskId)
                 
                 // Delete in chunks for better progress tracking
-                const CHUNK_SIZE = 10
+                const CHUNK_SIZE = 100
                 let completed = 0
                 
                 for (let i = 0; i < idsArray.length; i += CHUNK_SIZE) {
@@ -550,9 +561,6 @@ export default function PatientsPage() {
                     updateTask(taskId, {
                         progress: { current: completed, total }
                     })
-                    
-                    // Small delay for UI feedback
-                    await new Promise(resolve => setTimeout(resolve, 100))
                 }
                 
                 setPatients(await (await fetch('/api/patients')).json())
@@ -731,11 +739,6 @@ export default function PatientsPage() {
                         </div>
                     </div>
                 </div>
-            )}
-
-            {/* Loading Modal (for single deletes or when minimized) */}
-            {((deleting && deleteProgress.total === 0) || (deleting && isDeleteMinimized)) && (
-                <LoadingModal isOpen={true} message="Deleting patient..." />
             )}
             
             <div className="section-header flex justify-between items-center">

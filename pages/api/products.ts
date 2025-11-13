@@ -107,12 +107,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'DELETE') {
-        const { id } = req.body
+        const { id, ids } = req.body
         try {
-            await prisma.product.delete({
-                where: { id: Number(id) }
-            })
-            return res.status(200).json({ success: true })
+            if (ids && Array.isArray(ids)) {
+                // Bulk delete
+                await prisma.product.deleteMany({
+                    where: {
+                        id: { in: ids.map((id: any) => Number(id)) }
+                    }
+                })
+                return res.status(200).json({ success: true, count: ids.length })
+            } else if (id) {
+                // Single delete
+                await prisma.product.delete({
+                    where: { id: Number(id) }
+                })
+                return res.status(200).json({ success: true })
+            } else {
+                return res.status(400).json({ error: 'Missing id or ids' })
+            }
         } catch (err: any) {
             return res.status(500).json({ error: String(err?.message || err) })
         }

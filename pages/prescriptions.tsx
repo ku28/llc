@@ -456,8 +456,8 @@ export default function PrescriptionsPage() {
                         nextVisitTime,
                         occupation: visit.patient?.occupation || '',
                         pendingPaymentCents: visit.patient?.pendingPaymentCents ?? '',
-                        height: visit.patient?.height ?? '',
-                        weight: visit.patient?.weight ?? '',
+                        height: visit.height ?? visit.patient?.height ?? '',
+                        weight: visit.weight ?? visit.patient?.weight ?? '',
                         fatherHusbandGuardianName: visit.patient?.fatherHusbandGuardianName || '',
                         imageUrl: visit.patient?.imageUrl || '',
                         amount: visit.amount ?? '',
@@ -1242,6 +1242,62 @@ export default function PrescriptionsPage() {
             const data = await res.json()
             setLastCreatedVisitId(data.id)
             setLastCreatedVisit(data)
+            
+            // Auto-create or update invoice for this visit
+            try {
+                const selectedPatient = patients.find(p => String(p.id) === String(form.patientId))
+                const invoiceItems = prescriptions.map(p => {
+                    const product = products.find(prod => String(prod.id) === String(p.productId))
+                    return {
+                        productId: p.productId,
+                        description: product?.name || '',
+                        quantity: p.quantity || 1,
+                        unitPrice: product?.price || 0,
+                        taxRate: 0,
+                        discount: 0
+                    }
+                })
+                
+                // Check if invoice already exists for this visit
+                const existingInvoicesRes = await fetch('/api/customer-invoices')
+                const existingInvoices = await existingInvoicesRes.json()
+                const existingInvoice = Array.isArray(existingInvoices) 
+                    ? existingInvoices.find((inv: any) => inv.visitId === data.id)
+                    : null
+                
+                const invoicePayload = {
+                    visitId: data.id,
+                    patientId: form.patientId,
+                    customerName: `${selectedPatient?.firstName || ''} ${selectedPatient?.lastName || ''}`.trim(),
+                    customerPhone: form.phone || selectedPatient?.phone || '',
+                    customerAddress: form.address || selectedPatient?.address || '',
+                    invoiceDate: new Date().toISOString().split('T')[0],
+                    discount: parseFloat(form.discount || '0'),
+                    items: invoiceItems
+                }
+                
+                if (existingInvoice) {
+                    // Update existing invoice
+                    await fetch('/api/customer-invoices', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            id: existingInvoice.id,
+                            ...invoicePayload
+                        })
+                    })
+                } else {
+                    // Create new invoice
+                    await fetch('/api/customer-invoices', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(invoicePayload)
+                    })
+                }
+            } catch (err) {
+                console.error('Failed to create/update invoice:', err)
+            }
+            
             showSuccess(`Visit ${isEditMode ? 'updated' : 'created'} successfully!`)
             
             // Clear the auto-saved draft after successful submission

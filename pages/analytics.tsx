@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import Layout from '../components/Layout'
 import LoadingModal from '../components/LoadingModal'
 
 export default function AnalyticsPage() {
@@ -78,7 +77,7 @@ export default function AnalyticsPage() {
         .slice(0, 10)
 
     return (
-        <Layout>
+        <>
             <div>
                 <div className="section-header">
                     <h2 className="section-title">Analytics & Insights</h2>
@@ -357,6 +356,6 @@ export default function AnalyticsPage() {
                 isOpen={loading} 
                 message="Loading analytics data..." 
             />
-        </Layout>
+        </>
     )
 }

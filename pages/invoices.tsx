@@ -248,6 +248,158 @@ export default function InvoicesPage() {
     }
 
     function closePaymentModal() {
+        setIsPaymentModalOpen(false)
+        setPaymentInvoice(null)
+    }
+
+    function printInvoice(inv: any) {
+        const printWindow = window.open('', '_blank')
+        if (!printWindow) return
+        
+        const items = inv.items || []
+        const subtotal = items.reduce((sum: number, item: any) => {
+            const itemTotal = (item.quantity || 0) * (item.unitPrice || 0)
+            const itemDiscount = (item.discount || 0)
+            return sum + itemTotal - itemDiscount
+        }, 0)
+        const discount = inv.discount || 0
+        const total = subtotal - discount
+        
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Invoice ${inv.invoiceNumber}</title>
+                <style>
+                    @page { size: A4; margin: 10mm; }
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { font-family: Arial, sans-serif; font-size: 10pt; padding: 10mm; }
+                    .header { text-align: center; margin-bottom: 10mm; border-bottom: 2px solid #d32f2f; padding-bottom: 5mm; }
+                    .header h1 { color: #d32f2f; font-size: 24pt; margin-bottom: 2mm; }
+                    .header p { color: #666; font-size: 9pt; }
+                    .info-section { display: flex; justify-content: space-between; margin-bottom: 8mm; }
+                    .info-box { flex: 1; }
+                    .info-box h3 { font-size: 11pt; color: #d32f2f; margin-bottom: 3mm; border-bottom: 1px solid #ddd; padding-bottom: 2mm; }
+                    .info-box p { font-size: 9pt; margin-bottom: 1mm; color: #333; }
+                    .info-box strong { color: #000; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 5mm; }
+                    thead { background-color: #d32f2f; color: white; }
+                    th, td { padding: 4mm 2mm; text-align: left; border-bottom: 1px solid #ddd; }
+                    th { font-size: 10pt; font-weight: bold; }
+                    td { font-size: 9pt; }
+                    .text-right { text-align: right; }
+                    .text-center { text-align: center; }
+                    .totals { margin-top: 5mm; border-top: 2px solid #333; padding-top: 3mm; }
+                    .totals-row { display: flex; justify-content: flex-end; margin-bottom: 2mm; }
+                    .totals-label { width: 150px; text-align: right; font-weight: bold; padding-right: 3mm; }
+                    .totals-value { width: 100px; text-align: right; }
+                    .grand-total { font-size: 14pt; color: #d32f2f; }
+                    .footer { margin-top: 10mm; text-align: center; padding-top: 5mm; border-top: 2px solid #d32f2f; }
+                    .footer p { font-size: 8pt; color: #666; }
+                    .status { display: inline-block; padding: 2mm 4mm; border-radius: 3px; font-weight: bold; font-size: 9pt; }
+                    .status-paid { background: #4caf50; color: white; }
+                    .status-partial { background: #ff9800; color: white; }
+                    .status-unpaid { background: #f44336; color: white; }
+                    @media print {
+                        body { padding: 0; }
+                        @page { margin: 10mm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>Last Leaf Care</h1>
+                    <p>SCO-5, Royal Heights, Royal City, Chahal Road, Faridkot (Pb.) - 151203</p>
+                    <p>Phone: 01639252777 | D.L. No. 160913, 160914</p>
+                </div>
+                
+                <div class="info-section">
+                    <div class="info-box">
+                        <h3>CASH MEMO</h3>
+                        <p><strong>Sr. No.:</strong> ${inv.invoiceNumber || 'N/A'}</p>
+                        <p><strong>Date:</strong> ${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN') : 'N/A'}</p>
+                    </div>
+                    <div class="info-box">
+                        <h3>Bill To</h3>
+                        <p><strong>Prescriber:</strong> Dr. Sanjeev Juneja</p>
+                        <p><strong>Name & Address of Patient:</strong> ${inv.customerName || 'N/A'}</p>
+                        ${inv.customerPhone ? `<p><strong>Phone:</strong> ${inv.customerPhone}</p>` : ''}
+                        ${inv.customerAddress ? `<p><strong>Address:</strong> ${inv.customerAddress}</p>` : ''}
+                    </div>
+                    <div class="info-box">
+                        <h3>Status</h3>
+                        <span class="status status-${inv.status}">${inv.status?.toUpperCase() || 'UNPAID'}</span>
+                    </div>
+                </div>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="text-center">Qty.</th>
+                            <th>Name of the Drug Prep. & Qty. or if made by licence the Ingredient & qty. there of</th>
+                            <th class="text-center">If the drug is specified in Sch C</th>
+                            <th class="text-right">Amount (Rs.)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map((item: any, idx: number) => `
+                            <tr>
+                                <td class="text-center">${item.quantity || 0}</td>
+                                <td>${item.description || ''}</td>
+                                <td class="text-center">-</td>
+                                <td class="text-right">₹${((item.quantity || 0) * (item.unitPrice || 0) - (item.discount || 0)).toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                
+                <div class="totals">
+                    <div class="totals-row">
+                        <div class="totals-label">Subtotal:</div>
+                        <div class="totals-value">₹${subtotal.toFixed(2)}</div>
+                    </div>
+                    ${discount > 0 ? `
+                        <div class="totals-row">
+                            <div class="totals-label">Discount:</div>
+                            <div class="totals-value">-₹${discount.toFixed(2)}</div>
+                        </div>
+                    ` : ''}
+                    <div class="totals-row grand-total">
+                        <div class="totals-label">Total Amount:</div>
+                        <div class="totals-value">₹${total.toFixed(2)}</div>
+                    </div>
+                    ${inv.paidAmount > 0 ? `
+                        <div class="totals-row">
+                            <div class="totals-label">Paid:</div>
+                            <div class="totals-value">₹${(inv.paidAmount || 0).toFixed(2)}</div>
+                        </div>
+                        <div class="totals-row">
+                            <div class="totals-label">Balance Due:</div>
+                            <div class="totals-value">₹${(inv.balanceAmount || 0).toFixed(2)}</div>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="footer">
+                    <p>(Thank You)</p>
+                    <p>Signature: _________________________</p>
+                </div>
+                
+                <script>
+                    window.onload = function() {
+                        setTimeout(function() {
+                            window.print();
+                            window.close();
+                        }, 500);
+                    };
+                </script>
+            </body>
+            </html>
+        `)
+        printWindow.document.close()
+    }
+
+    function closePaymentModal2() {
         setIsAnimating(false)
         setTimeout(() => {
             setIsPaymentModalOpen(false)
@@ -371,7 +523,7 @@ export default function InvoicesPage() {
                 setDeleteProgress({ current: 0, total })
                 
                 // Delete in chunks for better progress tracking
-                const CHUNK_SIZE = 10
+                const CHUNK_SIZE = 100
                 let completed = 0
                 
                 for (let i = 0; i < idsArray.length; i += CHUNK_SIZE) {
@@ -671,13 +823,19 @@ export default function InvoicesPage() {
                                 <thead className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/50 dark:to-green-950/50 border-b border-emerald-200 dark:border-emerald-700">
                                     <tr>
                                         <th className="px-4 py-3 text-left">
-                                            <label className="flex items-center cursor-pointer group">
+                                            <label className="relative group/checkbox cursor-pointer flex-shrink-0">
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedInvoiceIds.size === filteredInvoices.length && filteredInvoices.length > 0}
                                                     onChange={toggleSelectAll}
-                                                    className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                                    className="peer sr-only"
                                                 />
+                                                <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                    <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                </div>
+                                                <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
                                             </label>
                                         </th>
                                         <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('invoiceNumber')}>
@@ -703,15 +861,22 @@ export default function InvoicesPage() {
                                 </thead>
                                 <tbody className="divide-y divide-emerald-100 dark:divide-emerald-900/30">
                                     {paginatedInvoices.map(inv => (
-                                        <tr key={inv.id} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors">
+                                        <tr key={inv.id} className={`hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors ${selectedInvoiceIds.has(inv.id) ? 'ring-2 ring-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/30' : ''}`}>
                                             <td className="px-4 py-3">
-                                                <label className="flex items-center cursor-pointer">
+                                                <label className="relative group/checkbox cursor-pointer">
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedInvoiceIds.has(inv.id)}
                                                         onChange={() => toggleSelectInvoice(inv.id)}
-                                                        className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="peer sr-only"
                                                     />
+                                                    <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                        <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    </div>
+                                                    <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
                                                 </label>
                                             </td>
                                         <td className="px-4 py-3 font-mono font-semibold">{inv.invoiceNumber}</td>
@@ -742,6 +907,13 @@ export default function InvoicesPage() {
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                    onClick={() => printInvoice(inv)}
+                                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded"
+                                                    title="Print Invoice"
+                                                >
+                                                    🖨️ Print
+                                                </button>
                                                 {inv.status !== 'paid' && (
                                                     <button
                                                         onClick={() => openPaymentModal(inv)}

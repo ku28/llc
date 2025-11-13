@@ -93,8 +93,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             height,
             weight,
             amount,
+            discount,
             payment,
             balance,
+            visitNumber,
+            followUpCount,
             prescriptions, // optional array of { treatmentId, dosage, administration, quantity, taken, productId }
             autoGenerateInvoice // flag to automatically create customer invoice
         } = req.body
@@ -184,8 +187,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     height: height ? Number(height) : undefined,
                     weight: weight ? Number(weight) : undefined,
                     amount: amount ? Number(amount) : undefined,
+                    discount: discount ? Number(discount) : undefined,
                     payment: payment ? Number(payment) : undefined,
-                    balance: balance ? Number(balance) : undefined
+                    balance: balance ? Number(balance) : undefined,
+                    visitNumber: visitNumber ? Number(visitNumber) : undefined,
+                    followUpCount: followUpCount ? Number(followUpCount) : undefined
                 }
                 
                 let visit

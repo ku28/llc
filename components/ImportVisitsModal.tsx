@@ -120,9 +120,10 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                 processData(Array.isArray(json) ? json : [json])
             } else {
                 const data = await file.arrayBuffer()
-                const workbook = XLSX.read(data)
+                const workbook = XLSX.read(data, { sheetRows: 0 }) // Read all rows
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-                const jsonData = XLSX.utils.sheet_to_json(worksheet)
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
+                console.log(`[Import] Parsed ${jsonData.length} rows from Excel file`)
                 processData(jsonData)
             }
         } catch (err: any) {
@@ -131,6 +132,8 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
     }
 
     const processData = (data: any[]) => {
+        console.log(`[Import] Processing ${data.length} rows from file`)
+        
         if (!data || data.length === 0) {
             setError('No data found in file')
             return
@@ -258,6 +261,8 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
             }
         })
 
+        console.log(`[Import] Parsed ${visits.length} visits, ${errors.length} errors`)
+
         if (errors.length > 0) {
             setError(errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n...and ${errors.length - 5} more errors` : ''))
             return
@@ -363,8 +368,8 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
             let successCount = 0
             const allErrors: any[] = []
 
-            // Smaller batch size for more responsive cancellation
-            const BATCH_SIZE = 20
+            // Send 100 visits per batch to backend
+            const BATCH_SIZE = 100
             const batches = []
             for (let i = 0; i < dataToImport.length; i += BATCH_SIZE) {
                 batches.push(dataToImport.slice(i, i + BATCH_SIZE))
@@ -651,7 +656,7 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                                                 <td className="px-4 py-2 text-sm">{v.opdNo}</td>
                                                 <td className="px-4 py-2 text-sm">{v.patientName || '-'}</td>
                                                 <td className="px-4 py-2 text-sm">{v.date || '-'}</td>
-                                                <td className="px-4 py-2 text-sm">{v.diagnoses || '-'}</td>
+                                                <td className="px-4 py-2 text-sm">{v.provDiagnosis || '-'}</td>
                                                 <td className="px-4 py-2 text-sm">{v.prescriptions?.length || 0}</td>
                                             </tr>
                                         ))}

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { useImportContext } from '../contexts/ImportContext'
 
@@ -48,6 +48,17 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
     const fileInputRef = useRef<HTMLInputElement>(null)
     const cancelRef = useRef(false)
     const { addTask, updateTask, removeTask, cancelTask } = useImportContext()
+
+    // Listen for maximize events from notification dropdown
+    useEffect(() => {
+        const handleMaximize = (e: any) => {
+            if (e.detail.type === 'treatments' && e.detail.operation === 'import' && e.detail.taskId === taskId) {
+                setIsMinimized(false)
+            }
+        }
+        window.addEventListener('maximizeTask', handleMaximize)
+        return () => window.removeEventListener('maximizeTask', handleMaximize)
+    }, [taskId])
 
     if (!isOpen) return null
 

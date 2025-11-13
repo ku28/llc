@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../../lib/prisma'
-import { requireDoctorOrAdmin, requireAuth } from '../../../lib/auth'
+import { requireDoctorOrAdmin } from '../../../lib/auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     const user = await requireDoctorOrAdmin(req, res)
@@ -48,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             console.log(`[Bulk Create] Found ${existingProducts.length} existing products in database`)
 
-            // Find products that need to be created
+            // Find products that need to be created as placeholders (quantity 0, price 0)
             const productsToCreate: string[] = []
             allProductNames.forEach(name => {
                 if (!productNameToId.has(name)) {
@@ -56,11 +56,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 }
             })
 
-            // Create new products if needed
+            // Create placeholder products for non-existent ones
             if (productsToCreate.length > 0) {
-                console.log(`[Bulk Create] Creating ${productsToCreate.length} new products...`)
+                console.log(`[Bulk Create] Creating ${productsToCreate.length} placeholder products for treatment plans...`)
                 
                 for (const productName of productsToCreate) {
+                    // Create product with quantity 0 and price 0 (won't appear in active inventory)
                     const newProduct = await prisma.product.create({
                         data: {
                             name: productName,
@@ -69,14 +70,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         }
                     })
                     productNameToId.set(productName.toUpperCase(), newProduct.id)
-                    console.log(`[Bulk Create] Created product: ${productName} (ID: ${newProduct.id})`)
+                    console.log(`[Bulk Create] Created placeholder product: ${productName} (ID: ${newProduct.id})`)
                 }
             }
 
-            console.log(`[Bulk Create] All products resolved. Starting treatment import...`)
+            console.log(`[Bulk Create] Product resolution complete. Starting treatment import...`)
 
-            // Process in parallel batches for much faster performance
-            const BATCH_SIZE = 50 // Increased for better performance
+            // Pre-fetch all existing treatments by provDiagnosis_planNumber
+            const treatmentKeys = treatments
+                .filter((t: any) => t.provDiagnosis && t.planNumber)
+                .map((t: any) => `${t.provDiagnosis}_${t.planNumber}`)
+            
+            const existingTreatments = await prisma.treatment.findMany({
+                where: {
+                    OR: treatments
+                        .filter((t: any) => t.provDiagnosis && t.planNumber)
+                        .map((t: any) => ({
+                            provDiagnosis: t.provDiagnosis,
+                            planNumber: t.planNumber
+                        }))
+                },
+                include: {
+                    treatmentProducts: true
+                }
+            })
+
+            // Create map of existing treatments
+            const existingTreatmentMap = new Map<string, any>()
+            existingTreatments.forEach((t: any) => {
+                const key = `${t.provDiagnosis}_${t.planNumber}`
+                existingTreatmentMap.set(key, t)
+            })
+
+            console.log(`[Bulk Create] Found ${existingTreatments.length} existing treatments`)
+
+            // Process 100 treatments per batch
+            const BATCH_SIZE = 100
             const results: any[] = []
             const errors: any[] = []
             
@@ -95,7 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             treatmentPlan, administration, notes, products 
                         } = treatmentData
 
-                        // Map product names to IDs
+                        // Map product names to IDs (all products now exist as placeholders if needed)
                         const productsWithIds = (products || []).map((p: any) => {
                             const productName = (p.productName || '').trim().toUpperCase()
                             
@@ -106,8 +135,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             
                             const productId = productNameToId.get(productName)
                             
+                            // All products should exist now (either real or placeholder)
                             if (!productId) {
-                                throw new Error(`Product not found: ${p.productName}`)
+                                console.log(`[Bulk Create] Warning: Product still not found: ${p.productName}`)
+                                return null
                             }
                             
                             return {
@@ -121,20 +152,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                 procedure: p.procedure || null,
                                 presentation: p.presentation || null,
                             }
-                        }).filter((p: any) => p !== null) // Remove null entries
+                        }).filter((p: any) => p !== null) // Remove entries with no product name
 
-                        // Check if treatment exists (including deleted ones)
-                        const existing = provDiagnosis && planNumber ? await prisma.treatment.findUnique({
-                            where: {
-                                provDiagnosis_planNumber: {
-                                    provDiagnosis,
-                                    planNumber
-                                }
-                            },
-                            include: {
-                                treatmentProducts: true
-                            }
-                        }) : null
+                        // Check if treatment exists using pre-fetched map
+                        const treatmentKey = provDiagnosis && planNumber ? `${provDiagnosis}_${planNumber}` : null
+                        const existing = treatmentKey ? existingTreatmentMap.get(treatmentKey) : null
 
                         if (existing) {
                             // Treatment exists - update it (restore if deleted)

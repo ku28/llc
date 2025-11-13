@@ -99,5 +99,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
     }
 
+    if (req.method === 'DELETE') {
+        try {
+            const { id, ids } = req.body
+            
+            if (ids && Array.isArray(ids)) {
+                // Bulk delete
+                await prisma.stockTransaction.deleteMany({
+                    where: {
+                        id: { in: ids.map((i: any) => Number(i)) }
+                    }
+                })
+                return res.status(200).json({ message: `Deleted ${ids.length} transactions` })
+            } else if (id) {
+                // Single delete
+                await prisma.stockTransaction.delete({
+                    where: { id: Number(id) }
+                })
+                return res.status(200).json({ message: 'Transaction deleted successfully' })
+            } else {
+                return res.status(400).json({ error: 'Missing id or ids parameter' })
+            }
+        } catch (error) {
+            console.error('Error deleting stock transaction:', error)
+            return res.status(500).json({ error: 'Failed to delete stock transaction' })
+        }
+    }
+
     return res.status(405).json({ error: 'Method not allowed' })
 }

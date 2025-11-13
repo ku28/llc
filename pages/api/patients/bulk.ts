@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../../lib/prisma'
-import { requireAuth } from '../../../lib/auth'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'POST') {
@@ -32,20 +31,84 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                             address, gender, fatherHusbandGuardianName 
                         } = patientData
 
-                        return await prisma.patient.create({
-                            data: {
-                                firstName,
-                                lastName,
-                                phone: phone || null,
-                                email: email || null,
-                                date: date ? new Date(date) : null,
-                                dob: dob ? new Date(dob) : null,
-                                age: age || null,
-                                address: address || null,
-                                gender: gender || null,
-                                fatherHusbandGuardianName: fatherHusbandGuardianName || null,
+                        // Helper function to validate and parse dates
+                        // Handles DD-MM-YYYY, MM/DD/YYYY, ISO formats
+                        const parseValidDate = (dateValue: any) => {
+                            if (!dateValue) return null
+                            
+                            const dateStr = String(dateValue).trim()
+                            if (!dateStr) return null
+                            
+                            // Try DD-MM-YYYY format first (common in forms)
+                            if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+                                const [day, month, year] = dateStr.split('-').map(Number)
+                                const parsed = new Date(year, month - 1, day)
+                                return isNaN(parsed.getTime()) ? null : parsed
                             }
-                        })
+                            
+                            // Try DD/MM/YYYY format
+                            if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+                                const [day, month, year] = dateStr.split('/').map(Number)
+                                const parsed = new Date(year, month - 1, day)
+                                return isNaN(parsed.getTime()) ? null : parsed
+                            }
+                            
+                            // Try standard Date parsing for ISO formats
+                            const parsed = new Date(dateValue)
+                            return isNaN(parsed.getTime()) ? null : parsed
+                        }
+
+                        // Parse dates safely
+                        const parsedDate = parseValidDate(date)
+                        const parsedDob = parseValidDate(dob)
+
+                        // Check if patient already exists by phone or email
+                        let existingPatient = null
+                        if (phone) {
+                            existingPatient = await prisma.patient.findFirst({
+                                where: { phone }
+                            })
+                        }
+                        if (!existingPatient && email) {
+                            existingPatient = await prisma.patient.findFirst({
+                                where: { email }
+                            })
+                        }
+
+                        if (existingPatient) {
+                            // Update existing patient
+                            return await prisma.patient.update({
+                                where: { id: existingPatient.id },
+                                data: {
+                                    firstName,
+                                    lastName,
+                                    phone: phone || existingPatient.phone,
+                                    email: email || existingPatient.email,
+                                    date: parsedDate || existingPatient.date,
+                                    dob: parsedDob || existingPatient.dob,
+                                    age: age || existingPatient.age,
+                                    address: address || existingPatient.address,
+                                    gender: gender || existingPatient.gender,
+                                    fatherHusbandGuardianName: fatherHusbandGuardianName || existingPatient.fatherHusbandGuardianName,
+                                }
+                            })
+                        } else {
+                            // Create new patient
+                            return await prisma.patient.create({
+                                data: {
+                                    firstName,
+                                    lastName,
+                                    phone: phone || null,
+                                    email: email || null,
+                                    date: parsedDate,
+                                    dob: parsedDob,
+                                    age: age || null,
+                                    address: address || null,
+                                    gender: gender || null,
+                                    fatherHusbandGuardianName: fatherHusbandGuardianName || null,
+                                }
+                            })
+                        }
                     } catch (err: any) {
                         console.error(`[Bulk Create Patients] Failed:`, err.message)
                         errors.push({

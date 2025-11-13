@@ -16,6 +16,11 @@ export default function StockTransactionsPage() {
     const [itemsPerPage] = useState(10)
     const [loading, setLoading] = useState(false)
     const [submitting, setSubmitting] = useState(false)
+    const [deleting, setDeleting] = useState(false)
+    const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 })
+    const [isDeleteMinimized, setIsDeleteMinimized] = useState(false)
+    const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; deleteMultiple?: boolean; message?: string }>({ open: false })
+    const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
     
     // Set-based state for multi-select
     const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<number>>(new Set())
@@ -175,6 +180,85 @@ export default function StockTransactionsPage() {
             newExpanded.add(id)
         }
         setExpandedRows(newExpanded)
+    }
+
+    // Delete functions
+    function openDeleteConfirm(id?: number) {
+        if (id) {
+            setConfirmModal({ open: true, id, message: 'Are you sure you want to delete this transaction? This action cannot be undone.' })
+        } else if (selectedTransactionIds.size > 0) {
+            setConfirmModal({ 
+                open: true, 
+                deleteMultiple: true, 
+                message: `Are you sure you want to delete ${selectedTransactionIds.size} selected transaction(s)? This action cannot be undone.` 
+            })
+        }
+        setTimeout(() => setConfirmModalAnimating(true), 10)
+    }
+
+    function closeConfirmModal() {
+        setConfirmModalAnimating(false)
+        setTimeout(() => setConfirmModal({ open: false }), 300)
+    }
+
+    async function handleConfirmDelete() {
+        if (!confirmModal.id && !confirmModal.deleteMultiple) {
+            closeConfirmModal()
+            return
+        }
+        
+        closeConfirmModal()
+        setDeleting(true)
+        
+        try {
+            if (confirmModal.deleteMultiple) {
+                // Delete multiple transactions with progress tracking
+                const idsArray = Array.from(selectedTransactionIds)
+                const total = idsArray.length
+                setDeleteProgress({ current: 0, total })
+                
+                // Delete in chunks
+                const CHUNK_SIZE = 100
+                let completed = 0
+                
+                for (let i = 0; i < idsArray.length; i += CHUNK_SIZE) {
+                    const chunk = idsArray.slice(i, i + CHUNK_SIZE)
+                    await fetch('/api/stock-transactions', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids: chunk })
+                    })
+                    
+                    completed += chunk.length
+                    setDeleteProgress({ current: completed, total })
+                }
+                
+                await fetchTransactions(filterProduct, filterType)
+                await fetchProducts()
+                setSelectedTransactionIds(new Set())
+                showSuccess(`Successfully deleted ${completed} transaction(s)`)
+                setDeleteProgress({ current: 0, total: 0 })
+            } else if (confirmModal.id) {
+                // Single delete
+                const res = await fetch('/api/stock-transactions', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: confirmModal.id })
+                })
+                
+                if (!res.ok) throw new Error('Delete failed')
+                
+                await fetchTransactions(filterProduct, filterType)
+                await fetchProducts()
+                showSuccess('Transaction deleted successfully')
+            }
+        } catch (error) {
+            console.error('Error deleting transaction(s):', error)
+            showError('Failed to delete transaction(s)')
+        } finally {
+            setDeleting(false)
+            setIsDeleteMinimized(false)
+        }
     }
 
     function getFilteredAndSortedTransactions() {
@@ -376,19 +460,31 @@ export default function StockTransactionsPage() {
                 </div>
             </div>
 
-            {/* Bulk Action Bar (for selection clarity - no delete for history) */}
+            {/* Bulk Action Bar */}
             {selectedTransactionIds.size > 0 && (
                 <div className="mb-4 p-4 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border border-emerald-200/30 dark:border-emerald-700/30 rounded-lg">
                     <div className="flex items-center justify-between">
                         <span className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
                             {selectedTransactionIds.size} transaction(s) selected
                         </span>
-                        <button
-                            onClick={() => setSelectedTransactionIds(new Set())}
-                            className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-300 dark:border-gray-600"
-                        >
-                            Clear Selection
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => openDeleteConfirm()}
+                                disabled={!user}
+                                className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete Selected
+                            </button>
+                            <button
+                                onClick={() => setSelectedTransactionIds(new Set())}
+                                className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-300 dark:border-gray-600"
+                            >
+                                Clear Selection
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -583,14 +679,22 @@ export default function StockTransactionsPage() {
                 {/* Transactions Timeline */}
                 <div className="card">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                checked={selectedTransactionIds.size === filteredTransactions.length && filteredTransactions.length > 0}
-                                onChange={toggleSelectAll}
-                                className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                            />
-                            <span>Transaction History</span>
+                        <h3 className="text-lg font-semibold flex items-center gap-3">
+                            <label className="relative group/checkbox cursor-pointer flex-shrink-0">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedTransactionIds.size === filteredTransactions.length && filteredTransactions.length > 0}
+                                    onChange={toggleSelectAll}
+                                    className="peer sr-only"
+                                />
+                                <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                    <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                            </label>
+                            <span>Transaction History {selectedTransactionIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-bold">({selectedTransactionIds.size} selected)</span>}</span>
                         </h3>
                         <span className="badge">
                             {filteredTransactions.length} movements
@@ -609,15 +713,24 @@ export default function StockTransactionsPage() {
                     ) : (
                         <div className="space-y-3">
                             {filteredTransactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(txn => (
-                                <div key={txn.id} className="border dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                <div key={txn.id} className={`border dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${selectedTransactionIds.has(txn.id) ? 'ring-2 ring-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/30' : ''}`}>
                                     <div className="flex items-start gap-4">
                                         {/* Checkbox */}
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedTransactionIds.has(txn.id)}
-                                            onChange={() => toggleSelectTransaction(txn.id)}
-                                            className="w-4 h-4 mt-1 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 flex-shrink-0"
-                                        />
+                                        <label className="relative group/checkbox cursor-pointer flex-shrink-0 mt-1">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedTransactionIds.has(txn.id)}
+                                                onChange={() => toggleSelectTransaction(txn.id)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="peer sr-only"
+                                            />
+                                            <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                            <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                        </label>
                                         
                                         {/* Icon */}
                                         <div className="text-3xl flex-shrink-0">
@@ -720,6 +833,93 @@ export default function StockTransactionsPage() {
                         </div>
                     )}
                 </div>
+
+            {/* Delete Progress Modal */}
+            {deleteProgress.total > 0 && !isDeleteMinimized && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Deleting Transactions
+                            </h3>
+                            <button
+                                onClick={() => setIsDeleteMinimized(true)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                title="Minimize"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="p-8">
+                            <div className="flex flex-col items-center">
+                                <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mb-4">
+                                    <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                                    Deleting Transactions
+                                </h3>
+                                <div className="text-3xl font-bold text-red-600 dark:text-red-400 mb-4">
+                                    {deleteProgress.current} / {deleteProgress.total}
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-4 overflow-hidden">
+                                    <div 
+                                        className="h-full bg-gradient-to-r from-red-500 to-red-600 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-2"
+                                        style={{ width: `${(deleteProgress.current / deleteProgress.total) * 100}%` }}
+                                    >
+                                        <span className="text-xs font-semibold text-white">
+                                            {Math.round((deleteProgress.current / deleteProgress.total) * 100)}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Please wait while we delete the transactions...
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirmation Modal */}
+            {confirmModal.open && (
+                <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300 ${confirmModalAnimating ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all duration-300 ${confirmModalAnimating ? 'scale-100' : 'scale-95'}`}>
+                        <div className="p-6">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Confirm Delete</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        {confirmModal.message}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button
+                                    onClick={closeConfirmModal}
+                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleConfirmDelete}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <LoadingModal 
                 isOpen={loading || submitting} 

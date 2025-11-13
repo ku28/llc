@@ -192,7 +192,7 @@ export default function CustomSelect({
     }
 
     return (
-        <div ref={containerRef} className={`custom-select ${className}`}>
+        <div ref={containerRef} className={`custom-select ${isOpen ? 'open' : ''} ${className}`}>
             <div className="custom-select-input-wrapper">
                 <input
                     ref={inputRef}

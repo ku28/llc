@@ -73,7 +73,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
 
         try {
-            const BATCH_SIZE = 50 // Increased from 10 for better performance
+            const BATCH_SIZE = 100 // Increased from 50 for better performance
             const results: any[] = []
             const errors: any[] = []
             
@@ -135,7 +135,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 chunks.push(visits.slice(i, i + BATCH_SIZE))
             }
 
-            for (const chunk of chunks) {
+            console.log(`[Bulk Create Visits] Processing ${visits.length} visits in ${chunks.length} batches of up to ${BATCH_SIZE}`)
+
+            for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+                const chunk = chunks[chunkIndex]
+                console.log(`[Bulk Create Visits] Batch ${chunkIndex + 1}/${chunks.length}: Processing ${chunk.length} visits`)
+                
                 const chunkPromises = chunk.map(async (visitData: any) => {
                     try {
                         const { 
@@ -158,22 +163,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                         // Try to find by phone first using map
                         if (phone && patientPhoneMap.has(phone)) {
                             patient = patientPhoneMap.get(phone)
-                        }
-                        
-                        // If not found and we have patient name, try to find by name (fallback query)
-                        if (!patient && patientName) {
-                            const nameParts = patientName.trim().split(' ')
-                            const firstName = nameParts[0]
-                            const lastName = nameParts.slice(1).join(' ')
-                            
-                            patient = await prisma.patient.findFirst({
-                                where: {
-                                    AND: [
-                                        { firstName: firstName },
-                                        lastName ? { lastName: lastName } : {}
-                                    ]
-                                }
-                            })
                         }
                         
                         // If still not found, create new patient

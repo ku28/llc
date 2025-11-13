@@ -872,13 +872,19 @@ export default function PurchaseOrdersPage() {
                                 <thead className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/50 dark:to-green-950/50 border-b border-emerald-200 dark:border-emerald-700">
                                     <tr>
                                         <th className="px-4 py-3 text-left">
-                                            <label className="flex items-center cursor-pointer group">
+                                            <label className="relative group/checkbox cursor-pointer flex-shrink-0">
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedPOIds.size === filteredDemands.length && filteredDemands.length > 0}
                                                     onChange={toggleSelectAll}
-                                                    className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                                    className="peer sr-only"
                                                 />
+                                                <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                    <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                </div>
+                                                <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
                                             </label>
                                         </th>
                                         <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('poNumber')}>
@@ -900,15 +906,22 @@ export default function PurchaseOrdersPage() {
                                 </thead>
                                 <tbody className="divide-y divide-emerald-100 dark:divide-emerald-900/30">
                                     {filteredDemands.map((demand) => (
-                                        <tr key={demand.id} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors">
+                                        <tr key={demand.id} className={`hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors ${selectedPOIds.has(demand.id) ? 'ring-2 ring-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/30' : ''}`}>
                                             <td className="px-4 py-3">
-                                                <label className="flex items-center cursor-pointer">
+                                                <label className="relative group/checkbox cursor-pointer">
                                                     <input
                                                         type="checkbox"
                                                         checked={selectedPOIds.has(demand.id)}
                                                         onChange={() => toggleSelectPO(demand.id)}
-                                                        className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="peer sr-only"
                                                     />
+                                                    <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                        <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    </div>
+                                                    <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
                                                 </label>
                                             </td>
                                             <td className="px-4 py-3 font-medium font-mono">{demand.poNumber}</td>
