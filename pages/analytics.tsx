@@ -205,9 +205,6 @@ export default function AnalyticsPage() {
                         </div>
                     </div>
 
-                    <div className="relative rounded-xl border border-yellow-200/30 dark:border-yellow-700/30 bg-gradient-to-br from-white via-yellow-50/30 to-orange-50/20 dark:from-gray-900 dark:via-yellow-950/20 dark:to-gray-900 shadow-lg shadow-yellow-500/5 backdrop-blur-sm p-4 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/5 via-transparent to-orange-500/5 pointer-events-none rounded-xl"></div>
-                        <div className="relative">
                     <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                         <div className="relative">
@@ -232,6 +229,7 @@ export default function AnalyticsPage() {
                                 <span className="text-sm font-semibold">Amount Due</span>
                                 <span className="font-bold text-orange-600 dark:text-orange-400">₹{totalReceivables.toLocaleString()}</span>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </div>
