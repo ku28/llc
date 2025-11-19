@@ -688,12 +688,10 @@ a:hover {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2), 0 10px 20px rgba(0, 0, 0, 0.15) !important;
   max-height: 300px;
   overflow-y: auto;
-  z-index: 10000 !important;
+  z-index: 99999 !important;
   animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0.5rem;
   isolation: isolate;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .dark .custom-select-dropdown {

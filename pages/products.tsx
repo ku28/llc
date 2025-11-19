@@ -993,7 +993,9 @@ function ProductsPage() {
             </div>
 
             {/* Search Bar */}
-            <div className="card mb-4" style={{ overflow: 'visible', zIndex: 1 }}>
+            <div className="rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 mb-4 overflow-hidden" style={{ overflow: 'visible', zIndex: 1 }}>
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                <div className="relative">
                 <div className="flex items-center gap-3 mb-3">
                     <div className="flex-1 relative">
                         <input
@@ -1001,7 +1003,7 @@ function ProductsPage() {
                             placeholder="🔍 Search products by name..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
+                            className="w-full p-3 pr-10 border border-emerald-300 dark:border-emerald-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-800 dark:text-white"
                         />
                         <svg className="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1300,6 +1302,7 @@ function ProductsPage() {
                         )}
                     </div>
                 )}
+                </div>
             </div>
 
             {/* Modal/Dialog */}
@@ -1548,7 +1551,7 @@ function ProductsPage() {
                                                     </button>
                                                     <button
                                                         onClick={() => toggleRowExpansion(p.id)}
-                                                        className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                                                        className="px-3 py-1.5 text-xs bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded shadow-sm"
                                                         title={isExpanded ? "Hide Details" : "View More"}
                                                     >
                                                         {isExpanded ? '▲ Hide' : '▼ View More'}

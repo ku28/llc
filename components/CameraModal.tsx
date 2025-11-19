@@ -96,7 +96,7 @@ export default function CameraModal({ isOpen, onClose, onCapture, title = 'Captu
 
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 p-4" style={{ zIndex: 10001 }}>
-            <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
                 {/* Header */}
                 <div className="relative flex items-center justify-between p-3 border-b border-emerald-200/30 dark:border-emerald-700/30 flex-shrink-0">

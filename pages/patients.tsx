@@ -912,7 +912,9 @@ export default function PatientsPage() {
                 </div>
             )}
             {/* Search Bar */}
-            <div className="card mb-4">
+            <div className="rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 mb-4 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                <div className="relative">
                 <div className="flex items-center gap-3">
                     <div className="flex-1 relative">
                         <input
@@ -920,7 +922,7 @@ export default function PatientsPage() {
                             placeholder="🔍 Search patients by name..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full p-3 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full p-3 pl-10 border border-emerald-300 dark:border-emerald-700 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:border-transparent"
                         />
                         <svg className="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1094,6 +1096,7 @@ export default function PatientsPage() {
                             Clear
                         </button>
                     )}
+                </div>
                 </div>
             </div>
 
