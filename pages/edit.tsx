@@ -765,8 +765,9 @@ export default function EditHomePage() {
 
                 {/* Mobile Tabs */}
                 <div className="md:hidden mb-4">
-                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-x-auto">
-                        <div className="flex gap-1 p-2 min-w-max">
+                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative flex gap-1 p-2 min-w-max overflow-x-auto">
                             {sidebarItems.map((item) => (
                                 <button
                                     key={item.id}
@@ -782,13 +783,15 @@ export default function EditHomePage() {
                                 </button>
                             ))}
                         </div>
+                        </div>
                     </div>
                 </div>
 
                 <div className="flex gap-6">
                     {/* Desktop Sidebar */}
                     <div className="hidden md:block w-64 flex-shrink-0">
-                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md p-4 sticky top-24 border border-gray-200 dark:border-gray-700">
+                        <div className="rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sticky top-24 overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                             <nav className="space-y-1">
                                 {sidebarItems.map((item) => (
                                     <button
@@ -810,7 +813,9 @@ export default function EditHomePage() {
 
                     {/* Main Content */}
                     <div className="flex-1 min-w-0">
-                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md p-4 sm:p-6 md:p-8 border border-gray-200 dark:border-gray-700">
+                        <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sm:p-6 md:p-8 overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                            <div className="relative">
                             <div className="flex items-center justify-between mb-6">
                                 <div>
                                     <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
@@ -833,6 +838,7 @@ export default function EditHomePage() {
 
                             <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
                                 {renderEditor()}
+                            </div>
                             </div>
                         </div>
 

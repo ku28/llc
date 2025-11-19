@@ -126,7 +126,9 @@ export default function ImportNotifications() {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[500px] overflow-hidden flex flex-col">
+                <div className="absolute right-0 mt-2 w-96 rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-xl shadow-emerald-500/10 backdrop-blur-sm z-50 max-h-[500px] overflow-hidden flex flex-col">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
+                    <div className="relative flex flex-col h-full">
                     {/* Header */}
                     <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                         <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -285,13 +287,16 @@ export default function ImportNotifications() {
                             </div>
                         )}
                     </div>
+                    </div>
                 </div>
             )}
 
             {/* Cancel Confirmation Modal - Use Portal to render at body level */}
             {showCancelConfirm && typeof window !== 'undefined' && createPortal(
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ zIndex: 99999 }}>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+                    <div className="rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-xl shadow-emerald-500/10 backdrop-blur-sm p-6 max-w-md w-full mx-4 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
+                        <div className="relative">
                         <div className="flex items-start gap-4">
                             <div className="flex-shrink-0 w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
                                 <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -323,6 +328,7 @@ export default function ImportNotifications() {
                                     </button>
                                 </div>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </div>,

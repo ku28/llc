@@ -531,15 +531,15 @@ function EditTreatmentPage() {
                                                     />
                                                 </div>
                                                 
-                                                {/* Components Section */}
+                                                {/* Spagyrics Section */}
                                                 <div className="sm:col-span-2 lg:col-span-3">
-                                                    <label className="block text-xs font-medium mb-1">Components</label>
+                                                    <label className="block text-xs font-medium mb-1">Spagyrics</label>
                                                     <div className="flex flex-wrap items-center gap-1.5">
                                                         <CustomSelect
                                                             value={medicine.comp1 || ''}
                                                             onChange={(val) => updateMedicine(medicineIndex, 'comp1', val.toUpperCase())}
                                                             options={components}
-                                                            placeholder="Component 1"
+                                                            placeholder="Spy1"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[100px]"
                                                         />
@@ -547,7 +547,7 @@ function EditTreatmentPage() {
                                                             value={medicine.comp2 || ''}
                                                             onChange={(val) => updateMedicine(medicineIndex, 'comp2', val.toUpperCase())}
                                                             options={components}
-                                                            placeholder="Component 2"
+                                                            placeholder="Spy2"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[100px]"
                                                         />
@@ -555,7 +555,7 @@ function EditTreatmentPage() {
                                                             value={medicine.comp3 || ''}
                                                             onChange={(val) => updateMedicine(medicineIndex, 'comp3', val.toUpperCase())}
                                                             options={components}
-                                                            placeholder="Component 3"
+                                                            placeholder="Spy3"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[100px]"
                                                         />
@@ -567,7 +567,7 @@ function EditTreatmentPage() {
                                                                     value={medicine.comp4 || ''}
                                                                     onChange={(val) => updateMedicine(medicineIndex, 'comp4', val.toUpperCase())}
                                                                     options={components}
-                                                                    placeholder="Component 4"
+                                                                    placeholder="Spy4"
                                                                     allowCustom={true}
                                                                     className="flex-1"
                                                                 />
@@ -580,7 +580,7 @@ function EditTreatmentPage() {
                                                                         setMedicines(updated)
                                                                     }}
                                                                     className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 text-xs"
-                                                                    title="Remove component 4"
+                                                                    title="Remove spagyric 4"
                                                                 >
                                                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -596,7 +596,7 @@ function EditTreatmentPage() {
                                                                     value={medicine.comp5 || ''}
                                                                     onChange={(val) => updateMedicine(medicineIndex, 'comp5', val.toUpperCase())}
                                                                     options={components}
-                                                                    placeholder="Component 5"
+                                                                    placeholder="Spy5"
                                                                     allowCustom={true}
                                                                     className="flex-1"
                                                                 />
@@ -608,7 +608,7 @@ function EditTreatmentPage() {
                                                                         setMedicines(updated)
                                                                     }}
                                                                     className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 text-xs"
-                                                                    title="Remove component 5"
+                                                                    title="Remove spagyric 5"
                                                                 >
                                                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />

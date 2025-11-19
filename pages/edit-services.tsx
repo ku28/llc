@@ -179,7 +179,9 @@ export default function EditServicesPage() {
 
                 <div className="space-y-6">
                     {services.map((service, index) => (
-                        <div key={index} className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+                        <div key={index} className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                            <div className="relative">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-xl font-bold text-green-600">Service #{index + 1}</h3>
                                 <button
@@ -282,6 +284,7 @@ export default function EditServicesPage() {
                                         />
                                     </div>
                                 </div>
+                            </div>
                             </div>
                         </div>
                     ))}

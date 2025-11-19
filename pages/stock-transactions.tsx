@@ -3,6 +3,8 @@ import LoadingModal from '../components/LoadingModal'
 import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
 import { useToast } from '../hooks/useToast'
+import { useDataCache } from '../contexts/DataCacheContext'
+import RefreshButton from '../components/RefreshButton'
 import * as XLSX from 'xlsx'
 
 export default function StockTransactionsPage() {
@@ -32,6 +34,7 @@ export default function StockTransactionsPage() {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
     
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
+    const { getCache, setCache } = useDataCache()
     
     const [form, setForm] = useState({
         productId: '',
@@ -45,7 +48,25 @@ export default function StockTransactionsPage() {
     const [user, setUser] = useState<any>(null)
 
     useEffect(() => {
+        // Check cache first
+        const cachedTransactions = getCache<any[]>('stockTransactions')
+        const cachedProducts = getCache<any[]>('products')
+        
+        if (cachedTransactions) {
+            setTransactions(cachedTransactions)
+        }
+        if (cachedProducts) {
+            setProducts(cachedProducts)
+        }
+        
+        // Fetch in background
         fetchInitialData()
+        
+        // Cleanup on unmount
+        return () => {
+            setTransactions([])
+            setProducts([])
+        }
     }, [])
 
     const fetchInitialData = async () => {
@@ -68,7 +89,9 @@ export default function StockTransactionsPage() {
         
         const response = await fetch(url)
         const data = await response.json()
-        setTransactions(Array.isArray(data) ? data : [])
+        const transactionsData = Array.isArray(data) ? data : []
+        setTransactions(transactionsData)
+        setCache('stockTransactions', transactionsData)
     }
 
     const fetchProducts = async () => {
@@ -119,6 +142,7 @@ export default function StockTransactionsPage() {
 
     function closeModal() {
         setIsAnimating(false)
+        document.body.style.overflow = 'unset'
         setTimeout(() => {
             setIsModalOpen(false)
             setForm({
@@ -385,8 +409,13 @@ export default function StockTransactionsPage() {
 
     return (
         <div>
-            <div className="section-header flex justify-between items-center gap-3">
-                <h2 className="section-title">Inventory History</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                        Inventory History
+                    </h1>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">Track all stock movements and adjustments</p>
+                </div>
                 <div className="flex items-center gap-3">
                     {/* Export Dropdown */}
                     {user && (
@@ -447,6 +476,7 @@ export default function StockTransactionsPage() {
                     <button 
                         onClick={() => {
                             setIsModalOpen(true)
+                            document.body.style.overflow = 'hidden'
                             setIsAnimating(false)
                             setTimeout(() => setIsAnimating(true), 10)
                         }}
@@ -550,11 +580,12 @@ export default function StockTransactionsPage() {
 
                 {/* Manual Adjustment Modal */}
                 {isModalOpen && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
+                        <div className="relative overflow-hidden rounded-2xl border border-purple-200/30 dark:border-purple-700/30 bg-gradient-to-br from-white via-purple-50/30 to-pink-50/20 dark:from-gray-900 dark:via-purple-950/20 dark:to-gray-900 shadow-lg shadow-purple-500/20 backdrop-blur-sm max-w-2xl w-full p-6">
+                            <div className="absolute inset-0 bg-gradient-to-br from-purple-400/5 via-transparent to-pink-500/5 pointer-events-none"></div>
                             {/* Header */}
-                            <div className="flex items-center justify-between mb-6">
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Manual Stock Adjustment</h2>
+                            <div className="relative flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-400 dark:to-pink-400">Manual Stock Adjustment</h2>
                                 <button
                                     onClick={closeModal}
                                     className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none"
@@ -677,7 +708,9 @@ export default function StockTransactionsPage() {
                 )}
 
                 {/* Transactions Timeline */}
-                <div className="card">
+                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                    <div className="relative">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold flex items-center gap-3">
                             <label className="relative group/checkbox cursor-pointer flex-shrink-0">

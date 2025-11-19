@@ -3,6 +3,8 @@ import LoadingModal from '../components/LoadingModal'
 import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
 import { useToast } from '../hooks/useToast'
+import { useDataCache } from '../contexts/DataCacheContext'
+import RefreshButton from '../components/RefreshButton'
 import * as XLSX from 'xlsx'
 
 export default function SuppliersPage() {
@@ -34,6 +36,7 @@ export default function SuppliersPage() {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
     
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
+    const { getCache, setCache } = useDataCache()
 
     const emptyForm = {
         name: '',
@@ -53,7 +56,20 @@ export default function SuppliersPage() {
     const [form, setForm] = useState(emptyForm)
 
     useEffect(() => {
-        fetchInitialData()
+        const cachedSuppliers = getCache<any[]>('suppliers')
+        if (cachedSuppliers) {
+            setSuppliers(Array.isArray(cachedSuppliers) ? cachedSuppliers : [])
+            setLoading(false)
+            // Still fetch user
+            fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user))
+        } else {
+            fetchInitialData()
+        }
+        
+        // Cleanup on unmount
+        return () => {
+            setSuppliers([])
+        }
     }, [])
 
     const fetchInitialData = async () => {
@@ -71,7 +87,9 @@ export default function SuppliersPage() {
     const fetchSuppliers = async () => {
         const response = await fetch('/api/suppliers')
         const data = await response.json()
-        setSuppliers(Array.isArray(data) ? data : [])
+        const suppliersData = Array.isArray(data) ? data : []
+        setSuppliers(suppliersData)
+        setCache('suppliers', suppliersData)
     }
 
     const [user, setUser] = useState<any>(null)
@@ -128,6 +146,7 @@ export default function SuppliersPage() {
         })
         setEditingId(supplier.id)
         setIsModalOpen(true)
+        document.body.style.overflow = 'hidden'
         setIsAnimating(false)
         setTimeout(() => setIsAnimating(true), 10)
     }
@@ -375,6 +394,7 @@ export default function SuppliersPage() {
 
     function closeModal() {
         setIsAnimating(false)
+        document.body.style.overflow = 'unset'
         setTimeout(() => {
             setIsModalOpen(false)
             setForm(emptyForm)
@@ -390,9 +410,15 @@ export default function SuppliersPage() {
 
     return (
         <div>
-            <div className="section-header flex justify-between items-center gap-3">
-                <h2 className="section-title">Supplier Management</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                        Supplier Management
+                    </h1>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">Manage supplier relationships and contacts</p>
+                </div>
                 <div className="flex items-center gap-3">
+                    <RefreshButton onRefresh={fetchSuppliers} />
                     {/* Export Dropdown */}
                     {user && (
                         <div className="relative">
@@ -455,7 +481,7 @@ export default function SuppliersPage() {
                             setIsAnimating(false)
                             setTimeout(() => setIsAnimating(true), 10)
                         }}
-                        className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg shadow-lg flex items-center gap-2 transition-all duration-200 font-medium"
+                        className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg shadow-lg flex items-center gap-2 transition-all duration-200 font-medium"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -502,7 +528,7 @@ export default function SuppliersPage() {
                                 placeholder="🔍 Search suppliers by name, contact, phone, or email..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                                className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
                             />
                         </div>
                         <div className="w-48">
@@ -533,11 +559,12 @@ export default function SuppliersPage() {
 
                 {/* Modal/Dialog */}
                 {isModalOpen && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
+                        <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-4xl w-full max-h-[90vh]">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
                             {/* Header */}
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                            <div className="relative flex items-center justify-between px-6 py-4 border-b border-emerald-200/30 dark:border-emerald-700/30">
+                                <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
                                     {editingId ? 'Edit Supplier' : 'Add New Supplier'}
                                 </h2>
                                 <button
@@ -554,7 +581,7 @@ export default function SuppliersPage() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {/* Basic Information */}
                                         <div className="md:col-span-2">
-                                            <h3 className="text-lg font-semibold mb-4 text-blue-600 dark:text-blue-400">Basic Information</h3>
+                                            <h3 className="text-lg font-semibold mb-4 text-emerald-600 dark:text-emerald-400">Basic Information</h3>
                                         </div>
 
                                         <div>
@@ -564,7 +591,7 @@ export default function SuppliersPage() {
                                                 required
                                                 value={form.name}
                                                 onChange={(e) => setForm({...form, name: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="Enter supplier name"
                                             />
                                         </div>
@@ -575,7 +602,7 @@ export default function SuppliersPage() {
                                                 type="text"
                                                 value={form.contactPerson}
                                                 onChange={(e) => setForm({...form, contactPerson: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="Contact person name"
                                             />
                                         </div>
@@ -586,7 +613,7 @@ export default function SuppliersPage() {
                                                 type="email"
                                                 value={form.email}
                                                 onChange={(e) => setForm({...form, email: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="supplier@example.com"
                                             />
                                         </div>
@@ -597,14 +624,14 @@ export default function SuppliersPage() {
                                                 type="tel"
                                                 value={form.phone}
                                                 onChange={(e) => setForm({...form, phone: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="+91 98765 43210"
                                             />
                                         </div>
 
                                         {/* Address Information */}
                                         <div className="md:col-span-2 mt-4">
-                                            <h3 className="text-lg font-semibold mb-4 text-blue-600 dark:text-blue-400">Address</h3>
+                                            <h3 className="text-lg font-semibold mb-4 text-emerald-600 dark:text-emerald-400">Address</h3>
                                         </div>
 
                                         <div className="md:col-span-2">
@@ -612,7 +639,7 @@ export default function SuppliersPage() {
                                             <textarea
                                                 value={form.address}
                                                 onChange={(e) => setForm({...form, address: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 rows={2}
                                                 placeholder="Street address"
                                             />
@@ -624,7 +651,7 @@ export default function SuppliersPage() {
                                                 type="text"
                                                 value={form.city}
                                                 onChange={(e) => setForm({...form, city: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="City"
                                             />
                                         </div>
@@ -635,7 +662,7 @@ export default function SuppliersPage() {
                                                 type="text"
                                                 value={form.state}
                                                 onChange={(e) => setForm({...form, state: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="State"
                                             />
                                         </div>
@@ -646,7 +673,7 @@ export default function SuppliersPage() {
                                                 type="text"
                                                 value={form.pincode}
                                                 onChange={(e) => setForm({...form, pincode: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="123456"
                                             />
                                         </div>
@@ -657,14 +684,14 @@ export default function SuppliersPage() {
                                                 type="text"
                                                 value={form.gstin}
                                                 onChange={(e) => setForm({...form, gstin: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="22AAAAA0000A1Z5"
                                             />
                                         </div>
 
                                         {/* Payment Terms */}
                                         <div className="md:col-span-2 mt-4">
-                                            <h3 className="text-lg font-semibold mb-4 text-blue-600 dark:text-blue-400">Payment & Credit</h3>
+                                            <h3 className="text-lg font-semibold mb-4 text-emerald-600 dark:text-emerald-400">Payment & Credit</h3>
                                         </div>
 
                                         <div>
@@ -691,7 +718,7 @@ export default function SuppliersPage() {
                                                 type="number"
                                                 value={form.creditLimit}
                                                 onChange={(e) => setForm({...form, creditLimit: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 placeholder="0"
                                                 min="0"
                                             />
@@ -703,7 +730,7 @@ export default function SuppliersPage() {
                                             <textarea
                                                 value={form.notes}
                                                 onChange={(e) => setForm({...form, notes: e.target.value})}
-                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
                                                 rows={3}
                                                 placeholder="Additional notes about the supplier..."
                                             />
@@ -722,7 +749,7 @@ export default function SuppliersPage() {
                                         <button
                                             type="submit"
                                             disabled={!user}
-                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                         >
                                             {editingId ? 'Update Supplier' : 'Add Supplier'}
                                         </button>
@@ -734,7 +761,9 @@ export default function SuppliersPage() {
                 )}
 
                 {/* Suppliers Table */}
-                <div className="card">
+                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                    <div className="relative">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
                             <input
@@ -800,7 +829,7 @@ export default function SuppliersPage() {
                                             <div className="flex items-center gap-2 flex-shrink-0">
                                                 <button
                                                     onClick={() => editSupplier(s)}
-                                                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+                                                    className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded"
                                                 >
                                                     ✏️ Edit
                                                 </button>
@@ -938,40 +967,43 @@ export default function SuppliersPage() {
 
             {/* Confirm Delete Modal */}
             {confirmModal.open && (
-                <div className={`fixed inset-0 bg-black transition-opacity duration-300 z-50 ${confirmModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} onClick={closeConfirmModal}>
-                    <div className={`fixed inset-0 flex items-center justify-center p-4 z-50 transition-all duration-300 ${confirmModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-                        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
-                            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 rounded-full">
-                                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                            </div>
-                            <h3 className="text-lg font-semibold text-center mb-2 text-gray-900 dark:text-gray-100">
-                                Confirm Delete
-                            </h3>
-                            <p className="text-sm text-center text-gray-600 dark:text-gray-400 mb-6">
-                                {confirmModal.message}
-                            </p>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={closeConfirmModal}
-                                    className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    onClick={() => handleConfirmDelete(confirmModal.id)} 
-                                    disabled={deleting} 
-                                    className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors font-medium"
-                                >
-                                    {deleting && (
-                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                    )}
-                                    {deleting ? 'Deleting...' : 'Yes, Delete'}
-                                </button>
+                <div className={`fixed inset-0 bg-black transition-opacity duration-300 ${confirmModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }} onClick={closeConfirmModal}>
+                    <div className={`fixed inset-0 flex items-center justify-center p-4 transition-all duration-300 ${confirmModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} style={{ zIndex: 10000 }}>
+                        <div className="relative overflow-hidden rounded-2xl border border-red-200/30 dark:border-red-700/30 bg-gradient-to-br from-white via-red-50/30 to-orange-50/20 dark:from-gray-900 dark:via-red-950/20 dark:to-gray-900 shadow-lg shadow-red-500/20 backdrop-blur-sm max-w-md w-full" onClick={e => e.stopPropagation()}>
+                            <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 via-transparent to-orange-500/5 pointer-events-none"></div>
+                            <div className="relative p-6">
+                                <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 rounded-full">
+                                    <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-lg font-semibold text-center mb-2 text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-400 dark:to-orange-400">
+                                    Confirm Delete
+                                </h3>
+                                <p className="text-sm text-center text-gray-600 dark:text-gray-400 mb-6">
+                                    {confirmModal.message}
+                                </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={closeConfirmModal}
+                                        className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        onClick={() => handleConfirmDelete(confirmModal.id)} 
+                                        disabled={deleting} 
+                                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors font-medium shadow-md"
+                                    >
+                                        {deleting && (
+                                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        )}
+                                        {deleting ? 'Deleting...' : 'Yes, Delete'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1040,6 +1072,7 @@ export default function SuppliersPage() {
             />
 
             <ToastNotification toasts={toasts} removeToast={removeToast} />
+            </div>
         </div>
     )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { canAccessRoute } from '../lib/permissions'
@@ -16,6 +16,8 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
   const [appDropdownOpen, setAppDropdownOpen] = useState(false)
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null)
+  const navRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   // Helper to check if user can access a route
@@ -88,6 +90,33 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
     }
   }, [])
 
+  // Update indicator position when route changes
+  useEffect(() => {
+    const updateIndicator = () => {
+      if (!navRef.current) return
+      
+      const activeLink = navRef.current.querySelector('[data-active="true"]') as HTMLElement
+      if (activeLink) {
+        const navRect = navRef.current.getBoundingClientRect()
+        const linkRect = activeLink.getBoundingClientRect()
+        setIndicatorStyle({
+          left: linkRect.left - navRect.left,
+          width: linkRect.width
+        })
+      } else {
+        setIndicatorStyle(null)
+      }
+    }
+
+    // Update on mount and route change
+    updateIndicator()
+    
+    // Update after a small delay to ensure DOM is ready
+    const timer = setTimeout(updateIndicator, 50)
+    
+    return () => clearTimeout(timer)
+  }, [router.pathname, user])
+
   function toggleTheme() {
     const next = !dark
     setDark(next)
@@ -138,13 +167,14 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
   }
 
   return (
-    <header className="panel shadow-sm py-4 mb-8 sticky top-0 z-50 backdrop-blur-sm bg-opacity-95">
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 flex justify-between items-center">
+    <header className="border-b border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-white via-emerald-50/20 to-green-50/10 dark:from-gray-900 dark:via-emerald-950/10 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-md py-4 mb-8 sticky top-0 z-50">
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/3 via-transparent to-green-500/3 pointer-events-none"></div>
+      <div className="relative max-w-7xl mx-auto px-2 sm:px-4 flex justify-between items-center">
         <div className="flex items-center gap-3 sm:gap-6">
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="md:hidden p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
             aria-label="Toggle menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -177,7 +207,9 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
             {/* App Dropdown Menu */}
             {appDropdownOpen && (
               <div className="absolute left-0 top-full pt-2 z-50">
-                <div className="w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2">
+                <div className="relative w-56 rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/10 backdrop-blur-sm py-2 overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                  <div className="relative">
                   {(() => {
                     const current = router.pathname === '/' ? 'website' : 'erp'
                     const items = [
@@ -189,8 +221,8 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                     return items.map((it) => {
                       const selected = it.key === current
                       const base = 'flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 transition-colors w-full text-left'
-                      const hover = 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                      const selCls = selected ? 'bg-gray-100 dark:bg-gray-700 font-medium' : hover
+                      const hover = 'hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+                      const selCls = selected ? 'bg-emerald-50 dark:bg-emerald-950/30 font-medium' : hover
 
                       if (it.href) {
                         return (
@@ -223,43 +255,84 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                       )
                     })
                   })()}
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
           {/* main nav - hidden on small screens */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav ref={navRef} className="hidden md:flex items-center gap-1 relative">
+            {/* Sliding indicator */}
+            {indicatorStyle && (
+              <span 
+                className="absolute bottom-0 h-0.5 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full transition-all duration-300 ease-out"
+                style={{ 
+                  left: `${indicatorStyle.left}px`, 
+                  width: `${indicatorStyle.width}px` 
+                }}
+              />
+            )}
+            
             {/* Patient/User Navigation */}
             {isPatient && (
               <>
-                <Link href="/user-dashboard" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Dashboard</Link>
-                <Link href="/visits" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Appointments</Link>
-                <Link href="/prescriptions" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Prescriptions</Link>
+                <Link href="/user-dashboard" data-active={router.pathname === '/user-dashboard'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/user-dashboard' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                  Dashboard
+                </Link>
+                <Link href="/visits" data-active={router.pathname === '/visits'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/visits' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                  Appointments
+                </Link>
+                <Link href="/prescriptions" data-active={router.pathname === '/prescriptions'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/prescriptions' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                  Prescriptions
+                </Link>
               </>
             )}
             
             {/* Staff/Admin/Doctor/Reception Navigation */}
             {!isPatient && (
               <>
-                {canAccess('/dashboard') && <Link href="/dashboard" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Dashboard</Link>}
-                {canAccess('/patients') && <Link href="/patients" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Patients</Link>}
-                {canAccess('/treatments') && <Link href="/treatments" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Treatments</Link>}
-                {canAccess('/products') && <Link href="/products" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Inventory</Link>}
-                {canAccess('/visits') && <Link href="/visits" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Visits</Link>}
+                {canAccess('/dashboard') && (
+                  <Link href="/dashboard" data-active={router.pathname === '/dashboard'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/dashboard' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                    Dashboard
+                  </Link>
+                )}
+                {canAccess('/patients') && (
+                  <Link href="/patients" data-active={router.pathname === '/patients'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/patients' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                    Patients
+                  </Link>
+                )}
+                {canAccess('/treatments') && (
+                  <Link href="/treatments" data-active={router.pathname === '/treatments'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/treatments' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                    Treatments
+                  </Link>
+                )}
+                {canAccess('/products') && (
+                  <Link href="/products" data-active={router.pathname === '/products'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/products' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                    Inventory
+                  </Link>
+                )}
+                {canAccess('/visits') && (
+                  <Link href="/visits" data-active={router.pathname === '/visits'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/visits' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                    Visits
+                  </Link>
+                )}
                 
                 {/* Show Invoices link directly for reception, or in dropdown for others */}
                 {isReception && canAccess('/invoices') && (
-                  <Link href="/invoices" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm">Invoices</Link>
+                  <Link href="/invoices" data-active={router.pathname === '/invoices'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/invoices' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                    Invoices
+                  </Link>
                 )}
                 
                 {/* Accounting Dropdown - only show for non-reception users who can access accounting features */}
                 {!isReception && (canAccess('/suppliers') || canAccess('/purchase-orders') || canAccess('/invoices') || canAccess('/stock-transactions') || canAccess('/analytics')) && (
                 <div className="relative">
                   <button
+                    data-active={['/suppliers', '/purchase-orders', '/invoices', '/stock-transactions', '/analytics'].includes(router.pathname)}
                     onMouseEnter={() => setAccountingOpen(true)}
                     onClick={() => setAccountingOpen(!accountingOpen)}
-                    className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm flex items-center gap-1"
+                    className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-1 relative ${['/suppliers', '/purchase-orders', '/invoices', '/stock-transactions', '/analytics'].includes(router.pathname) ? 'text-green-600 dark:text-green-400' : ''}`}
                   >
                     Accounting
                     <svg className={`w-4 h-4 transition-transform ${accountingOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -269,14 +342,16 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                   
                   {accountingOpen && (
                     <div 
-                      className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
+                      className="absolute top-full left-0 mt-1 w-48 rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/10 backdrop-blur-sm py-1 z-50 overflow-hidden"
                       onMouseEnter={() => setAccountingOpen(true)}
                       onMouseLeave={() => setAccountingOpen(false)}
                     >
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
+                      <div className="relative">
                       {canAccess('/suppliers') && (
                         <Link 
                           href="/suppliers" 
-                          className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                          className={`block px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-sm ${router.pathname === '/suppliers' ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
                           onClick={() => setAccountingOpen(false)}
                         >
                           Suppliers
@@ -285,7 +360,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                       {canAccess('/purchase-orders') && (
                         <Link 
                           href="/purchase-orders" 
-                          className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                          className={`block px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-sm ${router.pathname === '/purchase-orders' ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
                           onClick={() => setAccountingOpen(false)}
                         >
                           Purchase Orders
@@ -294,7 +369,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                       {canAccess('/invoices') && (
                         <Link 
                           href="/invoices" 
-                          className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                          className={`block px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-sm ${router.pathname === '/invoices' ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
                           onClick={() => setAccountingOpen(false)}
                         >
                           Invoices
@@ -303,7 +378,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                       {canAccess('/stock-transactions') && (
                         <Link 
                           href="/stock-transactions" 
-                          className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                          className={`block px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-sm ${router.pathname === '/stock-transactions' ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
                           onClick={() => setAccountingOpen(false)}
                         >
                           Inventory History
@@ -312,12 +387,13 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                       {canAccess('/analytics') && (
                         <Link 
                           href="/analytics" 
-                          className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                          className={`block px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-sm ${router.pathname === '/analytics' ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
                           onClick={() => setAccountingOpen(false)}
                         >
                           Analytics
                         </Link>
                       )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -335,7 +411,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
           {user && !isPatient && (
             <button 
               onClick={onOpenTokenSidebar}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+              className="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors relative"
               title="Token Queue"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -348,7 +424,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
           {user && !isPatient && (
             <Link 
               href="/requests"
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+              className="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors relative"
               title="Appointment Requests"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -361,7 +437,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
           {user && isPatient && (
             <Link 
               href="/my-requests"
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative"
+              className="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors relative"
               title="My Appointment Requests"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -419,10 +495,12 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
 
               {/* User Dropdown Menu */}
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50">
+                <div className="absolute right-0 mt-2 w-48 rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm py-2 z-50 overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                  <div className="relative">
                   <Link 
                     href="/profile" 
-                    className="block px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    className="block px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
                     onClick={() => setUserDropdownOpen(false)}
                   >
                     <div className="flex items-center gap-2">
@@ -440,6 +518,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                       <span>Logout</span>
                     </div>
                   </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -460,21 +539,21 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
               <>
                 <Link 
                   href="/user-dashboard" 
-                  className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                  className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Dashboard
                 </Link>
                 <Link 
                   href="/visits" 
-                  className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                  className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Appointments
                 </Link>
                 <Link 
                   href="/prescriptions" 
-                  className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                  className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Prescriptions
@@ -488,7 +567,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                 {canAccess('/dashboard') && (
                   <Link 
                     href="/" 
-                    className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Dashboard
@@ -497,7 +576,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                 {canAccess('/patients') && (
                   <Link 
                     href="/patients" 
-                    className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Patients
@@ -506,7 +585,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                 {canAccess('/treatments') && (
                   <Link 
                     href="/treatments" 
-                    className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Treatments
@@ -515,7 +594,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                 {canAccess('/products') && (
                   <Link 
                     href="/products" 
-                    className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Inventory
@@ -524,7 +603,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                 {canAccess('/visits') && (
                   <Link 
                     href="/visits" 
-                    className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Visits
@@ -533,7 +612,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                 {canAccess('/invoices') && (
                   <Link 
                     href="/invoices" 
-                    className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Invoices
@@ -542,7 +621,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                 {canAccess('/suppliers') && (
                   <Link 
                     href="/suppliers" 
-                    className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Suppliers
@@ -551,7 +630,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                 {canAccess('/purchase-orders') && (
                   <Link 
                     href="/purchase-orders" 
-                    className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Purchase Orders
@@ -560,7 +639,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                 {canAccess('/stock-transactions') && (
                   <Link 
                     href="/stock-transactions" 
-                    className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Inventory History
@@ -569,7 +648,7 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
                 {canAccess('/analytics') && (
                   <Link 
                     href="/analytics" 
-                    className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Analytics

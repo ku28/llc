@@ -457,7 +457,9 @@ export default function TokenSidebar({ isOpen, onClose }: TokenSidebarProps) {
                 {isModalOpen && (
                     <div className={`fixed inset-0 bg-black transition-opacity duration-300 z-[60] ${isAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} onClick={closeModal}>
                         <div className={`fixed inset-0 flex items-center justify-center p-4 z-[70] transition-all duration-300 ${isAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-                            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+                            <div className="rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-xl shadow-emerald-500/10 backdrop-blur-sm max-w-md w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
+                                <div className="relative">
                                 <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                                     <h2 className="text-xl font-semibold">{editingId ? 'Update Token' : 'Assign Token'}</h2>
                                     <button onClick={closeModal} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
@@ -475,10 +477,36 @@ export default function TokenSidebar({ isOpen, onClose }: TokenSidebarProps) {
                                             onChange={(val) => setForm({ ...form, patientId: val })}
                                             options={[
                                                 { value: '', label: '-- Select patient --' },
-                                                ...patients.map(p => ({
-                                                    value: String(p.id),
-                                                    label: `${p.firstName} ${p.lastName}${p.opdNo ? ' · OPD: ' + p.opdNo : ''}${!p.phone ? ' ⚠️ No Phone' : ''}`
-                                                }))
+                                                ...(() => {
+                                                    // Helper to check if patient is from today
+                                                    const isFromToday = (patient: any) => {
+                                                        if (!patient.createdAt) return false
+                                                        const createdDate = new Date(patient.createdAt).toDateString()
+                                                        const today = new Date().toDateString()
+                                                        return createdDate === today
+                                                    }
+                                                    
+                                                    // Sort patients - new ones first
+                                                    const sortedPatients = [...patients].sort((a, b) => {
+                                                        const aIsNew = isFromToday(a)
+                                                        const bIsNew = isFromToday(b)
+                                                        if (aIsNew && !bIsNew) return -1
+                                                        if (!aIsNew && bIsNew) return 1
+                                                        return 0
+                                                    })
+                                                    
+                                                    return sortedPatients.map(p => {
+                                                        const baseLabel = `${p.firstName} ${p.lastName}${p.opdNo ? ' · OPD: ' + p.opdNo : ''}`
+                                                        const phoneLabel = p.phone ? ` · ${p.phone}` : ''
+                                                        const isSuggested = isFromToday(p)
+                                                        return {
+                                                            value: String(p.id),
+                                                            label: `${baseLabel}${phoneLabel}`,
+                                                            ...(isSuggested && { description: 'SUGGESTED' }),
+                                                            ...(p.phone ? { hasPhone: true } : { noPhone: true })
+                                                        }
+                                                    })
+                                                })()
                                             ]}
                                             placeholder="-- Select patient --"
                                         />
@@ -528,6 +556,7 @@ export default function TokenSidebar({ isOpen, onClose }: TokenSidebarProps) {
                                         </button>
                                     </div>
                                 </form>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -537,7 +566,9 @@ export default function TokenSidebar({ isOpen, onClose }: TokenSidebarProps) {
                 {confirmModal.open && (
                     <div className={`fixed inset-0 bg-black transition-opacity duration-300 z-[60] ${confirmModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} onClick={closeConfirmModal}>
                         <div className={`fixed inset-0 flex items-center justify-center p-4 z-[70] transition-all duration-300 ${confirmModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-                            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+                            <div className="rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-xl shadow-emerald-500/10 backdrop-blur-sm max-w-md w-full p-6 overflow-hidden" onClick={e => e.stopPropagation()}>
+                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
+                                <div className="relative">
                                 <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
                                 <p className="text-gray-600 dark:text-gray-400 mb-6">{confirmModal.message}</p>
                                 <div className="flex gap-3">
@@ -555,6 +586,7 @@ export default function TokenSidebar({ isOpen, onClose }: TokenSidebarProps) {
                                     >
                                         {deleting ? 'Deleting...' : 'Delete'}
                                     </button>
+                                </div>
                                 </div>
                             </div>
                         </div>

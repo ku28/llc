@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import LoadingModal from '../components/LoadingModal'
+import { useDataCache } from '../contexts/DataCacheContext'
+import RefreshButton from '../components/RefreshButton'
 
 export default function AnalyticsPage() {
     const [products, setProducts] = useState<any[]>([])
@@ -8,9 +10,31 @@ export default function AnalyticsPage() {
     const [invoices, setInvoices] = useState<any[]>([])
     const [transactions, setTransactions] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const { getCache, setCache } = useDataCache()
 
     useEffect(() => {
+        // Check cache first
+        const cachedAnalytics = getCache<any>('analytics')
+        if (cachedAnalytics) {
+            setProducts(cachedAnalytics.products || [])
+            setSuppliers(cachedAnalytics.suppliers || [])
+            setPurchaseOrders(cachedAnalytics.purchaseOrders || [])
+            setInvoices(cachedAnalytics.invoices || [])
+            setTransactions(cachedAnalytics.transactions || [])
+            setLoading(false)
+        }
+        
+        // Fetch in background
         fetchAllData()
+        
+        // Cleanup on unmount
+        return () => {
+            setProducts([])
+            setSuppliers([])
+            setPurchaseOrders([])
+            setInvoices([])
+            setTransactions([])
+        }
     }, [])
 
     const fetchAllData = async () => {
@@ -32,11 +56,20 @@ export default function AnalyticsPage() {
                 txnRes.json()
             ])
 
-            setProducts(Array.isArray(productsData) ? productsData : [])
-            setSuppliers(Array.isArray(suppliersData) ? suppliersData : [])
-            setPurchaseOrders(Array.isArray(posData) ? posData : [])
-            setInvoices(Array.isArray(invoicesData) ? invoicesData : [])
-            setTransactions(Array.isArray(txnData) ? txnData : [])
+            const analyticsData = {
+                products: Array.isArray(productsData) ? productsData : [],
+                suppliers: Array.isArray(suppliersData) ? suppliersData : [],
+                purchaseOrders: Array.isArray(posData) ? posData : [],
+                invoices: Array.isArray(invoicesData) ? invoicesData : [],
+                transactions: Array.isArray(txnData) ? txnData : []
+            }
+            
+            setProducts(analyticsData.products)
+            setSuppliers(analyticsData.suppliers)
+            setPurchaseOrders(analyticsData.purchaseOrders)
+            setInvoices(analyticsData.invoices)
+            setTransactions(analyticsData.transactions)
+            setCache('analytics', analyticsData)
         } catch (error) {
             console.error('Error fetching analytics data:', error)
         } finally {
@@ -144,7 +177,9 @@ export default function AnalyticsPage() {
 
                 {/* Financial Summary */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="card">
+                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <span>💸</span>
                             <span>Purchase Summary</span>
@@ -167,9 +202,15 @@ export default function AnalyticsPage() {
                                 <span className="font-bold text-red-600 dark:text-red-400">₹{totalSupplierOutstanding.toLocaleString()}</span>
                             </div>
                         </div>
+                        </div>
                     </div>
 
-                    <div className="card">
+                    <div className="relative rounded-xl border border-yellow-200/30 dark:border-yellow-700/30 bg-gradient-to-br from-white via-yellow-50/30 to-orange-50/20 dark:from-gray-900 dark:via-yellow-950/20 dark:to-gray-900 shadow-lg shadow-yellow-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/5 via-transparent to-orange-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative">
+                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <span>💵</span>
                             <span>Sales Summary</span>
@@ -243,7 +284,9 @@ export default function AnalyticsPage() {
 
                 {/* Top & Slow Movers */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="card">
+                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <span>🏆</span>
                             <span>Top Selling Products</span>
@@ -269,7 +312,9 @@ export default function AnalyticsPage() {
                         )}
                     </div>
 
-                    <div className="card">
+                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                             <span>🐌</span>
                             <span>Slow Moving Products</span>
@@ -293,11 +338,15 @@ export default function AnalyticsPage() {
                                 ))}
                             </div>
                         )}
+                        </div>
+                        </div>
                     </div>
                 </div>
 
                 {/* Recent Stock Movements */}
-                <div className="card">
+                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                    <div className="relative">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                         <span>🔄</span>
                         <span>Recent Inventory Movements</span>

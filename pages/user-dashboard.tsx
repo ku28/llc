@@ -163,7 +163,9 @@ export default function UserDashboard() {
                 </div>
 
                 {/* Upcoming Appointments */}
-                <div className="card">
+                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                    <div className="relative">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-semibold flex items-center gap-2">
                             <span>📅</span>
@@ -214,7 +216,9 @@ export default function UserDashboard() {
                 {/* Two Column Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Recent Prescriptions */}
-                    <div className="card">
+                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-xl font-semibold flex items-center gap-2">
                                 <span>💊</span>
@@ -249,11 +253,14 @@ export default function UserDashboard() {
                                     </Link>
                                 ))}
                             </div>
-                        )}
+                        </div>
+                        </div>
                     </div>
 
                     {/* Visit History */}
-                    <div className="card">
+                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative">
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-xl font-semibold flex items-center gap-2">
                                 <span>🏥</span>
@@ -287,12 +294,15 @@ export default function UserDashboard() {
                                     </div>
                                 ))}
                             </div>
-                        )}
+                        </div>
+                        </div>
                     </div>
                 </div>
 
                 {/* Quick Actions */}
-                <div className="card">
+                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                    <div className="relative">
                     <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <Link
@@ -324,10 +334,13 @@ export default function UserDashboard() {
                             <span className="text-sm font-medium">My Profile</span>
                         </Link>
                     </div>
+                    </div>
                 </div>
 
                 {/* Contact Information */}
-                <div className="card bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
+                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-green-50/30 to-emerald-50/20 dark:from-gray-900 dark:via-green-950/20 dark:to-emerald-950/20 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-400/5 via-transparent to-emerald-500/5 pointer-events-none rounded-xl"></div>
+                    <div className="relative">
                     <h2 className="text-xl font-semibold mb-4">Need Help?</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="flex items-center gap-3">
@@ -351,6 +364,7 @@ export default function UserDashboard() {
                                 <p className="font-semibold">Royal Heights, Faridkot</p>
                             </div>
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>

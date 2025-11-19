@@ -95,11 +95,12 @@ export default function CameraModal({ isOpen, onClose, onCapture, title = 'Captu
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
-            <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 p-4" style={{ zIndex: 10001 }}>
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
                 {/* Header */}
-                <div className="flex items-center justify-between p-3 border-b dark:border-gray-700 flex-shrink-0">
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h3>
+                <div className="relative flex items-center justify-between p-3 border-b border-emerald-200/30 dark:border-emerald-700/30 flex-shrink-0">
+                    <h3 className="text-base font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">{title}</h3>
                     <button
                         onClick={handleClose}
                         className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"

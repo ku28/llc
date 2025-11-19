@@ -6,18 +6,27 @@ import ImportVisitsModal from '../components/ImportVisitsModal'
 import PatientSelectionModal from '../components/PatientSelectionModal'
 import { useToast } from '../hooks/useToast'
 import { useImportContext } from '../contexts/ImportContext'
+import { useDataCache } from '../contexts/DataCacheContext'
+import RefreshButton from '../components/RefreshButton'
 
 export default function VisitsPage() {
     const [visits, setVisits] = useState<any[]>([])
     const [patients, setPatients] = useState<any[]>([])
     const [form, setForm] = useState({ patientId: '', opdNo: '', diagnoses: '' })
     const [searchQuery, setSearchQuery] = useState('')
-    const [sortBy, setSortBy] = useState<'patientName' | 'date' | 'opdNo'>('date')
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+    const [sortBy, setSortBy] = useState<'patientName' | 'date' | 'opdNo' | 'visitType' | 'complaint'>('date')
+    const [sortOrders, setSortOrders] = useState<{[key: string]: 'asc' | 'desc'}>({
+        patientName: 'asc',
+        date: 'desc',
+        opdNo: 'asc',
+        visitType: 'asc',
+        complaint: 'asc'
+    })
     const [showSortDropdown, setShowSortDropdown] = useState(false)
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [deleting, setDeleting] = useState(false)
+    const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set())
     const [visitToDelete, setVisitToDelete] = useState<any>(null)
     const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
     const [showImportModal, setShowImportModal] = useState(false)
@@ -25,7 +34,7 @@ export default function VisitsPage() {
     const [selectedVisitIds, setSelectedVisitIds] = useState<Set<number>>(new Set())
     const [showPatientModal, setShowPatientModal] = useState(false)
     const [currentPage, setCurrentPage] = useState(1)
-    const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
     const [showDeleteSelectedConfirm, setShowDeleteSelectedConfirm] = useState(false)
     const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 })
     const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
@@ -36,6 +45,7 @@ export default function VisitsPage() {
     const isPatient = user?.role?.toLowerCase() === 'user'
     const { toasts, removeToast, showSuccess, showError } = useToast()
     const { addTask, updateTask, cancelTask } = useImportContext()
+    const { getCache, setCache } = useDataCache()
     
     // Listen for maximize events from notification dropdown
     useEffect(() => {
@@ -48,14 +58,26 @@ export default function VisitsPage() {
         return () => window.removeEventListener('maximizeTask', handleMaximize)
     }, [deleteTaskId])
     
-    useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
+    useEffect(() => {
+        const cachedUser = sessionStorage.getItem('currentUser')
+        if (cachedUser) {
+            setUser(JSON.parse(cachedUser))
+        } else {
+            fetch('/api/auth/me').then(r => r.json()).then(d => {
+                setUser(d.user)
+                sessionStorage.setItem('currentUser', JSON.stringify(d.user))
+            })
+        }
+    }, [])
 
-    useEffect(() => { 
+    async function fetchVisits() {
         setLoading(true)
-        Promise.all([
-            fetch('/api/visits').then(r => r.json()),
-            fetch('/api/patients').then(r => r.json())
-        ]).then(([visitsData, patientsData]) => {
+        try {
+            const [visitsData, patientsData] = await Promise.all([
+                fetch('/api/visits').then(r => r.json()),
+                fetch('/api/patients').then(r => r.json())
+            ])
+            
             // Filter visits for user role - show only their own visits
             let filteredVisits = visitsData
             if (user?.role?.toLowerCase() === 'user') {
@@ -65,14 +87,48 @@ export default function VisitsPage() {
             }
             setVisits(filteredVisits)
             setPatients(patientsData)
+            setCache('visits', visitsData)
+        } catch (err) {
+            console.error('Failed to fetch visits')
+        } finally {
             setLoading(false)
-        }).catch(() => setLoading(false))
+        }
+    }
+
+    useEffect(() => {
+        if (!user) return
+        
+        const cachedVisits = getCache<any[]>('visits')
+        if (cachedVisits) {
+            // Apply filtering for cached data
+            let filteredVisits = cachedVisits
+            if (user?.role?.toLowerCase() === 'user') {
+                filteredVisits = cachedVisits.filter((v: any) => 
+                    v.patient?.email === user.email || v.patient?.phone === user.phone
+                )
+            }
+            setVisits(filteredVisits)
+            setLoading(false)
+        } else {
+            fetchVisits()
+        }
+        
+        // Cleanup on unmount
+        return () => {
+            setVisits([])
+        }
     }, [user])
 
     async function create(e: any) {
         e.preventDefault()
-        await fetch('/api/visits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-        setVisits(await (await fetch('/api/visits')).json())
+        const response = await fetch('/api/visits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+        if (response.ok) {
+            const newVisit = await response.json()
+            const allVisits = await (await fetch('/api/visits')).json()
+            setVisits(allVisits)
+        } else {
+            setVisits(await (await fetch('/api/visits')).json())
+        }
         setForm({ patientId: '', opdNo: '', diagnoses: '' })
     }
 
@@ -91,20 +147,38 @@ export default function VisitsPage() {
 
     async function handleConfirmDelete() {
         if (!visitToDelete) return
+        
+        // Immediately show deleting state
+        setDeletingIds(new Set([visitToDelete.id]))
+        
+        // Show "Deleting..." text for 1.5 seconds so it's clearly visible
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        
         setDeleting(true)
+        
         try {
+            // Start the delete API call
             const res = await fetch(`/api/visits?id=${visitToDelete.id}`, { method: 'DELETE' })
             if (res.ok) {
-                setVisits(visits.filter(v => v.id !== visitToDelete.id))
+                // Wait for fade animation (700ms) before updating the list
+                await new Promise(resolve => setTimeout(resolve, 700))
+                
+                // NOW update the list - item fades out first, then gets removed
                 showSuccess('Visit deleted successfully')
                 closeConfirmModal()
+                setVisits(visits.filter(v => v.id !== visitToDelete.id))
+                setCache('visits', visits.filter(v => v.id !== visitToDelete.id))
+                
+                setDeletingIds(new Set())
             } else {
                 const error = await res.json().catch(() => ({ error: 'Failed to delete visit' }))
                 showError(error.error || 'Failed to delete visit')
+                setDeletingIds(new Set())
             }
         } catch (err) {
             console.error(err)
             showError('Failed to delete visit')
+            setDeletingIds(new Set())
         } finally {
             setDeleting(false)
         }
@@ -135,12 +209,13 @@ export default function VisitsPage() {
         }
     }
 
-    function toggleRowExpansion(id: number) {
+    function toggleRowExpansion(id: string | number) {
         const newExpanded = new Set(expandedRows)
-        if (newExpanded.has(id)) {
-            newExpanded.delete(id)
+        const key = typeof id === 'string' ? id : String(id)
+        if (newExpanded.has(key)) {
+            newExpanded.delete(key)
         } else {
-            newExpanded.add(id)
+            newExpanded.add(key)
         }
         setExpandedRows(newExpanded)
     }
@@ -439,8 +514,22 @@ export default function VisitsPage() {
             return patientName.includes(search) || opdNo.includes(search)
         })
 
+        // Helper to check if visit is from today
+        const isFromToday = (visit: any) => {
+            if (!visit.createdAt) return false
+            const createdDate = new Date(visit.createdAt).toDateString()
+            const today = new Date().toDateString()
+            return createdDate === today
+        }
+
         // Then sort
         filtered.sort((a, b) => {
+            // Keep visits created today at top
+            const aIsNew = isFromToday(a)
+            const bIsNew = isFromToday(b)
+            if (aIsNew && !bIsNew) return -1
+            if (!aIsNew && bIsNew) return 1
+            
             let compareResult = 0
             
             if (sortBy === 'patientName') {
@@ -453,9 +542,13 @@ export default function VisitsPage() {
                 compareResult = dateA - dateB
             } else if (sortBy === 'opdNo') {
                 compareResult = (a.opdNo || '').localeCompare(b.opdNo || '')
+            } else if (sortBy === 'visitType') {
+                compareResult = (a.visitType || '').localeCompare(b.visitType || '')
+            } else if (sortBy === 'complaint') {
+                compareResult = (a.complaint || '').localeCompare(b.complaint || '')
             }
             
-            return sortOrder === 'asc' ? compareResult : -compareResult
+            return sortOrders[sortBy] === 'asc' ? compareResult : -compareResult
         })
 
         return filtered
@@ -546,9 +639,15 @@ export default function VisitsPage() {
                 </div>
             )}
             
-            <div className="section-header flex justify-between items-center">
-                <h2 className="section-title">{isPatient ? 'My Appointments' : 'Patient Visits'}</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                        {isPatient ? 'My Appointments' : 'Patient Visits'}
+                    </h1>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">Track and manage patient appointments</p>
+                </div>
                 <div className="flex items-center gap-3">
+                    <RefreshButton onRefresh={fetchVisits} />
                     {!isPatient && (
                         <>
                             <div className="relative">
@@ -607,15 +706,18 @@ export default function VisitsPage() {
                             </button>
                         </>
                     )}
-                    <span className="badge">
+                    <div className="px-3 py-1.5 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 text-green-800 dark:text-green-300 rounded-lg text-sm font-semibold border border-green-200 dark:border-green-800">
                         {getFilteredAndSortedVisits().length} total {isPatient ? 'appointments' : 'visits'}
-                    </span>
+                    </div>
                     {!isPatient && (
                         <button
                             onClick={() => setShowPatientModal(true)}
-                            className="btn btn-primary text-sm"
+                            className="px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold text-sm transition-all duration-200 shadow-lg shadow-green-500/30 flex items-center gap-2"
                         >
-                            Create Visit with Prescriptions
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            Create Visit
                         </button>
                     )}
                 </div>
@@ -630,7 +732,7 @@ export default function VisitsPage() {
                             placeholder="🔍 Search visits by patient name or OPD number..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                            className="w-full p-3 pr-10 border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 dark:bg-gray-800 dark:text-white transition-all duration-200"
                         />
                         <svg className="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -659,83 +761,137 @@ export default function VisitsPage() {
                                     <button
                                         onClick={() => {
                                             setSortBy('date')
-                                            setShowSortDropdown(false)
+                                            setSortOrders({...sortOrders, date: sortOrders.date === 'asc' ? 'desc' : 'asc'})
                                         }}
-                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-between gap-3 ${
                                             sortBy === 'date'
                                                 ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
                                                 : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                                         }`}
                                     >
-                                        <svg className={`w-4 h-4 ${sortBy === 'date' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        <span className="font-medium">Visit Date</span>
+                                        <div className="flex items-center gap-3">
+                                            <svg className={`w-4 h-4 ${sortBy === 'date' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <span className="font-medium">Visit Date</span>
+                                        </div>
+                                        {sortBy === 'date' && (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                {sortOrders.date === 'asc' ? (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                ) : (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                )}
+                                            </svg>
+                                        )}
                                     </button>
                                     <button
                                         onClick={() => {
                                             setSortBy('patientName')
-                                            setShowSortDropdown(false)
+                                            setSortOrders({...sortOrders, patientName: sortOrders.patientName === 'asc' ? 'desc' : 'asc'})
                                         }}
-                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-between gap-3 ${
                                             sortBy === 'patientName'
                                                 ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
                                                 : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                                         }`}
                                     >
-                                        <svg className={`w-4 h-4 ${sortBy === 'patientName' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                        </svg>
-                                        <span className="font-medium">Patient Name</span>
+                                        <div className="flex items-center gap-3">
+                                            <svg className={`w-4 h-4 ${sortBy === 'patientName' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                            <span className="font-medium">Patient Name</span>
+                                        </div>
+                                        {sortBy === 'patientName' && (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                {sortOrders.patientName === 'asc' ? (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                ) : (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                )}
+                                            </svg>
+                                        )}
                                     </button>
                                     <button
                                         onClick={() => {
                                             setSortBy('opdNo')
-                                            setShowSortDropdown(false)
+                                            setSortOrders({...sortOrders, opdNo: sortOrders.opdNo === 'asc' ? 'desc' : 'asc'})
                                         }}
-                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center gap-3 ${
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-between gap-3 ${
                                             sortBy === 'opdNo'
                                                 ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
                                                 : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                                         }`}
                                     >
-                                        <svg className={`w-4 h-4 ${sortBy === 'opdNo' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-                                        </svg>
-                                        <span className="font-medium">OPD Number</span>
-                                    </button>
-                                </div>
-                                <div className="p-2 border-t border-gray-200 dark:border-gray-700">
-                                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 py-1">
-                                        Order
-                                    </p>
-                                </div>
-                                <div className="p-1">
-                                    <button
-                                        onClick={() => {
-                                            setSortOrder('asc')
-                                            setShowSortDropdown(false)
-                                        }}
-                                        className={`w-full text-left px-3 py-2 rounded ${
-                                            sortOrder === 'asc'
-                                                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                                                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                                        }`}
-                                    >
-                                        Ascending (A-Z, Old-New)
+                                        <div className="flex items-center gap-3">
+                                            <svg className={`w-4 h-4 ${sortBy === 'opdNo' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                                            </svg>
+                                            <span className="font-medium">OPD Number</span>
+                                        </div>
+                                        {sortBy === 'opdNo' && (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                {sortOrders.opdNo === 'asc' ? (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                ) : (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                )}
+                                            </svg>
+                                        )}
                                     </button>
                                     <button
                                         onClick={() => {
-                                            setSortOrder('desc')
-                                            setShowSortDropdown(false)
+                                            setSortBy('visitType')
+                                            setSortOrders({...sortOrders, visitType: sortOrders.visitType === 'asc' ? 'desc' : 'asc'})
                                         }}
-                                        className={`w-full text-left px-3 py-2 rounded ${
-                                            sortOrder === 'desc'
-                                                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                                                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-between gap-3 ${
+                                            sortBy === 'visitType'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                                         }`}
                                     >
-                                        Descending (Z-A, New-Old)
+                                        <div className="flex items-center gap-3">
+                                            <svg className={`w-4 h-4 ${sortBy === 'visitType' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                            </svg>
+                                            <span className="font-medium">Visit Type</span>
+                                        </div>
+                                        {sortBy === 'visitType' && (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                {sortOrders.visitType === 'asc' ? (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                ) : (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                )}
+                                            </svg>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSortBy('complaint')
+                                            setSortOrders({...sortOrders, complaint: sortOrders.complaint === 'asc' ? 'desc' : 'asc'})
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-between gap-3 ${
+                                            sortBy === 'complaint'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <svg className={`w-4 h-4 ${sortBy === 'complaint' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            <span className="font-medium">Complaint</span>
+                                        </div>
+                                        {sortBy === 'complaint' && (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                {sortOrders.complaint === 'asc' ? (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                ) : (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                )}
+                                            </svg>
+                                        )}
                                     </button>
                                 </div>
                             </div>
@@ -745,7 +901,7 @@ export default function VisitsPage() {
                     {searchQuery && (
                         <button
                             onClick={() => setSearchQuery('')}
-                            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            className="px-4 py-2.5 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:from-gray-200 hover:to-gray-300 dark:hover:from-gray-600 dark:hover:to-gray-500 transition-all duration-200 shadow-sm font-medium text-sm"
                         >
                             Clear
                         </button>
@@ -753,7 +909,9 @@ export default function VisitsPage() {
                 </div>
             </div>
 
-            <div className="card">
+            <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                <div className="relative">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-3">
                     {!isPatient && (
                         <label className="relative group/checkbox cursor-pointer flex-shrink-0">
@@ -784,7 +942,7 @@ export default function VisitsPage() {
                     if (loading) {
                         return (
                             <div className="flex flex-col items-center justify-center py-12">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
                                 <p className="text-muted">Loading visits...</p>
                             </div>
                         )
@@ -807,25 +965,64 @@ export default function VisitsPage() {
                         )
                     }
                     
+                    // Group visits by patient
+                    const groupedByPatient = filteredVisits.reduce((acc: any, v: any) => {
+                        const patientKey = `patient-${v.patient?.id || 'unknown'}`
+                        if (!acc[patientKey]) {
+                            acc[patientKey] = {
+                                patient: v.patient,
+                                visits: []
+                            }
+                        }
+                        acc[patientKey].visits.push(v)
+                        return acc
+                    }, {})
+
+                    // Sort visits within each patient group by date (most recent first)
+                    Object.keys(groupedByPatient).forEach(key => {
+                        groupedByPatient[key].visits.sort((a: any, b: any) => {
+                            const dateA = new Date(a.date || 0).getTime()
+                            const dateB = new Date(b.date || 0).getTime()
+                            return dateB - dateA
+                        })
+                    })
+
+                    const groupedEntries = Object.entries(groupedByPatient)
+                    const paginatedEntries = groupedEntries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
                     return (
                         <>
                         <div className="space-y-3">
-                            {filteredVisits.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(v => {
-                                const isExpanded = expandedRows.has(v.id)
-                                const isSelected = selectedVisitIds.has(v.id)
+                            {paginatedEntries.map(([patientKey, data]: [string, any]) => {
+                                const { patient, visits } = data
+                                const isExpanded = expandedRows.has(patientKey)
+                                const mostRecentVisit = visits[0]
+                                const allVisitsSelected = visits.every((v: any) => selectedVisitIds.has(v.id))
                                 
                                 return (
-                                    <div key={v.id} className={`card p-4 transition-all duration-200 ${isSelected ? 'ring-2 ring-green-500 shadow-xl shadow-green-100 dark:shadow-green-900/30 bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-gray-800 dark:to-gray-800' : ''}`}>
-                                        <div className="flex items-start gap-4">
-                                            {/* Checkbox (only for non-patient users) */}
+                                    <div key={patientKey} className="border-2 border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
+                                        {/* Summary Row */}
+                                        <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-850 p-4 flex items-center gap-4">
+                                            {/* Checkbox for selecting all visits for this patient (only for non-patient users) */}
                                             {!isPatient && (
-                                                <div className="flex-shrink-0 pt-1">
+                                                <div className="flex-shrink-0">
                                                     <label className="relative group/checkbox cursor-pointer">
                                                         <input
                                                             type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={() => toggleVisitSelection(v.id)}
+                                                            checked={allVisitsSelected}
+                                                            onChange={() => {
+                                                                const newSelected = new Set(selectedVisitIds)
+                                                                visits.forEach((v: any) => {
+                                                                    if (allVisitsSelected) {
+                                                                        newSelected.delete(v.id)
+                                                                    } else {
+                                                                        newSelected.add(v.id)
+                                                                    }
+                                                                })
+                                                                setSelectedVisitIds(newSelected)
+                                                            }}
                                                             className="peer sr-only"
+                                                            title="Select all visits for this patient"
                                                         />
                                                         <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
                                                             <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -840,85 +1037,174 @@ export default function VisitsPage() {
                                             {/* Patient Image Circle */}
                                             <div className="flex-shrink-0">
                                                 <img 
-                                                    src={v.patient?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
+                                                    src={patient?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
                                                     alt="Patient" 
                                                     className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
                                                 />
                                             </div>
                                             
-                                            {/* Visit Details */}
+                                            {/* Patient Summary */}
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <h4 className="font-semibold text-base">
-                                                        {v.patient?.firstName} {v.patient?.lastName}
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="font-bold text-base text-gray-900 dark:text-white truncate">
+                                                        {patient?.firstName} {patient?.lastName}
                                                     </h4>
-                                                    <span className="badge">OPD: {v.opdNo}</span>
-                                                </div>
-                                                <div className="text-sm text-muted space-y-1">
-                                                    <div><span className="font-medium">Date:</span> {v.date ? new Date(v.date).toLocaleDateString('en-GB') : '-'}</div>
-                                                    {!isExpanded && v.provisionalDiagnosis && (
-                                                        <div className="truncate"><span className="font-medium">Diagnosis:</span> {v.provisionalDiagnosis}</div>
+                                                    {visits.some((v: any) => {
+                                                        if (!v.createdAt) return false
+                                                        const createdDate = new Date(v.createdAt).toDateString()
+                                                        const today = new Date().toDateString()
+                                                        return createdDate === today
+                                                    }) && (
+                                                        <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs rounded-full font-bold shadow-md">
+                                                            NEW
+                                                        </span>
                                                     )}
                                                 </div>
-                                                
-                                                {/* Expanded Details */}
-                                                {isExpanded && (
-                                                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2 text-sm">
-                                                        {v.provisionalDiagnosis && (
-                                                            <div><span className="font-medium">Diagnosis:</span> {v.provisionalDiagnosis}</div>
-                                                        )}
-                                                        {v.patient?.email && (
-                                                            <div><span className="font-medium">Patient Email:</span> {v.patient.email}</div>
-                                                        )}
-                                                        {v.patient?.phone && (
-                                                            <div><span className="font-medium">Patient Phone:</span> {v.patient.phone}</div>
-                                                        )}
-                                                        {v.prescriptions && v.prescriptions.length > 0 && (
-                                                            <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded">
-                                                                <span className="font-medium">Prescriptions:</span> {v.prescriptions.length} item(s)
-                                                            </div>
-                                                        )}
-                                                        <div><span className="font-medium">Created:</span> {new Date(v.createdAt).toLocaleDateString()}</div>
-                                                        {v.updatedAt && new Date(v.updatedAt).getTime() !== new Date(v.createdAt).getTime() && (
-                                                            <div><span className="font-medium">Last Updated:</span> {new Date(v.updatedAt).toLocaleDateString()}</div>
-                                                        )}
+                                                <div className="flex items-center gap-2 flex-wrap mt-1">
+                                                    {patient?.phone && (
+                                                        <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                            </svg>
+                                                            <span>{patient.phone}</span>
+                                                        </div>
+                                                    )}
+                                                    {patient?.email && (
+                                                        <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                            </svg>
+                                                            <span className="truncate">{patient.email}</span>
+                                                        </div>
+                                                    )}
+                                                    <span className="px-2.5 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full text-xs font-bold shadow-sm">
+                                                        {visits.length} visit{visits.length > 1 ? 's' : ''}
+                                                    </span>
+                                                </div>
+                                                {mostRecentVisit && (
+                                                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                        </svg>
+                                                        <span className="font-medium">Latest:</span>
+                                                        <span>{mostRecentVisit.date ? new Date(mostRecentVisit.date).toLocaleDateString('en-GB') : '-'}</span>
+                                                        <span className="text-gray-400">•</span>
+                                                        <span className="font-mono">OPD: {mostRecentVisit.opdNo}</span>
                                                     </div>
                                                 )}
                                             </div>
                                             
-                                            {/* Action Buttons */}
-                                            <div className="flex flex-col gap-2 self-start flex-shrink-0">
+                                            {/* Action Button */}
+                                            <div className="flex items-center gap-2 flex-shrink-0">
                                                 <button
-                                                    onClick={() => toggleRowExpansion(v.id)}
-                                                    className="btn btn-secondary text-sm"
+                                                    onClick={() => toggleRowExpansion(patientKey)}
+                                                    className="px-4 py-2 text-xs font-semibold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg shadow-sm transition-all duration-200 flex items-center gap-1.5"
+                                                    title={isExpanded ? "Hide Details" : "View More"}
                                                 >
-                                                    {isExpanded ? '▲ Show Less' : '▼ View More'}
+                                                    {isExpanded ? (
+                                                        <>
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                            </svg>
+                                                            <span>Hide</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span>View Visits</span>
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </>
+                                                    )}
                                                 </button>
-                                                <Link href={`/visits/${v.id}`} className="btn btn-primary text-sm">
-                                                    View Details
-                                                </Link>
-                                                {!isPatient && (
-                                                    <>
-                                                        <Link href={`/prescriptions?visitId=${v.id}&edit=true`} className="btn btn-secondary text-sm">
-                                                            Edit
-                                                        </Link>
-                                                        <button
-                                                            onClick={() => openDeleteModal(v)}
-                                                            className="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                    </>
-                                                )}
                                             </div>
                                         </div>
+
+                                        {/* Expanded Details - Show all visits */}
+                                        {isExpanded && (
+                                            <div className="p-4 bg-white dark:bg-gray-900 space-y-3">
+                                                {visits.map((v: any, idx: number) => {
+                                                    const isSelected = selectedVisitIds.has(v.id)
+                                                    const isDeleting = deletingIds.has(v.id)
+                                                    
+                                                    return (
+                                                        <div key={v.id} className={`p-3 border border-gray-200 dark:border-gray-700 rounded-lg ${isDeleting ? 'transition-all duration-700 ease-in-out opacity-0 -translate-x-full scale-95' : 'transition-all duration-300'} ${isSelected ? 'bg-green-50/50 dark:bg-green-900/10 border-green-400' : ''}`}>
+                                                            {isDeleting ? (
+                                                                <div className="p-12 text-center bg-red-50 dark:bg-red-950/30 animate-pulse">
+                                                                    <span className="text-red-600 dark:text-red-400 font-bold text-2xl">Deleting...</span>
+                                                                </div>
+                                                            ) : (
+                                                            <div className="flex items-start gap-3">
+                                                                {/* Individual visit checkbox */}
+                                                                {!isPatient && (
+                                                                    <div className="flex-shrink-0 pt-1">
+                                                                        <label className="relative group/checkbox cursor-pointer">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={isSelected}
+                                                                                onChange={() => toggleVisitSelection(v.id)}
+                                                                                className="peer sr-only"
+                                                                            />
+                                                                            <div className="w-5 h-5 border-2 border-green-400 dark:border-green-600 rounded bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                                                                <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                                                </svg>
+                                                                            </div>
+                                                                            <div className="absolute inset-0 rounded bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                                                        </label>
+                                                                    </div>
+                                                                )}
+                                                                
+                                                                {/* Visit Details */}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <span className="font-medium text-sm">Visit #{idx + 1}</span>
+                                                                        <span className="badge text-xs">OPD: {v.opdNo}</span>
+                                                                    </div>
+                                                                    <div className="text-xs text-muted space-y-0.5">
+                                                                        <div><span className="font-medium">Date:</span> {v.date ? new Date(v.date).toLocaleDateString('en-GB') : '-'}</div>
+                                                                        {v.provisionalDiagnosis && (
+                                                                            <div><span className="font-medium">Diagnosis:</span> {v.provisionalDiagnosis}</div>
+                                                                        )}
+                                                                        {v.prescriptions && v.prescriptions.length > 0 && (
+                                                                            <div><span className="font-medium">Prescriptions:</span> {v.prescriptions.length} item(s)</div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                {/* Action Buttons */}
+                                                                <div className="flex flex-col gap-2 self-start flex-shrink-0">
+                                                                    <Link href={`/visits/${v.id}`} className="px-3 py-1 text-xs bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded font-medium transition-all duration-200">
+                                                                        View Details
+                                                                    </Link>
+                                                                    {!isPatient && (
+                                                                        <>
+                                                                            <Link href={`/prescriptions?visitId=${v.id}&edit=true`} className="px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded">
+                                                                                Edit
+                                                                            </Link>
+                                                                            <button
+                                                                                onClick={() => openDeleteModal(v)}
+                                                                                className="px-3 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+                                                                            >
+                                                                                Delete
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 )
                             })}
                         </div>
                     
                     {/* Pagination Controls */}
-                    {filteredVisits.length > itemsPerPage && (
+                    {groupedEntries.length > itemsPerPage && (
                         <div className="mt-6 flex items-center justify-center gap-4">
                             <button
                                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -931,11 +1217,11 @@ export default function VisitsPage() {
                                 Previous
                             </button>
                             <span className="text-sm text-gray-700 dark:text-gray-300">
-                                Page {currentPage} of {Math.ceil(filteredVisits.length / itemsPerPage)}
+                                Page {currentPage} of {Math.ceil(groupedEntries.length / itemsPerPage)}
                             </span>
                             <button
-                                onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredVisits.length / itemsPerPage), prev + 1))}
-                                disabled={currentPage === Math.ceil(filteredVisits.length / itemsPerPage)}
+                                onClick={() => setCurrentPage(prev => Math.min(Math.ceil(groupedEntries.length / itemsPerPage), prev + 1))}
+                                disabled={currentPage === Math.ceil(groupedEntries.length / itemsPerPage)}
                                 className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 Next
@@ -956,7 +1242,7 @@ export default function VisitsPage() {
                     <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-slideIn ${
                         toast.type === 'success' ? 'bg-green-500 text-white' :
                         toast.type === 'error' ? 'bg-red-500 text-white' :
-                        'bg-blue-500 text-white'
+                        'bg-green-500 text-white'
                     }`}>
                         <span className="flex-1">{toast.message}</span>
                         <button onClick={() => removeToast(toast.id)} className="text-white hover:text-gray-200">
@@ -1199,6 +1485,7 @@ export default function VisitsPage() {
                     </div>
                 </div>
             )}
+            </div>
         </div>
     )
 }

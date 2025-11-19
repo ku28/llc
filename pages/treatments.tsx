@@ -5,6 +5,9 @@ import { requireDoctorOrAdmin } from '../lib/withAuth'
 import ConfirmationModal from '../components/ConfirmationModal'
 import LoadingModal from '../components/LoadingModal'
 import ImportTreatmentModal from '../components/ImportTreatmentModal'
+import { useDataCache } from '../contexts/DataCacheContext'
+import RefreshButton from '../components/RefreshButton'
+import { useToast } from '../hooks/useToast'
 
 function TreatmentsPage() {
     const router = useRouter()
@@ -12,11 +15,12 @@ function TreatmentsPage() {
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
     const [selectedPlanByDiagnosis, setSelectedPlanByDiagnosis] = useState<{[key: string]: number}>({})
     const [searchQuery, setSearchQuery] = useState('')
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(false)
     const [user, setUser] = useState<any>(null)
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [deleteId, setDeleteId] = useState<number | null>(null)
     const [deleting, setDeleting] = useState(false)
+    const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set())
     const [showImportModal, setShowImportModal] = useState(false)
     const [showExportDropdown, setShowExportDropdown] = useState(false)
     const [selectedTreatmentIds, setSelectedTreatmentIds] = useState<Set<number>>(new Set())
@@ -26,18 +30,66 @@ function TreatmentsPage() {
     const [deleteAllProgress, setDeleteAllProgress] = useState({ current: 0, total: 0 })
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage] = useState(10)
+    const [sortBy, setSortBy] = useState<'diagnosis' | 'planNumber' | 'speciality' | 'organ'>('diagnosis')
+    const [sortOrders, setSortOrders] = useState<{[key: string]: 'asc' | 'desc'}>({
+        diagnosis: 'asc',
+        planNumber: 'asc',
+        speciality: 'asc',
+        organ: 'asc'
+    })
+    const [showSortDropdown, setShowSortDropdown] = useState(false)
+    const { getCache, setCache } = useDataCache()
+    const { showSuccess, showError, showInfo } = useToast()
     
-    useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
-    useEffect(() => { 
-        fetchTreatments()
+    useEffect(() => {
+        const cachedUser = sessionStorage.getItem('currentUser')
+        if (cachedUser) {
+            setUser(JSON.parse(cachedUser))
+        } else {
+            fetch('/api/auth/me').then(r => r.json()).then(d => {
+                setUser(d.user)
+                sessionStorage.setItem('currentUser', JSON.stringify(d.user))
+            })
+        }
     }, [])
+    
+    useEffect(() => { 
+        // Check if returning from creating new treatment
+        if (router.query.newId) {
+            const newId = Number(router.query.newId)
+            fetchTreatments(newId)
+            // Clean up URL
+            router.replace('/treatments', undefined, { shallow: true })
+        } else {
+            const cachedTreatments = getCache<any[]>('treatments')
+            if (cachedTreatments) {
+                setItems(cachedTreatments)
+                setLoading(false)
+                // Don't fetch in background to avoid loading spinner
+            } else {
+                fetchTreatments()
+            }
+        }
+        
+        // Cleanup on unmount
+        return () => {
+            setItems([])
+        }
+    }, [router.query.newId])
 
-    function fetchTreatments() {
-        setLoading(true)
-        fetch('/api/treatments').then(r => r.json()).then(treatmentsData => {
-            setItems(Array.isArray(treatmentsData) ? treatmentsData : [])
+    async function fetchTreatments(newId?: number) {
+        try {
+            setLoading(true)
+            const res = await fetch('/api/treatments')
+            const treatmentsData = await res.json()
+            const data = Array.isArray(treatmentsData) ? treatmentsData : []
+            setItems(data)
+            setCache('treatments', data)
+        } catch (err) {
+            console.error('Failed to fetch treatments')
+        } finally {
             setLoading(false)
-        }).catch(() => setLoading(false))
+        }
     }
 
     function handleImportSuccess() {
@@ -96,25 +148,45 @@ function TreatmentsPage() {
     async function confirmDelete() {
         if (deleteId === null) return
         
+        // Immediately show deleting state
+        setDeletingIds(prev => new Set(prev).add(deleteId))
         setShowDeleteConfirm(false)
+        
+        // Show "Deleting..." text for 1.5 seconds so it's clearly visible
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        
         setDeleting(true)
         
         try {
+            // Start the delete API call
             const response = await fetch('/api/treatments', { 
                 method: 'DELETE', 
                 headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify({ id: deleteId }) 
             })
             if (response.ok) {
-                setItems(await (await fetch('/api/treatments')).json())
+                // Wait for fade animation (700ms) before updating the list
+                await new Promise(resolve => setTimeout(resolve, 700))
+                
+                // NOW update the list - item fades out first, then gets removed
+                const updatedItems = await (await fetch('/api/treatments')).json()
+                setItems(updatedItems)
+                setCache('treatments', updatedItems)
+                
+                showSuccess('Treatment plan deleted successfully!')
             } else {
                 const error = await response.json()
-                alert('Failed to delete treatment: ' + (error.error || 'Unknown error'))
+                showError('Failed to delete treatment: ' + (error.error || 'Unknown error'))
             }
         } catch (error) {
             console.error('Delete error:', error)
-            alert('Failed to delete treatment')
+            showError('Failed to delete treatment')
         } finally {
+            setDeletingIds(prev => {
+                const next = new Set(prev)
+                next.delete(deleteId)
+                return next
+            })
             setDeleting(false)
             setDeleteId(null)
         }
@@ -176,7 +248,7 @@ function TreatmentsPage() {
             setSelectedTreatmentIds(new Set())
         } catch (error: any) {
             console.error('Delete all error:', error)
-            alert('Failed to delete all treatments: ' + error.message)
+            showError('Failed to delete all treatments: ' + error.message)
         } finally {
             setDeleting(false)
             setDeleteAllDiagnosis('')
@@ -194,7 +266,7 @@ function TreatmentsPage() {
     function exportData(format: 'csv' | 'json' | 'xlsx') {
         try {
             if (selectedTreatmentIds.size === 0) {
-                alert('Please select at least one treatment to export')
+                showInfo('Please select at least one treatment to export')
                 return
             }
 
@@ -254,11 +326,11 @@ function TreatmentsPage() {
                 XLSX.writeFile(wb, `treatments_${timestamp}.xlsx`)
             }
             
-            alert(`${selectedTreatmentIds.size} treatment(s) exported as ${format.toUpperCase()}`)
+            showSuccess(`${selectedTreatmentIds.size} treatment(s) exported as ${format.toUpperCase()}`)
             setShowExportDropdown(false)
         } catch (e) {
             console.error(e)
-            alert('Failed to export treatments')
+            showError('Failed to export treatments')
         }
     }
 
@@ -354,9 +426,15 @@ function TreatmentsPage() {
                 <LoadingModal isOpen={deleting} message="Deleting treatment plan..." />
             )}
 
-            <div className="section-header flex justify-between items-center">
-                <h2 className="section-title">Treatment Management</h2>
-                <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                        Treatment Management
+                    </h1>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">Create and manage treatment plans</p>
+                </div>
+                <div className="flex gap-3 items-center">
+                    <RefreshButton onRefresh={fetchTreatments} />
                     <div className="relative">
                         <button 
                             onClick={() => setShowExportDropdown(!showExportDropdown)}
@@ -420,7 +498,7 @@ function TreatmentsPage() {
                 </div>
             </div>
 
-            {/* Search Bar */}
+            {/* Search and Sort Bar */}
             <div className="card mb-4">
                 <div className="flex items-center gap-3">
                     <div className="flex-1 relative">
@@ -429,12 +507,145 @@ function TreatmentsPage() {
                             placeholder="🔍 Search treatments by diagnosis or treatment plan..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                            className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-800 dark:text-white"
                         />
                         <svg className="w-5 h-5 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </div>
+                    
+                    {/* Sort Dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowSortDropdown(!showSortDropdown)}
+                            className="px-4 py-2.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-400 dark:hover:border-green-600 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-sm hover:shadow-md"
+                        >
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
+                            <span>Sort</span>
+                        </button>
+                        {showSortDropdown && (
+                            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-900 dark:to-gray-900">
+                                    <p className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">
+                                        Sort Treatment Plans
+                                    </p>
+                                </div>
+                                <div className="p-2">
+                                    <button
+                                        onClick={() => {
+                                            setSortBy('diagnosis')
+                                            setSortOrders({...sortOrders, diagnosis: sortOrders.diagnosis === 'asc' ? 'desc' : 'asc'})
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-between gap-3 ${
+                                            sortBy === 'diagnosis'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <svg className={`w-4 h-4 ${sortBy === 'diagnosis' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            <span className="font-medium">Diagnosis</span>
+                                        </div>
+                                        {sortBy === 'diagnosis' && (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                {sortOrders.diagnosis === 'asc' ? (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                ) : (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                )}
+                                            </svg>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSortBy('planNumber')
+                                            setSortOrders({...sortOrders, planNumber: sortOrders.planNumber === 'asc' ? 'desc' : 'asc'})
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-between gap-3 ${
+                                            sortBy === 'planNumber'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <svg className={`w-4 h-4 ${sortBy === 'planNumber' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                                            </svg>
+                                            <span className="font-medium">Plan Number</span>
+                                        </div>
+                                        {sortBy === 'planNumber' && (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                {sortOrders.planNumber === 'asc' ? (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                ) : (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                )}
+                                            </svg>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSortBy('speciality')
+                                            setSortOrders({...sortOrders, speciality: sortOrders.speciality === 'asc' ? 'desc' : 'asc'})
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-between gap-3 ${
+                                            sortBy === 'speciality'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <svg className={`w-4 h-4 ${sortBy === 'speciality' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                            </svg>
+                                            <span className="font-medium">Speciality</span>
+                                        </div>
+                                        {sortBy === 'speciality' && (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                {sortOrders.speciality === 'asc' ? (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                ) : (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                )}
+                                            </svg>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSortBy('organ')
+                                            setSortOrders({...sortOrders, organ: sortOrders.organ === 'asc' ? 'desc' : 'asc'})
+                                        }}
+                                        className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-between gap-3 ${
+                                            sortBy === 'organ'
+                                                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md'
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <svg className={`w-4 h-4 ${sortBy === 'organ' ? 'text-white' : 'text-green-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                            </svg>
+                                            <span className="font-medium">Organ</span>
+                                        </div>
+                                        {sortBy === 'organ' && (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                {sortOrders.organ === 'asc' ? (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                ) : (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                )}
+                                            </svg>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
                     {searchQuery && (
                         <button
                             onClick={() => setSearchQuery('')}
@@ -447,7 +658,9 @@ function TreatmentsPage() {
             </div>
 
             {/* Treatments Table */}
-            <div className="card">
+            <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                <div className="relative">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold flex items-center gap-3">
                         <label className="relative group/checkbox cursor-pointer flex-shrink-0">
@@ -460,6 +673,18 @@ function TreatmentsPage() {
                                         const treatmentPlan = (t.treatmentPlan || '').toLowerCase()
                                         const search = searchQuery.toLowerCase()
                                         return diagnosis.includes(search) || treatmentPlan.includes(search)
+                                    }).sort((a: any, b: any) => {
+                                        let compareResult = 0
+                                        if (sortBy === 'diagnosis') {
+                                            compareResult = (a.provDiagnosis || '').localeCompare(b.provDiagnosis || '')
+                                        } else if (sortBy === 'planNumber') {
+                                            compareResult = (a.planNumber || 0) - (b.planNumber || 0)
+                                        } else if (sortBy === 'speciality') {
+                                            compareResult = (a.speciality || '').localeCompare(b.speciality || '')
+                                        } else if (sortBy === 'organ') {
+                                            compareResult = (a.organ || '').localeCompare(b.organ || '')
+                                        }
+                                        return sortOrders[sortBy] === 'asc' ? compareResult : -compareResult
                                     })
                                     return filtered.length > 0 && filtered.every((t: any) => selectedTreatmentIds.has(t.id))
                                 })()}
@@ -514,7 +739,7 @@ function TreatmentsPage() {
                     if (loading) {
                         return (
                             <div className="flex flex-col items-center justify-center py-12">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
                                 <p className="text-muted">Loading treatments...</p>
                             </div>
                         )
@@ -541,8 +766,37 @@ function TreatmentsPage() {
                     return (
                         <div className="space-y-2">
                             {(() => {
+                                // Helper to check if treatment is from today
+                                const isFromToday = (treatment: any) => {
+                                    if (!treatment.createdAt) return false
+                                    const createdDate = new Date(treatment.createdAt).toDateString()
+                                    const today = new Date().toDateString()
+                                    return createdDate === today
+                                }
+                                
+                                // Prioritize treatments created today
+                                const sortedItems = [...filteredItems].sort((a: any, b: any) => {
+                                    const aIsNew = isFromToday(a)
+                                    const bIsNew = isFromToday(b)
+                                    if (aIsNew && !bIsNew) return -1
+                                    if (!aIsNew && bIsNew) return 1
+                                    
+                                    // Apply selected sort
+                                    let compareResult = 0
+                                    if (sortBy === 'diagnosis') {
+                                        compareResult = (a.provDiagnosis || '').localeCompare(b.provDiagnosis || '')
+                                    } else if (sortBy === 'planNumber') {
+                                        compareResult = (a.planNumber || '00').localeCompare(b.planNumber || '00')
+                                    } else if (sortBy === 'speciality') {
+                                        compareResult = (a.speciality || '').localeCompare(b.speciality || '')
+                                    } else if (sortBy === 'organ') {
+                                        compareResult = (a.organ || '').localeCompare(b.organ || '')
+                                    }
+                                    return sortOrders[sortBy] === 'asc' ? compareResult : -compareResult
+                                })
+                                
                                 // Group treatments by provDiagnosis
-                                const groupedByDiagnosis = filteredItems.reduce((acc: any, t: any) => {
+                                const groupedByDiagnosis = sortedItems.reduce((acc: any, t: any) => {
                                 const key = t.provDiagnosis || 'Unknown'
                                 if (!acc[key]) {
                                     acc[key] = []
@@ -551,7 +805,7 @@ function TreatmentsPage() {
                                 return acc
                             }, {})
 
-                            // Sort each group by plan number
+                            // Sort each group by plan number (within the group)
                             Object.keys(groupedByDiagnosis).forEach(key => {
                                 groupedByDiagnosis[key].sort((a: any, b: any) => {
                                     const aNum = a.planNumber || '00'
@@ -571,9 +825,9 @@ function TreatmentsPage() {
                                 const isExpanded = expandedRows.has(groupKey as any)
                                 
                                 return (
-                                    <div key={groupKey} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                                    <div key={groupKey} className="border border-emerald-100 dark:border-emerald-800 rounded-lg overflow-hidden hover:shadow-lg hover:shadow-emerald-100 dark:hover:shadow-emerald-900/20 transition-shadow duration-200">
                                         {/* Summary Row */}
-                                        <div className="bg-gray-50 dark:bg-gray-800 p-3 flex items-center gap-3">
+                                        <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/50 dark:to-green-950/50 p-3 flex items-center gap-3 border-b border-emerald-100 dark:border-emerald-800">
                                             {/* Checkbox for selecting all plans in this diagnosis */}
                                             <div className="flex-shrink-0">
                                                 <label className="relative group/checkbox cursor-pointer">
@@ -597,17 +851,29 @@ function TreatmentsPage() {
                                                         className="peer sr-only"
                                                         title="Select all plans in this diagnosis"
                                                     />
-                                                    <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                                    <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
                                                         <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
                                                         </svg>
                                                     </div>
-                                                    <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                                    <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
                                                 </label>
                                             </div>
                                             
                                             <div className="flex-1">
-                                                <div className="font-semibold text-sm">{diagnosis}</div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="font-semibold text-sm">{diagnosis}</div>
+                                                    {treatments.some((t: any) => {
+                                                        if (!t.createdAt) return false
+                                                        const createdDate = new Date(t.createdAt).toDateString()
+                                                        const today = new Date().toDateString()
+                                                        return createdDate === today
+                                                    }) && (
+                                                        <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs rounded-full font-bold shadow-md">
+                                                            NEW
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="text-xs text-muted mt-0.5">
                                                     {firstTreatment.speciality} • {firstTreatment.organ} • {firstTreatment.diseaseAction}
                                                     <span className="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
@@ -681,16 +947,23 @@ function TreatmentsPage() {
                                                         {treatments.map((t: any, idx: number) => {
                                                             const isSelected = selectedTreatmentIds.has(t.id)
                                                             const isCurrentPlan = idx === selectedIndex
+                                                            const isDeleting = deletingIds.has(t.id)
                                                             
                                                             return (
                                                                 <div 
                                                                     key={t.id} 
-                                                                    className={`flex items-center gap-2 p-2 rounded transition-colors ${
+                                                                    className={`flex items-center gap-2 p-2 rounded ${isDeleting ? 'transition-all duration-700 ease-in-out opacity-0 -translate-x-full scale-95' : 'transition-all duration-300'} ${
                                                                         isCurrentPlan 
                                                                             ? 'bg-blue-50 dark:bg-blue-900/10' 
                                                                             : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                                                                     }`}
                                                                 >
+                                                                    {isDeleting ? (
+                                                                        <div className="w-full p-6 text-center bg-red-50 dark:bg-red-950/30 animate-pulse">
+                                                                            <span className="text-red-600 dark:text-red-400 font-bold text-lg">Deleting...</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <>
                                                                     <label className="relative group/checkbox cursor-pointer flex-shrink-0">
                                                                         <input
                                                                             type="checkbox"
@@ -715,7 +988,7 @@ function TreatmentsPage() {
                                                                         }}
                                                                     >
                                                                         <span className="text-sm text-gray-700 dark:text-gray-300">
-                                                                            Plan {t.planNumber || (idx + 1).toString().padStart(2, '0')}
+                                                                            Plan {treatments.length === 1 ? '1' : (t.planNumber || (idx + 1).toString().padStart(2, '0'))}
                                                                         </span>
                                                                         <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                                                                             {t.treatmentPlan || diagnosis}
@@ -742,6 +1015,8 @@ function TreatmentsPage() {
                                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                                         </svg>
                                                                     </button>
+                                                                </>
+                                                                    )}
                                                                 </div>
                                                             )
                                                         })}
@@ -753,7 +1028,7 @@ function TreatmentsPage() {
                                                             {/* Plan Header */}
                                                             <div className="mb-3">
                                                                 <div className="font-semibold text-base mb-2">
-                                                                    Plan {selectedTreatment.planNumber || '-'}: {selectedTreatment.treatmentPlan || diagnosis}
+                                                                    Plan {treatments.length === 1 ? '1' : (selectedTreatment.planNumber || '-')}: {selectedTreatment.treatmentPlan || diagnosis}
                                                                 </div>
                                                             </div>
 
@@ -971,6 +1246,7 @@ function TreatmentsPage() {
                     </div>
                 </button>
             )}
+            </div>
         </div>
     )
 }

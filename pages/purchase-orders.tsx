@@ -4,6 +4,8 @@ import LoadingModal from '../components/LoadingModal'
 import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
 import { useToast } from '../hooks/useToast'
+import { useDataCache } from '../contexts/DataCacheContext'
+import RefreshButton from '../components/RefreshButton'
 import * as XLSX from 'xlsx'
 
 export default function PurchaseOrdersPage() {
@@ -30,6 +32,7 @@ export default function PurchaseOrdersPage() {
     const [successModalAnimating, setSuccessModalAnimating] = useState(false)
     const [receivedPODetails, setReceivedPODetails] = useState<any>(null)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
+    const { getCache, setCache } = useDataCache()
     const [user, setUser] = useState<any>(null)
     
     // Bulk operations and sorting
@@ -46,7 +49,31 @@ export default function PurchaseOrdersPage() {
     const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
 
     useEffect(() => {
+        // Check cache first
+        const cachedPOs = getCache<any[]>('purchaseOrders')
+        const cachedSuppliers = getCache<any[]>('suppliers')
+        const cachedProducts = getCache<any[]>('products')
+        
+        if (cachedPOs) {
+            setSentDemands(cachedPOs)
+        }
+        if (cachedSuppliers) {
+            setSuppliers(cachedSuppliers.filter((s: any) => s.status === 'active'))
+        }
+        if (cachedProducts) {
+            setProducts(cachedProducts)
+        }
+        
+        // Fetch in background
         fetchInitialData()
+        
+        // Cleanup on unmount
+        return () => {
+            setSentDemands([])
+            setSuppliers([])
+            setProducts([])
+            setDemandList([])
+        }
     }, [])
 
     const fetchInitialData = async () => {
@@ -66,7 +93,9 @@ export default function PurchaseOrdersPage() {
     const fetchSentDemands = async () => {
         const response = await fetch('/api/purchase-orders')
         const data = await response.json()
-        setSentDemands(Array.isArray(data) ? data : [])
+        const posData = Array.isArray(data) ? data : []
+        setSentDemands(posData)
+        setCache('purchaseOrders', posData)
     }
 
     const fetchSuppliers = async () => {
@@ -160,12 +189,14 @@ export default function PurchaseOrdersPage() {
         }
         
         setShowSupplierModal(true)
+        document.body.style.overflow = 'hidden'
         setSupplierModalAnimating(false)
         setTimeout(() => setSupplierModalAnimating(true), 10)
     }
 
     const closeSupplierModal = () => {
         setSupplierModalAnimating(false)
+        document.body.style.overflow = 'unset'
         setTimeout(() => {
             setShowSupplierModal(false)
             setSelectedSupplier('')
@@ -260,12 +291,14 @@ export default function PurchaseOrdersPage() {
             }))
         })
         setIsReceivingModalOpen(true)
+        document.body.style.overflow = 'hidden'
         setReceivingModalAnimating(false)
         setTimeout(() => setReceivingModalAnimating(true), 10)
     }
 
     const closeReceivingModal = () => {
         setReceivingModalAnimating(false)
+        document.body.style.overflow = 'unset'
         setTimeout(() => {
             setIsReceivingModalOpen(false)
             setReceivingPO(null)
@@ -318,6 +351,7 @@ export default function PurchaseOrdersPage() {
                 // Show success modal
                 setReceivedPODetails(updatedPO)
                 setShowSuccessModal(true)
+                document.body.style.overflow = 'hidden'
                 setSuccessModalAnimating(false)
                 setTimeout(() => setSuccessModalAnimating(true), 10)
             } else {
@@ -335,6 +369,7 @@ export default function PurchaseOrdersPage() {
 
     const closeSuccessModal = () => {
         setSuccessModalAnimating(false)
+        document.body.style.overflow = 'unset'
         setTimeout(() => {
             setShowSuccessModal(false)
             setReceivedPODetails(null)
@@ -425,6 +460,7 @@ export default function PurchaseOrdersPage() {
     // Delete functions
     async function deleteDemand(id: number) {
         setConfirmModal({ open: true, id, message: 'Are you sure you want to delete this purchase order?' })
+        document.body.style.overflow = 'hidden'
         setTimeout(() => setConfirmModalAnimating(true), 10)
     }
 
@@ -434,11 +470,13 @@ export default function PurchaseOrdersPage() {
             deleteMultiple: true,
             message: `Are you sure you want to delete ${selectedPOIds.size} selected purchase order(s)?`
         })
+        document.body.style.overflow = 'hidden'
         setTimeout(() => setConfirmModalAnimating(true), 10)
     }
 
     function closeConfirmModal() {
         setConfirmModalAnimating(false)
+        document.body.style.overflow = 'unset'
         setTimeout(() => setConfirmModal({ open: false }), 300)
     }
 
@@ -972,10 +1010,11 @@ export default function PurchaseOrdersPage() {
             {/* Modals */}
             {/* Supplier Selection Modal */}
             {showSupplierModal && (
-                <div className={`fixed inset-0 bg-black flex items-center justify-center z-50 p-4 transition-opacity duration-300 ${supplierModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`}>
-                    <div className={`bg-white dark:bg-gray-900 rounded-lg max-w-md w-full shadow-2xl transform transition-all duration-300 ${supplierModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-                        <div className="p-6">
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Select Supplier</h2>
+                <div className={`fixed inset-0 bg-black flex items-center justify-center p-4 transition-opacity duration-300 ${supplierModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }}>
+                    <div className={`relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-md w-full transform transition-all duration-300 ${supplierModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+                        <div className="relative p-6">
+                            <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 mb-4">Select Supplier</h2>
                             <p className="text-gray-600 dark:text-gray-400 mb-6">
                                 Choose a supplier to send this demand to. An email will be sent automatically.
                             </p>
@@ -1014,7 +1053,7 @@ export default function PurchaseOrdersPage() {
                                 <button
                                     onClick={sendDemand}
                                     disabled={!selectedSupplier || sendingEmail}
-                                    className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+                                    className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-lg font-medium transition-colors shadow-md"
                                 >
                                     {sendingEmail ? 'Sending...' : '📧 Send Demand'}
                                 </button>
@@ -1026,10 +1065,11 @@ export default function PurchaseOrdersPage() {
 
             {/* Receiving Goods Modal */}
             {isReceivingModalOpen && receivingPO && (
-                <div className={`fixed inset-0 bg-black flex items-center justify-center z-50 p-4 transition-opacity duration-300 ${receivingModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`}>
-                    <div className={`bg-white dark:bg-gray-900 rounded-lg max-w-4xl w-full shadow-2xl transform transition-all duration-300 max-h-[90vh] overflow-y-auto ${receivingModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-                        <form onSubmit={handleReceiveGoods} className="p-6">
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Receive Goods - {receivingPO.poNumber}</h2>
+                <div className={`fixed inset-0 bg-black flex items-center justify-center p-4 transition-opacity duration-300 ${receivingModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }}>
+                    <div className={`relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-4xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 ${receivingModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+                        <form onSubmit={handleReceiveGoods} className="relative p-6">
+                            <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 mb-4">Receive Goods - {receivingPO.poNumber}</h2>
                             <p className="text-gray-600 dark:text-gray-400 mb-6">
                                 Supplier: <strong>{receivingPO.supplier?.name}</strong> | 
                                 Order Date: <strong>{receivingPO.orderDate ? new Date(receivingPO.orderDate).toLocaleDateString() : '-'}</strong>
@@ -1115,19 +1155,20 @@ export default function PurchaseOrdersPage() {
 
             {/* Success Modal */}
             {showSuccessModal && receivedPODetails && (
-                <div className={`fixed inset-0 bg-black flex items-center justify-center z-50 p-4 transition-opacity duration-300 ${successModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`}>
-                    <div className={`bg-white dark:bg-gray-900 rounded-lg max-w-2xl w-full shadow-2xl transform transition-all duration-300 ${successModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-                        <div className="p-6 text-center border-b border-gray-200 dark:border-gray-700">
+                <div className={`fixed inset-0 bg-black flex items-center justify-center p-4 transition-opacity duration-300 ${successModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }}>
+                    <div className={`relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-2xl w-full transform transition-all duration-300 ${successModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+                        <div className="relative p-6 text-center border-b border-gray-200 dark:border-gray-700">
                             <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
                                 <svg className="h-10 w-10 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
                             </div>
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Goods Received Successfully!</h2>
+                            <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Goods Received Successfully!</h2>
                             <p className="text-gray-600 dark:text-gray-400 mt-2">Order {receivedPODetails.poNumber} has been marked as received and inventory has been updated.</p>
                         </div>
 
-                        <div className="p-6 space-y-4">
+                        <div className="relative p-6 space-y-4">
                             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -1201,40 +1242,43 @@ export default function PurchaseOrdersPage() {
 
             {/* Confirm Delete Modal */}
             {confirmModal.open && (
-                <div className={`fixed inset-0 bg-black transition-opacity duration-300 z-50 ${confirmModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} onClick={closeConfirmModal}>
-                    <div className={`fixed inset-0 flex items-center justify-center p-4 z-50 transition-all duration-300 ${confirmModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-                        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
-                            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 rounded-full">
-                                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                            </div>
-                            <h3 className="text-lg font-semibold text-center mb-2 text-gray-900 dark:text-gray-100">
-                                Confirm Delete
-                            </h3>
-                            <p className="text-sm text-center text-gray-600 dark:text-gray-400 mb-6">
-                                {confirmModal.message}
-                            </p>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={closeConfirmModal}
-                                    className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    onClick={() => handleConfirmDelete(confirmModal.id)} 
-                                    disabled={deleting} 
-                                    className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors font-medium"
-                                >
-                                    {deleting && (
-                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                    )}
-                                    {deleting ? 'Deleting...' : 'Yes, Delete'}
-                                </button>
+                <div className={`fixed inset-0 bg-black transition-opacity duration-300 ${confirmModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }} onClick={closeConfirmModal}>
+                    <div className={`fixed inset-0 flex items-center justify-center p-4 transition-all duration-300 ${confirmModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} style={{ zIndex: 10000 }}>
+                        <div className="relative overflow-hidden rounded-2xl border border-red-200/30 dark:border-red-700/30 bg-gradient-to-br from-white via-red-50/30 to-orange-50/20 dark:from-gray-900 dark:via-red-950/20 dark:to-gray-900 shadow-lg shadow-red-500/20 backdrop-blur-sm max-w-md w-full" onClick={e => e.stopPropagation()}>
+                            <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 via-transparent to-orange-500/5 pointer-events-none"></div>
+                            <div className="relative p-6">
+                                <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 rounded-full">
+                                    <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-lg font-semibold text-center mb-2 text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-400 dark:to-orange-400">
+                                    Confirm Delete
+                                </h3>
+                                <p className="text-sm text-center text-gray-600 dark:text-gray-400 mb-6">
+                                    {confirmModal.message}
+                                </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={closeConfirmModal}
+                                        className="flex-1 px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        onClick={() => handleConfirmDelete(confirmModal.id)} 
+                                        disabled={deleting} 
+                                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors font-medium shadow-md"
+                                    >
+                                        {deleting && (
+                                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        )}
+                                        {deleting ? 'Deleting...' : 'Yes, Delete'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

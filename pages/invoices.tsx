@@ -3,6 +3,8 @@ import LoadingModal from '../components/LoadingModal'
 import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
 import { useToast } from '../hooks/useToast'
+import { useDataCache } from '../contexts/DataCacheContext'
+import RefreshButton from '../components/RefreshButton'
 import * as XLSX from 'xlsx'
 
 export default function InvoicesPage() {
@@ -36,6 +38,7 @@ export default function InvoicesPage() {
     const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
     const [user, setUser] = useState<any>(null)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
+    const { getCache, setCache } = useDataCache()
 
     const emptyForm = {
         patientId: '',
@@ -60,7 +63,34 @@ export default function InvoicesPage() {
     })
 
     useEffect(() => {
-        fetchInitialData()
+        // Check cache first
+        const cachedInvoices = getCache<any[]>('invoices')
+        const cachedPatients = getCache<any[]>('patients')
+        const cachedProducts = getCache<any[]>('products')
+        
+        if (cachedInvoices) {
+            setInvoices(cachedInvoices)
+        }
+        if (cachedPatients) {
+            setPatients(cachedPatients)
+        }
+        if (cachedProducts) {
+            setProducts(cachedProducts)
+        }
+        
+        // Fetch in background if cache exists, or show loading if no cache
+        if (cachedInvoices && cachedPatients && cachedProducts) {
+            fetchInitialData()
+        } else {
+            fetchInitialData()
+        }
+        
+        // Cleanup on unmount to prevent data flashing
+        return () => {
+            setInvoices([])
+            setPatients([])
+            setProducts([])
+        }
     }, [])
 
     const fetchInitialData = async () => {
@@ -80,7 +110,9 @@ export default function InvoicesPage() {
     const fetchInvoices = async () => {
         const response = await fetch('/api/customer-invoices')
         const data = await response.json()
-        setInvoices(Array.isArray(data) ? data : [])
+        const invoicesData = Array.isArray(data) ? data : []
+        setInvoices(invoicesData)
+        setCache('invoices', invoicesData)
     }
 
     const fetchPatients = async () => {
@@ -664,8 +696,13 @@ export default function InvoicesPage() {
 
     return (
         <div>
-            <div className="section-header flex justify-between items-center">
-                <h2 className="section-title">Customer Invoices</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                        Customer Invoices
+                    </h1>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">Generate and manage customer invoices</p>
+                </div>
                 {user && (
                     <div className="flex gap-2">
                         <div className="relative">

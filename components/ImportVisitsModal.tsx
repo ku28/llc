@@ -527,8 +527,10 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
+            <div className="rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-xl shadow-emerald-500/10 backdrop-blur-sm max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
+                <div className="relative">
+                <div className="sticky top-0 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Import Visits</h2>
                     <div className="flex items-center gap-2">
                         {/* Minimize button - only show during import */}
@@ -830,12 +832,15 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                         </div>
                     )}
                 </div>
+                </div>
             </div>
 
             {/* Cancel Confirmation Modal */}
             {showCancelConfirm && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+                    <div className="rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-xl shadow-emerald-500/10 backdrop-blur-sm p-6 max-w-md w-full mx-4 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
+                        <div className="relative">
                         <div className="flex items-start gap-4">
                             <div className="flex-shrink-0 w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
                                 <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -864,6 +869,7 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                                     </button>
                                 </div>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </div>

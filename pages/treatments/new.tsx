@@ -231,6 +231,13 @@ function NewTreatmentPage() {
                 return
             }
             
+            const savedTreatment = await res.json()
+            
+            // Store the new ID for showing NEW label
+            if (savedTreatment.id) {
+                localStorage.setItem('newTreatmentId', savedTreatment.id.toString())
+            }
+            
             // Show success modal after save
             setSaving(false)
             setShowSuccessModal(true)
@@ -243,6 +250,7 @@ function NewTreatmentPage() {
 
     function handleAddAnotherPlan() {
         setShowSuccessModal(false)
+        localStorage.removeItem('newTreatmentId') // Clear the new ID when adding another
         // Redirect to add page with basic information prefilled
         const params = new URLSearchParams({
             diagnosis: form.provDiagnosis,
@@ -255,7 +263,13 @@ function NewTreatmentPage() {
 
     function handleNoThanks() {
         setShowSuccessModal(false)
-        router.push('/treatments')
+        const newId = localStorage.getItem('newTreatmentId')
+        if (newId) {
+            router.push(`/treatments?newId=${newId}`)
+            localStorage.removeItem('newTreatmentId')
+        } else {
+            router.push('/treatments')
+        }
     }
 
     return (
@@ -510,15 +524,15 @@ function NewTreatmentPage() {
                                                     />
                                                 </div>
                                                 
-                                                {/* Components Section */}
+                                                {/* SPYSection */}
                                                 <div className="sm:col-span-2 lg:col-span-3">
-                                                    <label className="block text-xs font-medium mb-1">Components</label>
+                                                    <label className="block text-xs font-medium mb-1">Spagyric</label>
                                                     <div className="flex flex-wrap items-center gap-1.5">
                                                         <CustomSelect
                                                             value={medicine.comp1 || ''}
                                                             onChange={(val) => updateMedicine(medicineIndex, 'comp1', val.toUpperCase())}
                                                             options={components}
-                                                            placeholder="Component 1"
+                                                            placeholder="SPY1"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[100px]"
                                                         />
@@ -526,7 +540,7 @@ function NewTreatmentPage() {
                                                             value={medicine.comp2 || ''}
                                                             onChange={(val) => updateMedicine(medicineIndex, 'comp2', val.toUpperCase())}
                                                             options={components}
-                                                            placeholder="Component 2"
+                                                            placeholder="SPY2"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[100px]"
                                                         />
@@ -534,7 +548,7 @@ function NewTreatmentPage() {
                                                             value={medicine.comp3 || ''}
                                                             onChange={(val) => updateMedicine(medicineIndex, 'comp3', val.toUpperCase())}
                                                             options={components}
-                                                            placeholder="Component 3"
+                                                            placeholder="SPY3"
                                                             allowCustom={true}
                                                             className="flex-1 min-w-[100px]"
                                                         />
@@ -546,7 +560,7 @@ function NewTreatmentPage() {
                                                                     value={medicine.comp4 || ''}
                                                                     onChange={(val) => updateMedicine(medicineIndex, 'comp4', val.toUpperCase())}
                                                                     options={components}
-                                                                    placeholder="Component 4"
+                                                                    placeholder="SPY4"
                                                                     allowCustom={true}
                                                                     className="flex-1"
                                                                 />
@@ -575,7 +589,7 @@ function NewTreatmentPage() {
                                                                     value={medicine.comp5 || ''}
                                                                     onChange={(val) => updateMedicine(medicineIndex, 'comp5', val.toUpperCase())}
                                                                     options={components}
-                                                                    placeholder="Component 5"
+                                                                    placeholder="SPY5"
                                                                     allowCustom={true}
                                                                     className="flex-1"
                                                                 />

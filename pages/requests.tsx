@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import Layout from '../components/Layout'
 import ToastNotification from '../components/ToastNotification'
 import { useToast } from '../hooks/useToast'
+import { useDataCache } from '../contexts/DataCacheContext'
+import RefreshButton from '../components/RefreshButton'
 
 interface AppointmentRequest {
     id: number
@@ -33,9 +34,26 @@ export default function RequestsPage() {
     const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
     const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'declined'>('pending')
     const [refreshing, setRefreshing] = useState(false)
+    const { getCache, setCache } = useDataCache()
 
     useEffect(() => {
-        checkAuthAndFetchRequests()
+        // Check cache first
+        const cachedRequests = getCache<any[]>('requests')
+        if (cachedRequests) {
+            setRequests(cachedRequests)
+            setLoading(false)
+            // Still fetch user auth
+            fetch('/api/auth/me').then(r => r.json()).then(d => {
+                if (d.user) setUser(d.user)
+            })
+        } else {
+            checkAuthAndFetchRequests()
+        }
+        
+        // Cleanup on unmount
+        return () => {
+            setRequests([])
+        }
     }, [])
 
     async function refreshRequests() {
@@ -45,6 +63,7 @@ export default function RequestsPage() {
             if (!reqRes.ok) throw new Error(await reqRes.text())
             const reqData = await reqRes.json()
             setRequests(reqData)
+            setCache('requests', reqData)
             showSuccess('Requests refreshed')
         } catch (err) {
             console.error('Failed to refresh requests:', err)
@@ -75,6 +94,7 @@ export default function RequestsPage() {
             const reqRes = await fetch('/api/appointment-requests')
             const reqData = await reqRes.json()
             setRequests(reqData)
+            setCache('requests', reqData)
         } catch (err) {
             console.error('Error:', err)
         } finally {
@@ -85,10 +105,12 @@ export default function RequestsPage() {
     function openDetailModal(request: AppointmentRequest) {
         setSelectedRequest(request)
         setShowDetailModal(true)
+        document.body.style.overflow = 'hidden'
     }
 
     function closeDetailModal() {
         setShowDetailModal(false)
+        document.body.style.overflow = 'unset'
         setSelectedRequest(null)
     }
 
@@ -101,10 +123,12 @@ export default function RequestsPage() {
             message: request.message || ''
         })
         setShowEditModal(true)
+        document.body.style.overflow = 'hidden'
     }
 
     function closeEditModal() {
         setShowEditModal(false)
+        document.body.style.overflow = 'unset'
         setSelectedRequest(null)
         setEditForm({ userName: '', userEmail: '', userPhone: '', message: '' })
     }
@@ -167,10 +191,12 @@ export default function RequestsPage() {
 
     function confirmDecline(request: AppointmentRequest) {
         setConfirmModal({ open: true, action: 'decline', request })
+        document.body.style.overflow = 'hidden'
     }
 
     async function handleDecline(request: AppointmentRequest) {
         setConfirmModal({ open: false, action: 'decline' })
+        document.body.style.overflow = 'unset'
         setLoadingIds(prev => new Set(prev).add(request.id))
         try {
             const res = await fetch('/api/appointment-requests', {
@@ -199,6 +225,8 @@ export default function RequestsPage() {
     }
 
     async function handleDeleteRequest(request: AppointmentRequest) {
+        setConfirmModal({ open: false, action: 'delete' })
+        document.body.style.overflow = 'unset'
         setLoadingIds(prev => new Set(prev).add(request.id))
         try {
             const res = await fetch('/api/appointment-requests', {
@@ -229,6 +257,7 @@ export default function RequestsPage() {
 
     function confirmDelete(request: AppointmentRequest) {
         setConfirmModal({ open: true, action: 'delete', request })
+        document.body.style.overflow = 'hidden'
     }
 
     async function handleRegisterPatient(request: AppointmentRequest) {
@@ -351,22 +380,14 @@ export default function RequestsPage() {
     return (
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="mb-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold">Appointment Requests</h1>
-                            <p className="text-sm text-muted mt-1">Manage patient appointment requests</p>
-                        </div>
-                        <div>
-                            <button
-                                onClick={refreshRequests}
-                                disabled={refreshing}
-                                className={`px-3 py-2 bg-gray-100 dark:bg-gray-800 text-sm rounded-lg flex items-center gap-2 ${refreshing ? 'opacity-70 cursor-wait' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-                            >
-                                {refreshing ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-700" /> : 'Refresh'}
-                            </button>
-                        </div>
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                            Appointment Requests
+                        </h1>
+                        <p className="text-gray-600 dark:text-gray-400 mt-1">Manage patient appointment requests</p>
                     </div>
+                    <RefreshButton onRefresh={refreshRequests} />
                 </div>
 
                 {/* Tabs */}
@@ -405,11 +426,16 @@ export default function RequestsPage() {
 
                 {/* Table */}
                 {displayRequests.length === 0 ? (
-                    <div className="bg-white dark:bg-gray-900 rounded-lg p-12 text-center border border-gray-200 dark:border-gray-700">
+                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-12 text-center overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative">
                         <p className="text-muted">No {activeTab} requests</p>
+                        </div>
                     </div>
                 ) : (
-                    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative">
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -520,22 +546,24 @@ export default function RequestsPage() {
                                 </tbody>
                             </table>
                         </div>
+                        </div>
                     </div>
                 )}
 
                 {/* Confirm Modal */}
                 {confirmModal.open && confirmModal.request && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white dark:bg-gray-900 rounded-lg max-w-lg w-full">
-                            <div className="p-6">
-                                <h3 className="text-lg font-semibold">Confirm {confirmModal.action === 'decline' ? 'Decline' : 'Delete'}</h3>
-                                <p className="text-sm text-muted mt-2">Are you sure you want to {confirmModal.action === 'decline' ? 'decline' : 'delete'} the request from <strong>{confirmModal.request.userName}</strong>?</p>
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
+                        <div className="relative overflow-hidden rounded-2xl border border-red-200/30 dark:border-red-700/30 bg-gradient-to-br from-white via-red-50/30 to-orange-50/20 dark:from-gray-900 dark:via-red-950/20 dark:to-gray-900 shadow-lg shadow-red-500/20 backdrop-blur-sm max-w-lg w-full">
+                            <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 via-transparent to-orange-500/5 pointer-events-none"></div>
+                            <div className="relative p-6">
+                                <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-400 dark:to-orange-400">Confirm {confirmModal.action === 'decline' ? 'Decline' : 'Delete'}</h3>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Are you sure you want to {confirmModal.action === 'decline' ? 'decline' : 'delete'} the request from <strong>{confirmModal.request.userName}</strong>?</p>
                                 <div className="mt-4 flex justify-end gap-3">
-                                    <button onClick={() => setConfirmModal({ open: false, action: 'decline' })} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                                    <button onClick={() => { setConfirmModal({ open: false, action: 'decline' }); document.body.style.overflow = 'unset' }} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">Cancel</button>
                                     {confirmModal.action === 'decline' ? (
-                                        <button onClick={() => handleDecline(confirmModal.request!)} className="px-4 py-2 bg-red-600 text-white rounded">Yes, Decline</button>
+                                        <button onClick={() => handleDecline(confirmModal.request!)} className="px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg shadow-md transition-colors">Yes, Decline</button>
                                     ) : (
-                                        <button onClick={() => handleDeleteRequest(confirmModal.request!)} className="px-4 py-2 bg-red-600 text-white rounded">Yes, Delete</button>
+                                        <button onClick={() => handleDeleteRequest(confirmModal.request!)} className="px-4 py-2 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg shadow-md transition-colors">Yes, Delete</button>
                                     )}
                                 </div>
                             </div>
@@ -548,10 +576,11 @@ export default function RequestsPage() {
 
                 {/* Detail Modal */}
                 {showDetailModal && selectedRequest && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white dark:bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                            <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
-                                <h2 className="text-xl font-bold">Request Details</h2>
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
+                        <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+                            <div className="sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between z-10">
+                                <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Request Details</h2>
                                 <button
                                     onClick={closeDetailModal}
                                     className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
@@ -559,7 +588,7 @@ export default function RequestsPage() {
                                     ✕
                                 </button>
                             </div>
-                            <div className="p-6 space-y-4">
+                            <div className="relative p-6 space-y-4">
                                 <div>
                                     <label className="text-sm font-semibold text-muted">Name</label>
                                     <p className="mt-1">{selectedRequest.userName}</p>
@@ -597,10 +626,10 @@ export default function RequestsPage() {
                                     </div>
                                 )}
                             </div>
-                            <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-end gap-3">
+                            <div className="sticky bottom-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-end gap-3 z-10">
                                 <button
                                     onClick={closeDetailModal}
-                                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg shadow-md transition-colors"
                                 >
                                     Close
                                 </button>
@@ -611,10 +640,11 @@ export default function RequestsPage() {
 
                 {/* Edit Modal */}
                 {showEditModal && selectedRequest && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white dark:bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                            <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
-                                <h2 className="text-xl font-bold">Edit Request</h2>
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
+                        <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+                            <div className="sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between z-10">
+                                <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Edit Request</h2>
                                 <button
                                     onClick={closeEditModal}
                                     className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
@@ -622,7 +652,7 @@ export default function RequestsPage() {
                                     ✕
                                 </button>
                             </div>
-                            <form onSubmit={handleUpdateRequest} className="p-6 space-y-4">
+                            <form onSubmit={handleUpdateRequest} className="relative p-6 space-y-4">
                                 <div>
                                     <label className="block text-sm font-semibold mb-2">Name *</label>
                                     <input
@@ -672,7 +702,7 @@ export default function RequestsPage() {
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-600 transition-colors"
+                                        className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg shadow-md transition-colors"
                                     >
                                         Save Changes
                                     </button>

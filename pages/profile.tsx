@@ -383,6 +383,7 @@ export default function ProfilePage() {
 
     const closeDeleteDialog = () => {
         setIsClosingDialog(true)
+        document.body.style.overflow = 'unset'
         setTimeout(() => {
             setShowDeleteDialog(false)
             setIsClosingDialog(false)
@@ -436,7 +437,8 @@ export default function ProfilePage() {
                     <div className="flex gap-6">
                         {/* Desktop Sidebar */}
                         <div className="hidden md:block w-64 flex-shrink-0">
-                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md p-4 sticky top-24 border border-gray-200 dark:border-gray-700">
+                            <div className="rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sticky top-24 overflow-hidden">
+                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                                 <nav className="space-y-1">
                                     {sidebarItems.map((item) => (
                                         <button
@@ -607,7 +609,9 @@ export default function ProfilePage() {
                             )}
 
                             {activeTab === 'edit' && (
-                                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md p-4 sm:p-6 md:p-8 border border-gray-200 dark:border-gray-700">
+                                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sm:p-6 md:p-8 overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                                    <div className="relative">
                                     <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">Edit Profile</h2>
                                     
                                     {user?.role?.toLowerCase() === 'user' && (
@@ -804,7 +808,9 @@ export default function ProfilePage() {
                             )}
 
                             {activeTab === 'security' && (
-                                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md p-4 sm:p-6 md:p-8 border border-gray-200 dark:border-gray-700">
+                                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sm:p-6 md:p-8 overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                                    <div className="relative">
                                     <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">Security Settings</h2>
                                     
                                     <div className="max-w-2xl">
@@ -859,7 +865,9 @@ export default function ProfilePage() {
                             )}
 
                             {activeTab === 'account' && (
-                                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md p-4 sm:p-6 md:p-8 border border-gray-200 dark:border-gray-700">
+                                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sm:p-6 md:p-8 overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                                    <div className="relative">
                                     <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">Account Settings</h2>
                                     
                                     <div className="space-y-3 sm:space-y-4 max-w-2xl">
@@ -889,7 +897,7 @@ export default function ProfilePage() {
                                                     <p className="text-xs sm:text-sm text-red-700 dark:text-red-300">Permanently delete your account and all associated data. This action cannot be undone.</p>
                                                 </div>
                                                 <button
-                                                    onClick={() => setShowDeleteDialog(true)}
+                                                    onClick={() => { setShowDeleteDialog(true); document.body.style.overflow = 'hidden' }}
                                                     className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 transition-all shadow-md hover:shadow-lg font-medium transform hover:scale-105 text-sm sm:text-base"
                                                 >
                                                     Delete
@@ -906,30 +914,32 @@ export default function ProfilePage() {
                 {/* Delete Account Confirmation Dialog */}
                 {showDeleteDialog && (
                     <div 
-                        className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 ${
+                        className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 ${
                             isClosingDialog ? 'dialog-overlay-exit' : 'dialog-overlay-enter'
                         }`}
+                        style={{ zIndex: 9999 }}
                         onClick={closeDeleteDialog}
                     >
                         <div 
-                            className={`bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full mx-4 p-6 sm:p-8 shadow-2xl border border-gray-200 dark:border-gray-700 ${
+                            className={`relative overflow-hidden rounded-2xl border border-red-200/30 dark:border-red-700/30 bg-gradient-to-br from-white via-red-50/30 to-orange-50/20 dark:from-gray-900 dark:via-red-950/20 dark:to-gray-900 shadow-lg shadow-red-500/20 backdrop-blur-sm max-w-md w-full mx-4 p-6 sm:p-8 ${
                                 isClosingDialog ? 'dialog-content-exit' : 'dialog-content-enter'
                             }`}
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+                            <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 via-transparent to-orange-500/5 pointer-events-none"></div>
+                            <div className="relative flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
                                 <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 flex items-center justify-center border-2 border-red-300 dark:border-red-700 flex-shrink-0">
                                     <svg className="w-6 h-6 sm:w-7 sm:h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                     </svg>
                                 </div>
                                 <div>
-                                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">Delete Account</h3>
+                                    <h3 className="text-lg sm:text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-400 dark:to-orange-400">Delete Account</h3>
                                     <p className="text-xs sm:text-sm text-red-600 dark:text-red-400 font-medium">This action cannot be undone</p>
                                 </div>
                             </div>
 
-                            <div className="mb-4 sm:mb-6">
+                            <div className="relative mb-4 sm:mb-6">
                                 <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mb-3 sm:mb-4 bg-gray-50 dark:bg-gray-800/50 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700">
                                     Are you sure you want to delete your account? This will permanently remove all your data and cannot be reversed.
                                 </p>
@@ -946,11 +956,11 @@ export default function ProfilePage() {
                                 />
                             </div>
 
-                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                            <div className="relative flex flex-col sm:flex-row gap-2 sm:gap-3">
                                 <button
                                     onClick={handleDeleteAccount}
                                     disabled={deleting || deleteConfirmText !== 'DELETE'}
-                                    className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg font-semibold transform hover:scale-105 disabled:transform-none text-sm sm:text-base"
+                                    className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-xl hover:from-red-700 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg font-semibold transform hover:scale-105 disabled:transform-none text-sm sm:text-base"
                                 >
                                     {deleting ? 'Deleting...' : 'Delete Account'}
                                 </button>

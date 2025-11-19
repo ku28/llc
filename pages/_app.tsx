@@ -8,35 +8,36 @@ import Layout from '../components/Layout'
 import ToastNotification from '../components/ToastNotification'
 import { useToast } from '../hooks/useToast'
 import { ImportProvider } from '../contexts/ImportContext'
+import { DataCacheProvider } from '../contexts/DataCacheContext'
+import { AuthProvider } from '../contexts/AuthContext'
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
   const [authChecked, setAuthChecked] = useState(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
   const { toasts, removeToast, showError } = useToast()
   // Pages that don't require authentication
   const publicPages = ['/login', '/signup', '/user-signup', '/', '/about', '/services', '/gallery', '/contact']
   const isPublicPage = publicPages.includes(router.pathname)
+  
+  // Landing pages that should not have page transitions
+  const landingPages = ['/', '/about', '/services', '/gallery', '/contact']
+  const isLandingPage = landingPages.includes(router.pathname)
   
   // Edit pages that use their own EditLayout (no need for main Layout wrapper)
   const editPages = ['/edit', '/edit-about', '/edit-services', '/edit-gallery', '/edit-contact']
   const isEditPage = editPages.includes(router.pathname)
 
   useEffect(() => {
-    // Check DB connection on every page load
-    const checkDb = async () => {
-      try {
-        const res = await fetch('/api/users')
-        if (!res.ok) {
-          showError('Database is not connected or crashed. Please contact support.')
-        }
-      } catch (err) {
-        showError('Database is not connected or crashed. Please contact support.')
-      }
-    }
-    checkDb()
-
     // Skip auth check for public pages
     if (isPublicPage) {
+      setAuthChecked(true)
+      return
+    }
+
+    // Check if auth is cached in sessionStorage to avoid repeated checks on page reload
+    const cachedAuth = sessionStorage.getItem('authChecked')
+    if (cachedAuth === 'true') {
       setAuthChecked(true)
       return
     }
@@ -48,21 +49,43 @@ export default function App({ Component, pageProps }: AppProps) {
         const data = await res.json()
         if (!data.user) {
           // Not authenticated - redirect to login
+          sessionStorage.removeItem('authChecked')
           router.push('/login')
           return
         }
+        // Cache auth status in sessionStorage
+        sessionStorage.setItem('authChecked', 'true')
         setAuthChecked(true)
       } catch (err) {
+        sessionStorage.removeItem('authChecked')
         router.push('/login')
       }
     }
     checkAuth()
-  }, [router.pathname, isPublicPage, router, showError])
+  }, [router.pathname, isPublicPage, router])
+
+  // Handle page transition animations
+  useEffect(() => {
+    const handleStart = () => setIsTransitioning(true)
+    const handleComplete = () => setIsTransitioning(false)
+
+    router.events.on('routeChangeStart', handleStart)
+    router.events.on('routeChangeComplete', handleComplete)
+    router.events.on('routeChangeError', handleComplete)
+
+    return () => {
+      router.events.off('routeChangeStart', handleStart)
+      router.events.off('routeChangeComplete', handleComplete)
+      router.events.off('routeChangeError', handleComplete)
+    }
+  }, [router])
 
   return (
     <>
-      <ImportProvider>
-        <ToastNotification toasts={toasts} removeToast={removeToast} />
+      <AuthProvider>
+        <DataCacheProvider>
+          <ImportProvider>
+          <ToastNotification toasts={toasts} removeToast={removeToast} />
         <Head>
           <title>LLC ERP</title>
           {/* Prefer a PNG file (browsers reliably show PNG); keep .ico for legacy */}
@@ -103,7 +126,9 @@ export default function App({ Component, pageProps }: AppProps) {
         <>
           {/* Only render component after auth check (or if public page) */}
           {(authChecked || isPublicPage) ? (
-            <Component {...pageProps} />
+            <div className={`${!isLandingPage ? `page-transition ${isTransitioning ? 'page-exiting' : 'page-entering'}` : ''}`}>
+              <Component {...pageProps} />
+            </div>
           ) : (
             <div className="flex items-center justify-center min-h-screen">
               <div className="text-center">
@@ -117,7 +142,9 @@ export default function App({ Component, pageProps }: AppProps) {
         <Layout>
           {/* Only render component after auth check (or if public page) */}
           {(authChecked || isPublicPage) ? (
-            <Component {...pageProps} />
+            <div className={`${!isLandingPage ? `page-transition ${isTransitioning ? 'page-exiting' : 'page-entering'}` : ''}`}>
+              <Component {...pageProps} />
+            </div>
           ) : (
             <div className="flex items-center justify-center min-h-screen">
               <div className="text-center">
@@ -128,7 +155,9 @@ export default function App({ Component, pageProps }: AppProps) {
           )}
         </Layout>
       )}
-      </ImportProvider>
+          </ImportProvider>
+        </DataCacheProvider>
+      </AuthProvider>
     </>
   )
 }

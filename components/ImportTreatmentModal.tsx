@@ -374,7 +374,9 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-xl shadow-emerald-500/10 backdrop-blur-sm max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
+                <div className="relative flex flex-col h-full">
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">Import Treatment Plans</h2>
@@ -452,7 +454,7 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                                     <li className="ml-4">• <strong>quantity</strong> - Amount to prescribe</li>
                                     <li className="ml-4">• <strong>dosage</strong> - Dosage instructions</li>
                                     <li className="ml-4">• <strong>timing</strong> - When to take (e.g., "After meals")</li>
-                                    <li className="ml-4">• Components: comp1-comp5 for medicine composition</li>
+                                    <li className="ml-4">• Spagyric: comp1-comp5 for medicine composition</li>
                                     
                                     <li className="mt-2"><strong>ℹ️ Important Notes:</strong></li>
                                     <li className="ml-4">• Plan numbers are <strong>per diagnosis</strong> (Fever Plan 1, Cold Plan 1, etc.)</li>
@@ -650,6 +652,7 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                         )}
                     </div>
                 )}
+            </div>
             </div>
         </div>
     )

@@ -10,7 +10,9 @@ export default function LoadingModal({ isOpen, message = 'Loading...' }: Loading
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md animate-fadeIn">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 flex flex-col items-center space-y-6 min-w-[320px] border border-gray-200 dark:border-gray-700 animate-scaleIn">
+            <div className="rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-2xl shadow-emerald-500/10 backdrop-blur-sm p-8 flex flex-col items-center space-y-6 min-w-[320px] overflow-hidden animate-scaleIn">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
+                <div className="relative w-full flex flex-col items-center space-y-6">
                 {/* Modern Spinner Animation */}
                 <div className="relative w-20 h-20">
                     {/* Outer rotating circle */}
@@ -36,6 +38,7 @@ export default function LoadingModal({ isOpen, message = 'Loading...' }: Loading
                         <span className="w-2 h-2 bg-emerald-500 dark:bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                         <span className="w-2 h-2 bg-emerald-500 dark:bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                     </div>
+                </div>
                 </div>
             </div>
         </div>

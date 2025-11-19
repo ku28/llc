@@ -67,7 +67,9 @@ export default function PatientSelectionModal({ isOpen, onClose }: PatientSelect
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-xl shadow-emerald-500/10 backdrop-blur-sm max-w-md w-full p-6 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
+                <div className="relative">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">
@@ -104,10 +106,35 @@ export default function PatientSelectionModal({ isOpen, onClose }: PatientSelect
                                 onChange={(value) => setSelectedPatientId(value)}
                                 options={[
                                     { value: '', label: '-- Select patient --' },
-                                    ...patients.map(p => ({
-                                        value: String(p.id),
-                                        label: `${p.firstName} ${p.lastName}${p.opdNo ? ' · OPD: ' + p.opdNo : ''}`
-                                    }))
+                                    ...(() => {
+                                        // Helper to check if patient is from today
+                                        const isFromToday = (patient: any) => {
+                                            if (!patient.createdAt) return false
+                                            const createdDate = new Date(patient.createdAt).toDateString()
+                                            const today = new Date().toDateString()
+                                            return createdDate === today
+                                        }
+                                        
+                                        // Sort patients - new ones first
+                                        const sortedPatients = [...patients].sort((a, b) => {
+                                            const aIsNew = isFromToday(a)
+                                            const bIsNew = isFromToday(b)
+                                            if (aIsNew && !bIsNew) return -1
+                                            if (!aIsNew && bIsNew) return 1
+                                            return 0
+                                        })
+                                        
+                                        return sortedPatients.map(p => {
+                                            const baseLabel = `${p.firstName} ${p.lastName}${p.opdNo ? ' · OPD: ' + p.opdNo : ''}`
+                                            const isSuggested = isFromToday(p)
+                                            return {
+                                                value: String(p.id),
+                                                label: baseLabel,
+                                                // We'll handle the SUGGESTED badge in CustomSelect styling
+                                                ...(isSuggested && { description: 'SUGGESTED' })
+                                            }
+                                        })
+                                    })()
                                 ]}
                                 placeholder="-- Select patient --"
                             />
@@ -183,6 +210,7 @@ export default function PatientSelectionModal({ isOpen, onClose }: PatientSelect
                         )}
                     </div>
                 )}
+            </div>
             </div>
         </div>
     )

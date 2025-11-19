@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Layout from '../components/Layout'
 import Link from 'next/link'
+import { useDataCache } from '../contexts/DataCacheContext'
+import RefreshButton from '../components/RefreshButton'
 
 interface DashboardStats {
   lowStockProducts: any[]
@@ -28,28 +30,48 @@ export default function Dashboard() {
   })
   const [loading, setLoading] = useState(true)
   const [authChecked, setAuthChecked] = useState(false)
+  const { getCache, setCache } = useDataCache()
 
   useEffect(() => {
     // Check authentication first
     const checkAuth = async () => {
       try {
-        const res = await fetch('/api/auth/me')
-        const data = await res.json()
+        const cachedUser = sessionStorage.getItem('currentUser')
+        let user
         
-        if (!data.user) {
+        if (cachedUser) {
+          user = JSON.parse(cachedUser)
+        } else {
+          const res = await fetch('/api/auth/me')
+          const data = await res.json()
+          user = data.user
+          if (user) {
+            sessionStorage.setItem('currentUser', JSON.stringify(user))
+          }
+        }
+        
+        if (!user) {
           // Not authenticated, redirect to login
           router.push('/login')
           return
         }
         
         // If user role is 'user', redirect to user dashboard
-        if (data.user.role?.toLowerCase() === 'user') {
+        if (user.role?.toLowerCase() === 'user') {
           router.push('/user-dashboard')
           return
         }
         
         setAuthChecked(true)
-        fetchDashboardData()
+        
+        // Check cache first
+        const cachedStats = getCache<DashboardStats>('dashboardStats')
+        if (cachedStats) {
+          setStats(cachedStats)
+          setLoading(false)
+        } else {
+          fetchDashboardData()
+        }
       } catch (err) {
         // Error checking auth, redirect to login
         router.push('/login')
@@ -57,6 +79,20 @@ export default function Dashboard() {
     }
     
     checkAuth()
+    
+    // Cleanup on unmount to prevent data flashing
+    return () => {
+      setStats({
+        lowStockProducts: [],
+        recentSales: 0,
+        pendingPurchaseOrders: 0,
+        totalRevenue: 0,
+        unpaidInvoices: 0,
+        expiringProducts: [],
+        topSellingProducts: [],
+        recentActivities: []
+      })
+    }
   }, [router])
 
   async function fetchDashboardData() {
@@ -144,6 +180,18 @@ export default function Dashboard() {
         topSellingProducts: topSelling,
         recentActivities: activities
       })
+      
+      // Cache the dashboard stats
+      setCache('dashboardStats', {
+        lowStockProducts: lowStock,
+        recentSales: outTransactions.length,
+        pendingPurchaseOrders: pendingPOs,
+        totalRevenue: revenue,
+        unpaidInvoices: unpaid.length,
+        expiringProducts: expiring,
+        topSellingProducts: topSelling,
+        recentActivities: activities
+      })
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
     } finally {
@@ -151,11 +199,11 @@ export default function Dashboard() {
     }
   }
 
-  if (!authChecked || loading) {
+  if (!authChecked) {
     return (
         <div className="py-6 text-center">
           <div className="animate-spin inline-block w-8 h-8 border-4 border-current border-t-transparent text-brand rounded-full" />
-          <p className="mt-4 text-muted">Loading dashboard...</p>
+          <p className="mt-4 text-muted">Checking authentication...</p>
         </div>
     )
   }
@@ -164,51 +212,66 @@ export default function Dashboard() {
       <div className="py-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <button 
-            onClick={fetchDashboardData}
-            className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-green-600 transition-all text-sm"
-          >
-            🔄 Refresh
-          </button>
+          <RefreshButton onRefresh={fetchDashboardData} />
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="card bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800">
-            <div className="flex items-center justify-between">
+          <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+            <div className="relative flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted mb-1">Total Revenue</p>
-                <p className="text-2xl font-bold">₹{(stats.totalRevenue / 100).toFixed(2)}</p>
+                {loading ? (
+                  <div className="animate-pulse h-8 bg-emerald-200 dark:bg-emerald-700 rounded w-24"></div>
+                ) : (
+                  <p className="text-2xl font-bold">₹{(stats.totalRevenue / 100).toFixed(2)}</p>
+                )}
               </div>
               <span className="text-4xl">💰</span>
             </div>
           </div>
 
-          <div className="card bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900 dark:to-yellow-800">
-            <div className="flex items-center justify-between">
+          <div className="relative rounded-xl border border-yellow-200/30 dark:border-yellow-700/30 bg-gradient-to-br from-white via-yellow-50/30 to-orange-50/20 dark:from-gray-900 dark:via-yellow-950/20 dark:to-gray-900 shadow-lg shadow-yellow-500/5 backdrop-blur-sm p-4 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/5 via-transparent to-orange-500/5 pointer-events-none"></div>
+            <div className="relative flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted mb-1">Low Stock Alerts</p>
-                <p className="text-2xl font-bold text-red-600">{stats.lowStockProducts.length}</p>
+                {loading ? (
+                  <div className="animate-pulse h-8 bg-yellow-200 dark:bg-yellow-700 rounded w-16"></div>
+                ) : (
+                  <p className="text-2xl font-bold text-red-600">{stats.lowStockProducts.length}</p>
+                )}
               </div>
               <span className="text-4xl">⚠️</span>
             </div>
           </div>
 
-          <div className="card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800">
-            <div className="flex items-center justify-between">
+          <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+            <div className="relative flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted mb-1">Pending Purchase Orders</p>
-                <p className="text-2xl font-bold">{stats.pendingPurchaseOrders}</p>
+                {loading ? (
+                  <div className="animate-pulse h-8 bg-emerald-200 dark:bg-emerald-700 rounded w-12"></div>
+                ) : (
+                  <p className="text-2xl font-bold">{stats.pendingPurchaseOrders}</p>
+                )}
               </div>
               <span className="text-4xl">📋</span>
             </div>
           </div>
 
-          <div className="card bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900 dark:to-red-800">
-            <div className="flex items-center justify-between">
+          <div className="relative rounded-xl border border-red-200/30 dark:border-red-700/30 bg-gradient-to-br from-white via-red-50/30 to-orange-50/20 dark:from-gray-900 dark:via-red-950/20 dark:to-gray-900 shadow-lg shadow-red-500/5 backdrop-blur-sm p-4 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 via-transparent to-orange-500/5 pointer-events-none"></div>
+            <div className="relative flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted mb-1">Unpaid Invoices</p>
-                <p className="text-2xl font-bold">{stats.unpaidInvoices}</p>
+                {loading ? (
+                  <div className="animate-pulse h-8 bg-red-200 dark:bg-red-700 rounded w-12"></div>
+                ) : (
+                  <p className="text-2xl font-bold">{stats.unpaidInvoices}</p>
+                )}
               </div>
               <span className="text-4xl">📄</span>
             </div>
@@ -216,8 +279,10 @@ export default function Dashboard() {
         </div>
 
         {/* Alert Cards */}
-        {stats.lowStockProducts.length > 0 && (
-          <div className="card border-l-4 border-red-500">
+        {!loading && stats.lowStockProducts.length > 0 && (
+          <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 border-l-4 border-l-red-500 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+            <div className="relative">
             <div className="flex items-start gap-3">
               <span className="text-3xl">🚨</span>
               <div className="flex-1">
@@ -253,6 +318,7 @@ export default function Dashboard() {
                     Create Purchase Order
                   </Link>
                 </div>
+                </div>
               </div>
             </div>
           </div>
@@ -261,12 +327,23 @@ export default function Dashboard() {
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Top Selling Products */}
-          <div className="card">
+          <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+            <div className="relative">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <span>🏆</span>
               <span>Top Selling Products</span>
             </h3>
-            {stats.topSellingProducts.length === 0 ? (
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="animate-pulse flex items-center justify-between">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                  </div>
+                ))}
+              </div>
+            ) : stats.topSellingProducts.length === 0 ? (
               <p className="text-muted text-sm">No sales data available</p>
             ) : (
               <div className="space-y-3">
@@ -282,14 +359,29 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+          </div>
 
           {/* Recent Activities */}
-          <div className="card">
+          <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+            <div className="relative">
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <span>📊</span>
               <span>Recent Activities</span>
             </h3>
-            {stats.recentActivities.length === 0 ? (
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="animate-pulse flex items-start gap-3">
+                    <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : stats.recentActivities.length === 0 ? (
               <p className="text-muted text-sm">No recent activities</p>
             ) : (
               <div className="space-y-2">
@@ -304,11 +396,14 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
+            </div>
           </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="card">
+        <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+          <div className="relative">
           <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Link 
@@ -339,6 +434,7 @@ export default function Dashboard() {
               <span className="text-3xl block mb-2">💳</span>
               <span className="text-sm font-medium">Invoices</span>
             </Link>
+          </div>
           </div>
         </div>
       </div>

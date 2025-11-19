@@ -54,7 +54,9 @@ export default function LoginPage() {
             <ToastNotification toasts={toasts} removeToast={removeToast} />
             <div className="min-h-[70vh] flex items-center justify-center">
                 <div className="max-w-md w-full mx-4">
-                    <div className="card">
+                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative">
                         <div className="text-center mb-6">
                             <h2 className="text-2xl font-bold mb-2">Welcome Back</h2>
                             <p className="text-muted text-sm">Sign in to access LLC ERP</p>

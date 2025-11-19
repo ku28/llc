@@ -5,6 +5,7 @@ import CustomSelect from '../components/CustomSelect'
 import DateInput from '../components/DateInput'
 import LoadingModal from '../components/LoadingModal'
 import CameraModal from '../components/CameraModal'
+import ConfirmModal from '../components/ConfirmModal'
 import genderOptions from '../data/gender.json'
 import temperamentOptions from '../data/temperament.json'
 import pulseDiagnosisOptions from '../data/pulseDiagnosis.json'
@@ -125,6 +126,8 @@ export default function PrescriptionsPage() {
     const [treatmentModalMessage, setTreatmentModalMessage] = useState('Creating Treatment Plan and Saving Prescription...')
     const [generatedOpdNo, setGeneratedOpdNo] = useState<string>('')
     const [hasDraft, setHasDraft] = useState(false)
+    const [showRestoreDraftModal, setShowRestoreDraftModal] = useState(false)
+    const [draftData, setDraftData] = useState<any>(null)
     const [currentStep, setCurrentStep] = useState(1)
 
     // Step configuration
@@ -348,17 +351,8 @@ export default function PrescriptionsPage() {
                 // Only restore if draft is less than 24 hours old
                 if (age < maxAge) {
                     setHasDraft(true)
-                    const shouldRestore = window.confirm(
-                        'Found unsaved prescription data from a previous session. Would you like to restore it?'
-                    )
-                    if (shouldRestore) {
-                        setForm(draftData.form)
-                        setPrescriptions(draftData.prescriptions)
-                        showSuccess('Draft restored successfully!')
-                    } else {
-                        localStorage.removeItem('prescriptionDraft')
-                        setHasDraft(false)
-                    }
+                    setDraftData(draftData)
+                    setShowRestoreDraftModal(true)
                 } else {
                     // Draft is too old, remove it
                     localStorage.removeItem('prescriptionDraft')
@@ -418,7 +412,7 @@ export default function PrescriptionsPage() {
                 .then(r => r.json())
                 .then(visit => {
                     if (!visit) {
-                        alert('Visit not found')
+                        showError('Visit not found')
                         router.push('/visits')
                         return
                     }
@@ -516,7 +510,7 @@ export default function PrescriptionsPage() {
                 })
                 .catch(err => {
                     console.error(err)
-                    alert('Failed to load visit data')
+                    showError('Failed to load visit data')
                     setLoading(false)
                 })
         }
@@ -609,7 +603,7 @@ export default function PrescriptionsPage() {
 
         // Check total file count
         if (attachments.length + files.length > 10) {
-            alert('You can upload a maximum of 10 files')
+            showError('You can upload a maximum of 10 files')
             return
         }
 
@@ -626,7 +620,7 @@ export default function PrescriptionsPage() {
 
                 // Validate file size (max 10MB per file)
                 if (file.size > 10 * 1024 * 1024) {
-                    alert(`File "${file.name}" is too large. Maximum size is 10MB.`)
+                    showError(`File "${file.name}" is too large. Maximum size is 10MB.`)
                     continue
                 }
 
@@ -665,7 +659,7 @@ export default function PrescriptionsPage() {
             setAttachments([...attachments, ...uploadedFiles])
         } catch (error: any) {
             console.error('Attachment upload error:', error)
-            alert(`Failed to upload attachments: ${error.message || 'Unknown error'}`)
+            showError(`Failed to upload attachments: ${error.message || 'Unknown error'}`)
         } finally {
             setUploadingAttachment(false)
             // Reset input
@@ -682,7 +676,7 @@ export default function PrescriptionsPage() {
         if (!files || files.length === 0) return
 
         if (reportsAttachments.length + files.length > 10) {
-            alert('You can upload a maximum of 10 files')
+            showError('You can upload a maximum of 10 files')
             return
         }
 
@@ -695,7 +689,7 @@ export default function PrescriptionsPage() {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i]
                 if (file.size > 10 * 1024 * 1024) {
-                    alert(`File "${file.name}" is too large. Maximum size is 10MB.`)
+                    showError(`File "${file.name}" is too large. Maximum size is 10MB.`)
                     continue
                 }
 
@@ -732,7 +726,7 @@ export default function PrescriptionsPage() {
             setReportsAttachments([...reportsAttachments, ...uploadedFiles])
         } catch (error: any) {
             console.error('Reports attachment upload error:', error)
-            alert(`Failed to upload attachments: ${error.message || 'Unknown error'}`)
+            showError(`Failed to upload attachments: ${error.message || 'Unknown error'}`)
         } finally {
             setUploadingReports(false)
             e.target.value = ''
@@ -742,7 +736,7 @@ export default function PrescriptionsPage() {
     // Handle captured image from camera modal
     async function handleCameraCapture(imageData: string) {
         if (reportsAttachments.length >= 10) {
-            alert('You can upload a maximum of 10 files')
+            showError('You can upload a maximum of 10 files')
             return
         }
 
@@ -775,7 +769,7 @@ export default function PrescriptionsPage() {
             }
         } catch (error: any) {
             console.error('Camera capture upload error:', error)
-            alert(`Failed to upload image: ${error.message || 'Unknown error'}`)
+            showError(`Failed to upload image: ${error.message || 'Unknown error'}`)
         } finally {
             setUploadingReports(false)
         }
@@ -798,7 +792,7 @@ export default function PrescriptionsPage() {
             setShowCamera(true)
         } catch (error) {
             console.error('Camera access error:', error)
-            alert('Unable to access camera. Please check permissions.')
+            showError('Unable to access camera. Please check permissions.')
         }
     }
 
@@ -821,7 +815,7 @@ export default function PrescriptionsPage() {
 
     async function capturePhoto() {
         if (!videoRef.current || !form.patientId) {
-            alert('Please select a patient first')
+            showError('Please select a patient first')
             return
         }
 
@@ -865,7 +859,7 @@ export default function PrescriptionsPage() {
             }
         } catch (error: any) {
             console.error('Photo capture error:', error)
-            alert(`Failed to upload photo: ${error.message || 'Unknown error'}`)
+            showError(`Failed to upload photo: ${error.message || 'Unknown error'}`)
         } finally {
             setUploadingReports(false)
         }
@@ -907,9 +901,9 @@ export default function PrescriptionsPage() {
     }
 
     function addSelectedProductToPrescription() {
-        if (!selectedProductId) return alert('Select a medicine first')
+        if (!selectedProductId) return showError('Select a medicine first')
         const prod = products.find(p => String(p.id) === String(selectedProductId))
-        if (!prod) return alert('Selected product not found')
+        if (!prod) return showError('Selected product not found')
 
         // Clear treatment plan tracking when adding individual medicine
         setSelectedTreatmentId(null)
@@ -927,11 +921,11 @@ export default function PrescriptionsPage() {
     }
 
     function addToSelectedMedicines() {
-        if (!selectedProductId) return alert('Select a medicine first')
+        if (!selectedProductId) return showError('Select a medicine first')
         
         // Check if already in the list
         if (selectedMedicines.includes(selectedProductId)) {
-            return alert('This medicine is already in your selection')
+            return showInfo('This medicine is already in your selection')
         }
         
         setSelectedMedicines([...selectedMedicines, selectedProductId])
@@ -947,7 +941,7 @@ export default function PrescriptionsPage() {
     }
 
     function addAllSelectedMedicinesToPrescription() {
-        if (selectedMedicines.length === 0) return alert('No medicines selected')
+        if (selectedMedicines.length === 0) return showError('No medicines selected')
 
         const newPrescriptions = selectedMedicines.map(productId => ({
             treatmentId: selectedTreatmentId || '', // Use selected treatment plan if any
@@ -962,6 +956,21 @@ export default function PrescriptionsPage() {
         setPrescriptions([...prescriptions, ...newPrescriptions])
         setSelectedMedicines([]) // Clear the selected medicines
         showSuccess('Medicines added to prescription successfully')
+    }
+
+    function handleRestoreDraft() {
+        if (draftData) {
+            setForm(draftData.form)
+            setPrescriptions(draftData.prescriptions)
+            showSuccess('Draft restored successfully!')
+        }
+        setShowRestoreDraftModal(false)
+    }
+
+    function handleDiscardDraft() {
+        localStorage.removeItem('prescriptionDraft')
+        setHasDraft(false)
+        setShowRestoreDraftModal(false)
     }
 
     // Helpers to format dates for inputs
@@ -1334,6 +1343,17 @@ export default function PrescriptionsPage() {
                 onClose={() => setShowCamera(false)} 
                 onCapture={handleCameraCapture}
                 title="Capture Report Document"
+            />
+            {/* Restore Draft Modal */}
+            <ConfirmModal
+                isOpen={showRestoreDraftModal}
+                onCancel={handleDiscardDraft}
+                onConfirm={handleRestoreDraft}
+                title="Restore Draft"
+                message="Found unsaved prescription data from a previous session. Would you like to restore it?"
+                confirmText="Restore"
+                cancelText="Discard"
+                variant="info"
             />
             
             {isPatient ? (
@@ -1928,17 +1948,17 @@ export default function PrescriptionsPage() {
 
                         {/* Medicines Selection Card */}
                         <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6"
-                            style={{ display: currentStep !== 4 ? 'none' : 'block' }}
+                            style={{ display: currentStep !== 4 ? 'none' : 'block', overflow: 'visible', position: 'relative', zIndex: 1 }}
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
                             <h3 className="relative text-lg font-semibold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Medicine Selection</h3>
 
                             {/* Add from Treatment Plan */}
-                            <div className="relative mb-4 p-3 bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl backdrop-blur-sm">
+                            <div className="relative mb-4 p-3 bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl backdrop-blur-sm" style={{ overflow: 'visible', position: 'relative', zIndex: 100 }}>
                                 <label className="block text-sm font-medium mb-2">
                                     Quick Add from Treatment Plan
                                 </label>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2" style={{ position: 'relative', zIndex: 100 }}>
                                     <CustomSelect
                                         value={selectedTreatmentId || ""}
                                         onChange={(treatmentId) => {
@@ -1976,10 +1996,19 @@ export default function PrescriptionsPage() {
                                             ...(Array.isArray(treatments) ? treatments : [])
                                                 .filter(t => !t.deleted) // Only show non-deleted treatments in dropdown
                                                 .filter(t => !(t.provDiagnosis === 'IMPORTED' && t.planNumber === '00')) // Hide imported treatment plan
-                                                .map(t => ({
-                                                    value: String(t.id),
-                                                    label: `${t.planNumber ? `Plan ${t.planNumber} - ` : ''}${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`} (${t.treatmentProducts?.length || 0} medicines)`
-                                                }))
+                                                .map(t => {
+                                                    // Count how many plans exist for this diagnosis
+                                                    const sameDignosisPlans = treatments.filter(plan => 
+                                                        plan.provDiagnosis === t.provDiagnosis && !plan.deleted
+                                                    )
+                                                    // If only one plan exists for this diagnosis, show as Plan 1
+                                                    const displayPlanNumber = sameDignosisPlans.length === 1 ? '1' : t.planNumber
+                                                    
+                                                    return {
+                                                        value: String(t.id),
+                                                        label: `${displayPlanNumber ? `Plan ${displayPlanNumber} - ` : ''}${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`} (${t.treatmentProducts?.length || 0} medicines)`
+                                                    }
+                                                })
                                         ]}
                                         placeholder="-- select treatment plan --"
                                         className={`flex-1 ${selectedTreatmentId ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}
@@ -3038,7 +3067,9 @@ function UserPrescriptionsContent({ user }: { user: any }) {
             ) : (
                 <div className="space-y-4">
                     {visits.filter(v => v.prescriptions && v.prescriptions.length > 0).map(visit => (
-                        <div key={visit.id} className="card">
+                        <div key={visit.id} className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                            <div className="relative">
                             {/* Visit Header */}
                             <div className="border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
                                 <div className="flex justify-between items-start">
@@ -3118,6 +3149,7 @@ function UserPrescriptionsContent({ user }: { user: any }) {
                                         </div>
                                     </div>
                                 ))}
+                            </div>
                             </div>
                         </div>
                     ))}

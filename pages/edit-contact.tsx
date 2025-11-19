@@ -104,7 +104,9 @@ export default function EditContactPage() {
           <p className="text-sm text-gray-600 dark:text-gray-400">Update your contact information</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md p-6 md:p-8 border border-gray-200 dark:border-gray-700 space-y-6">
+        <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 md:p-8 space-y-6 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+          <div className="relative">
           <div>
             <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Address</label>
             <textarea
@@ -151,13 +153,14 @@ export default function EditContactPage() {
 
           <button
             onClick={handleSave}
-            className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all"
+            className=\"w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all\"
           >
             Save Changes
           </button>
+          </div>
         </div>
 
-        <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+        <div className=\"mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg\">
           <h3 className="font-semibold mb-2 text-blue-900 dark:text-blue-100">Instructions:</h3>
           <ul className="list-disc list-inside space-y-1 text-sm text-blue-800 dark:text-blue-200">
             <li>Update your contact information in the fields above</li>
