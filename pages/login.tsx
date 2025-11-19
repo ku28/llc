@@ -98,22 +98,6 @@ export default function LoginPage() {
                         >
                             {loading ? 'Signing in...' : 'Sign In'}
                         </button>
-                    {/* Forgot Password Modal */}
-                    {showForgot && (
-                        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-                            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm relative">
-                                <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600" onClick={() => setShowForgot(false)}>&times;</button>
-                                <h3 className="text-lg font-bold mb-2">Forgot Password</h3>
-                                <form onSubmit={handleForgot}>
-                                    <label className="block text-sm font-medium mb-1.5">Enter your registered email</label>
-                                    <input type="email" required value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="w-full p-2 border rounded mb-3" placeholder="your@email.com" />
-                                    {forgotError && <div className="text-red-600 mb-2">{forgotError}</div>}
-                                    {forgotSuccess && <div className="text-green-600 mb-2">{forgotSuccess}</div>}
-                                    <button type="submit" className="w-full btn btn-primary" disabled={forgotLoading}>{forgotLoading ? 'Sending...' : 'Send Reset Link'}</button>
-                                </form>
-                            </div>
-                        </div>
-                    )}
                     </form>
 
                     <div className="mt-6 text-center text-sm text-muted">
@@ -123,7 +107,25 @@ export default function LoginPage() {
                     </div>
                 </div>
             </div>
-        </div>
+                </div>
+            </div>
+
+            {/* Forgot Password Modal */}
+            {showForgot && (
+                <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-sm relative">
+                        <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl leading-none" onClick={() => setShowForgot(false)}>&times;</button>
+                        <h3 className="text-lg font-bold mb-2">Forgot Password</h3>
+                        <form onSubmit={handleForgot}>
+                            <label className="block text-sm font-medium mb-1.5">Enter your registered email</label>
+                            <input type="email" required value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="w-full p-2 border rounded mb-3" placeholder="your@email.com" />
+                            {forgotError && <div className="text-red-600 mb-2">{forgotError}</div>}
+                            {forgotSuccess && <div className="text-green-600 mb-2">{forgotSuccess}</div>}
+                            <button type="submit" className="w-full btn btn-primary" disabled={forgotLoading}>{forgotLoading ? 'Sending...' : 'Send Reset Link'}</button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </>
     )
 }

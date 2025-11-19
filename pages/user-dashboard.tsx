@@ -253,7 +253,7 @@ export default function UserDashboard() {
                                     </Link>
                                 ))}
                             </div>
-                        </div>
+                        )}
                         </div>
                     </div>
 
@@ -294,7 +294,7 @@ export default function UserDashboard() {
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        )}
                         </div>
                     </div>
                 </div>
@@ -368,5 +368,6 @@ export default function UserDashboard() {
                     </div>
                 </div>
             </div>
+        </div>
     )
 }

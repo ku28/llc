@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useDataCache } from '../contexts/DataCacheContext'
-import RefreshButton from '../components/RefreshButton'
 
 export default function UsersPage() {
     const [users, setUsers] = useState<any[]>([])

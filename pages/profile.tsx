@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import Layout from '../components/Layout'
 import { useToast } from '../hooks/useToast'
 import ToastNotification from '../components/ToastNotification'
 
@@ -804,6 +803,7 @@ export default function ProfilePage() {
                                             </button>
                                         </div>
                                     </form>
+                                    </div>
                                 </div>
                             )}
 
@@ -861,6 +861,7 @@ export default function ProfilePage() {
                                             </button>
                                         </form>
                                     </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -904,6 +905,7 @@ export default function ProfilePage() {
                                                 </button>
                                             </div>
                                         </div>
+                                    </div>
                                     </div>
                                 </div>
                             )}

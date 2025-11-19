@@ -4,7 +4,6 @@ import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
 import { useToast } from '../hooks/useToast'
 import { useDataCache } from '../contexts/DataCacheContext'
-import RefreshButton from '../components/RefreshButton'
 import * as XLSX from 'xlsx'
 
 export default function StockTransactionsPage() {
@@ -865,6 +864,7 @@ export default function StockTransactionsPage() {
                             )}
                         </div>
                     )}
+                </div>
                 </div>
 
             {/* Delete Progress Modal */}

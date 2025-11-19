@@ -153,14 +153,14 @@ export default function EditContactPage() {
 
           <button
             onClick={handleSave}
-            className=\"w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all\"
+            className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all"
           >
             Save Changes
           </button>
           </div>
         </div>
 
-        <div className=\"mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg\">
+        <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
           <h3 className="font-semibold mb-2 text-blue-900 dark:text-blue-100">Instructions:</h3>
           <ul className="list-disc list-inside space-y-1 text-sm text-blue-800 dark:text-blue-200">
             <li>Update your contact information in the fields above</li>

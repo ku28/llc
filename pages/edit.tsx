@@ -783,7 +783,6 @@ export default function EditHomePage() {
                                 </button>
                             ))}
                         </div>
-                        </div>
                     </div>
                 </div>
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import Link from 'next/link'
-import CustomSelect from '../components/CustomSelect'
 import ImportVisitsModal from '../components/ImportVisitsModal'
 import PatientSelectionModal from '../components/PatientSelectionModal'
 import { useToast } from '../hooks/useToast'
