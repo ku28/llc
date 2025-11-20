@@ -870,10 +870,10 @@ function ProductsPage() {
                             </svg>
                         </button>
                         {showExportDropdown && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-50 overflow-hidden">
+                            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-[9999] overflow-hidden">
                                 <button
                                     onClick={() => exportData('csv')}
-                                    className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                    className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900 dark:hover:to-emerald-900 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
                                 >
                                     <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -882,7 +882,7 @@ function ProductsPage() {
                                 </button>
                                 <button
                                     onClick={() => exportData('json')}
-                                    className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                    className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900 dark:hover:to-emerald-900 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
                                 >
                                     <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -891,7 +891,7 @@ function ProductsPage() {
                                 </button>
                                 <button
                                     onClick={() => exportData('xlsx')}
-                                    className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
+                                    className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900 dark:hover:to-emerald-900 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
                                 >
                                     <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -925,7 +925,7 @@ function ProductsPage() {
 
             {/* Stock Status Summary */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div className="card bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border-emerald-200 dark:border-emerald-800">
+                <div className="card bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900 dark:to-emerald-800 border-emerald-200 dark:border-emerald-800">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">Total Products</p>
@@ -939,7 +939,7 @@ function ProductsPage() {
                     </div>
                 </div>
 
-                <div className="card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
+                <div className="card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 border-green-200 dark:border-green-800">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">In Stock</p>
@@ -955,7 +955,7 @@ function ProductsPage() {
                     </div>
                 </div>
 
-                <div className="card bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 border-yellow-200 dark:border-yellow-800">
+                <div className="card bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900 dark:to-yellow-800 border-yellow-200 dark:border-yellow-800">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">Low Stock</p>
@@ -975,7 +975,7 @@ function ProductsPage() {
                     </div>
                 </div>
 
-                <div className="card bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200 dark:border-red-800">
+                <div className="card bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900 dark:to-red-800 border-red-200 dark:border-red-800">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">Out of Stock</p>
@@ -993,7 +993,7 @@ function ProductsPage() {
             </div>
 
             {/* Search Bar */}
-            <div className="rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 mb-4 overflow-hidden" style={{ overflow: 'visible', zIndex: 1 }}>
+            <div className="rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 mb-4 overflow-hidden" style={{ overflow: 'visible', zIndex: 1 }}>
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                 <div className="relative">
                 <div className="flex items-center gap-3 mb-3">
@@ -1022,7 +1022,7 @@ function ProductsPage() {
                             <span>Sort</span>
                         </button>
                         {showSortDropdown && (
-                            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[9999] overflow-hidden">
                                 <div className="p-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-900 dark:to-gray-900">
                                     <p className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">
                                         Sort By
@@ -1317,7 +1317,7 @@ function ProductsPage() {
                     onClick={!showSuccessModal ? cancelEdit : undefined}
                 >
                     <div 
-                        className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-lg w-full transition-all duration-300 ease-out"
+                        className="relative overflow-hidden rounded-2xl border border-emerald-200/50 dark:border-emerald-700 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 max-w-lg w-full transition-all duration-300 ease-out"
                         style={{
                             opacity: isAnimating ? 1 : 0,
                             transform: isAnimating ? 'scale(1)' : 'scale(0.95)',
@@ -1418,7 +1418,7 @@ function ProductsPage() {
             )}
 
             {/* Products Table */}
-            <div className="rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden" style={{ position: 'relative', zIndex: 0 }}>
+            <div className="rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden" style={{ position: 'relative', zIndex: 0 }}>
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl" style={{ zIndex: -1 }}></div>
                 <div className="relative">
                 <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
@@ -1460,9 +1460,9 @@ function ProductsPage() {
                                     const isOutOfStock = qty <= 0
                                     
                                     return (
-                                        <div key={p.id} className={`border border-emerald-100 dark:border-emerald-800 rounded-lg overflow-hidden hover:shadow-lg hover:shadow-emerald-100 dark:hover:shadow-emerald-900/20 transition-all duration-300 ${isDeleting ? 'opacity-0 -translate-x-full scale-95' : ''} ${selectedProductIds.has(p.id) ? 'ring-2 ring-emerald-500 shadow-xl shadow-emerald-100 dark:shadow-emerald-900/30 bg-gradient-to-r from-emerald-50/30 to-green-50/30 dark:from-emerald-950/20 dark:to-green-950/20' : ''}`}>
+                                        <div key={p.id} className={`border border-emerald-100 dark:border-emerald-800 rounded-lg overflow-hidden hover:shadow-lg hover:shadow-emerald-100 dark:hover:shadow-emerald-900/50 transition-all duration-300 ${isDeleting ? 'opacity-0 -translate-x-full scale-95' : ''} ${selectedProductIds.has(p.id) ? 'ring-2 ring-emerald-500 shadow-xl shadow-emerald-100 dark:shadow-emerald-900 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950 dark:to-green-950' : ''}`}>
                                             {isDeleting ? (
-                                                <div className="p-6 text-center bg-red-50 dark:bg-red-950/30 animate-pulse">
+                                                <div className="p-6 text-center bg-red-50 dark:bg-red-950 animate-pulse">
                                                     <span className="text-red-600 dark:text-red-400 font-bold text-lg">Deleting...</span>
                                                 </div>
                                             ) : (
@@ -1777,7 +1777,7 @@ function ProductsPage() {
                             </div>
 
                             {/* Total Summary */}
-                            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                            <div className="bg-emerald-50 dark:bg-emerald-900 p-4 rounded-lg border border-emerald-200 dark:border-emerald-800">
                                 <div className="flex justify-between items-center">
                                     <span className="text-lg font-semibold text-gray-900 dark:text-white">Estimated Total:</span>
                                     <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
@@ -1856,10 +1856,10 @@ function ProductsPage() {
                         </div>
                     </button>
                     {showExportDropdown && (
-                        <div className="fixed bottom-24 right-40 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-50 overflow-hidden">
+                        <div className="fixed bottom-24 right-40 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-green-200 dark:border-green-900 z-[9999] overflow-hidden">
                             <button
                                 onClick={() => exportData('csv')}
-                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900 dark:hover:to-emerald-900 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
                             >
                                 <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1868,7 +1868,7 @@ function ProductsPage() {
                             </button>
                             <button
                                 onClick={() => exportData('json')}
-                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900 dark:hover:to-emerald-900 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300"
                             >
                                 <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -1877,7 +1877,7 @@ function ProductsPage() {
                             </button>
                             <button
                                 onClick={() => exportData('xlsx')}
-                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900/20 dark:hover:to-emerald-900/20 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
+                                className="w-full text-left px-4 py-2.5 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 dark:hover:from-green-900 dark:hover:to-emerald-900 transition-all duration-150 flex items-center gap-2 text-gray-700 dark:text-gray-300 rounded-b-lg"
                             >
                                 <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />

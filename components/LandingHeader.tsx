@@ -1,26 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
+import AppSwitcherModal from './AppSwitcherModal'
 
 export default function LandingHeader() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [mobileOpen, setMobileOpen] = useState(false)
-    const [appDropdownOpen, setAppDropdownOpen] = useState(false)
+    const [appSwitcherModalOpen, setAppSwitcherModalOpen] = useState(false)
+    const [user, setUser] = useState<any>(null)
 
-    const handleEnterERP = async () => {
-        setLoading(true)
-        try {
-            const res = await fetch('/api/auth/me')
-            const data = await res.json()
-            if (data?.user) router.push('/dashboard')
-            else router.push(`/login?next=${encodeURIComponent('/dashboard')}`)
-        } catch (e) {
-            router.push(`/login?next=${encodeURIComponent('/dashboard')}`)
-        } finally {
-            setLoading(false)
-        }
-    }
+    useEffect(() => {
+        // Fetch user data
+        fetch('/api/auth/me')
+            .then(res => res.json())
+            .then(data => setUser(data.user))
+            .catch(() => setUser(null))
+    }, [])
 
     const [dark, setDark] = useState(false)
 
@@ -47,7 +43,15 @@ export default function LandingHeader() {
     }
 
     return (
-        <header className="sticky top-5 z-50 w-[90%] md:w-[70%] lg:w-[75%] lg:max-w-screen-xl mx-auto rounded-2xl shadow-inner bg-white/80 dark:bg-black/15 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 py-2">
+        <>
+            <AppSwitcherModal 
+                isOpen={appSwitcherModalOpen}
+                onClose={() => setAppSwitcherModalOpen(false)}
+                currentApp="website"
+                user={user}
+            />
+            
+            <header className="sticky top-5 z-50 w-[90%] md:w-[70%] lg:w-[75%] lg:max-w-screen-xl mx-auto rounded-2xl shadow-inner bg-white/80 dark:bg-black/15 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 py-2">
             <div className="mx-auto px-2 sm:px-4 flex justify-between items-center">
                 <div className="flex items-center gap-3 sm:gap-6">
                     <button
@@ -64,70 +68,27 @@ export default function LandingHeader() {
                         </svg>
                     </button>
 
-                    <div
-                        className="relative"
-                        onMouseEnter={() => setAppDropdownOpen(true)}
-                        onMouseLeave={() => setAppDropdownOpen(false)}
-                    >
-                        <button className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity pb-2">
-                            <img src="/favicon.png" alt="LLC" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
-                            <h1 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">Last Leaf Care</h1>
-                            <svg className="w-4 h-4 text-gray-600 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    {/* Logo and Title with App Switcher Icon */}
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <img src="/favicon.png" alt="LLC" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+                        <h1 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">Last Leaf Care</h1>
+                        
+                        {/* App Switcher Icon Button */}
+                        <button
+                            onClick={() => setAppSwitcherModalOpen(true)}
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-200 group"
+                            aria-label="Switch application"
+                            title="Switch between Last Leaf Care and LLC ERP"
+                        >
+                            <svg 
+                                className="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                             </svg>
                         </button>
-
-                        {appDropdownOpen && (
-                            <div className="absolute left-0 top-full pt-2 z-50">
-                                <div className="w-56 bg-white dark:bg-gray-900/95 backdrop-blur-md rounded-xl shadow-lg border border-gray-200/50 dark:border-gray-700/50 py-2">
-                                    {(() => {
-                                        const current = router.pathname === '/' ? 'website' : 'erp'
-                                        const items = [
-                                            { key: 'website', label: 'LLC Website', href: '/' },
-                                            { key: 'erp', label: 'LLC ERP', action: handleEnterERP },
-                                        ]
-                                        items.sort((a: any, b: any) => (a.key === current ? -1 : b.key === current ? 1 : 0))
-
-                                        return items.map((it: any) => {
-                                            const selected = it.key === current
-                                            const base = 'flex items-center gap-3 px-4 py-3 text-sm text-gray-800 dark:text-white transition-colors w-full text-left'
-                                            const hover = 'hover:bg-gray-100 dark:hover:bg-white/10'
-                                            const selCls = selected ? 'bg-gray-100 dark:bg-white/10 font-medium' : hover
-
-                                            if (it.href) {
-                                                return (
-                                                    <Link
-                                                        href={it.href}
-                                                        key={it.key}
-                                                        className={`${base} ${selCls}`}
-                                                        onClick={() => setAppDropdownOpen(false)}
-                                                    >
-                                                        <img src="/favicon.png" alt="logo" className="w-6 h-6 object-contain" />
-                                                        <span className="font-medium">{it.label}</span>
-                                                        {selected && <span className="ml-auto text-green-600">✓</span>}
-                                                    </Link>
-                                                )
-                                            }
-
-                                            return (
-                                                <button
-                                                    key={it.key}
-                                                    onClick={() => {
-                                                        setAppDropdownOpen(false)
-                                                        it.action && it.action()
-                                                    }}
-                                                    className={`${base} ${selCls}`}
-                                                >
-                                                    <img src="/favicon.png" alt="logo" className="w-6 h-6 object-contain" />
-                                                    <span className="font-medium">{it.label}</span>
-                                                    {selected && <span className="ml-auto text-green-600">✓</span>}
-                                                </button>
-                                            )
-                                        })
-                                    })()}
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     <nav className="hidden md:flex items-center gap-1">
@@ -178,5 +139,6 @@ export default function LandingHeader() {
                 </div>
             )}
         </header>
+        </>
     )
 }

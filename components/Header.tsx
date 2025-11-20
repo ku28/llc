@@ -3,22 +3,29 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { canAccessRoute } from '../lib/permissions'
 import ImportNotifications from './ImportNotifications'
+import AppSwitcherModal from './AppSwitcherModal'
 
 interface HeaderProps {
   title?: string
   onOpenTokenSidebar?: () => void
 }
 
-export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: HeaderProps) {
+export default function Header({ onOpenTokenSidebar }: HeaderProps) {
   const [user, setUser] = useState<any>(null)
   const [dark, setDark] = useState<boolean>(false)
   const [accountingOpen, setAccountingOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
-  const [appDropdownOpen, setAppDropdownOpen] = useState(false)
+  const [appSwitcherModalOpen, setAppSwitcherModalOpen] = useState(false)
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null)
   const navRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+
+  // Determine current app and title
+  const landingPages = ['/', '/about', '/services', '/gallery', '/contact']
+  const isWebsite = landingPages.includes(router.pathname)
+  const currentApp = isWebsite ? 'website' : 'erp'
+  const title = isWebsite ? 'Last Leaf Care' : 'LLC ERP'
 
   // Helper to check if user can access a route
   const canAccess = (route: string) => {
@@ -142,32 +149,16 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
     }
   }
 
-  // Navigate to the main ERP app (dashboard) but ensure auth is checked first.
-  const handleLLCERPClick = async () => {
-    setAppDropdownOpen(false)
-    let u = user
-    // If we don't have a user yet, try to fetch latest auth state before deciding
-    if (!u) {
-      try {
-        const res = await fetch('/api/auth/me')
-        const data = await res.json()
-        u = data.user
-        setUser(u)
-      } catch (e) {
-        // ignore and treat as unauthenticated
-        u = null
-      }
-    }
-
-    if (u) {
-      router.push('/dashboard')
-    } else {
-      router.push(`/login?next=${encodeURIComponent('/dashboard')}`)
-    }
-  }
-
   return (
-    <header className="border-b border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-white via-emerald-50/20 to-green-50/10 dark:from-gray-900 dark:via-emerald-950/10 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-md py-4 mb-8 sticky top-0 z-50">
+    <>
+      <AppSwitcherModal 
+        isOpen={appSwitcherModalOpen}
+        onClose={() => setAppSwitcherModalOpen(false)}
+        currentApp={currentApp}
+        user={user}
+      />
+      
+      <header className="border-b border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-white via-emerald-50/20 to-green-50/10 dark:from-gray-900 dark:via-emerald-950/10 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-md py-4 mb-8 sticky top-0 z-50">
       <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/3 via-transparent to-green-500/3 pointer-events-none"></div>
       <div className="relative max-w-7xl mx-auto px-2 sm:px-4 flex justify-between items-center">
         <div className="flex items-center gap-3 sm:gap-6">
@@ -186,79 +177,31 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
             </svg>
           </button>
 
-          {/* Logo and Title with Dropdown */}
-          <div 
-            className="relative"
-            onMouseEnter={() => setAppDropdownOpen(true)}
-            onMouseLeave={() => setAppDropdownOpen(false)}
-          >
-            <button className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity pb-2">
-              <img 
-                src="/favicon.png" 
-                alt="LLC Logo" 
-                className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
-              />
-              <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-brand to-green-600 bg-clip-text text-transparent">{title}</h1>
-              <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          {/* Logo and Title with App Switcher Icon */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <img 
+              src="/favicon.png" 
+              alt="LLC Logo" 
+              className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+            />
+            <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-brand to-green-600 bg-clip-text text-transparent">{title}</h1>
+            
+            {/* App Switcher Icon Button */}
+            <button
+              onClick={() => setAppSwitcherModalOpen(true)}
+              className="p-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-all duration-200 group"
+              aria-label="Switch application"
+              title="Switch between Last Leaf Care and LLC ERP"
+            >
+              <svg 
+                className="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
               </svg>
             </button>
-
-            {/* App Dropdown Menu */}
-            {appDropdownOpen && (
-              <div className="absolute left-0 top-full pt-2 z-50">
-                <div className="relative w-56 rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/10 backdrop-blur-sm py-2 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                  <div className="relative">
-                  {(() => {
-                    const current = router.pathname === '/' ? 'website' : 'erp'
-                    const items = [
-                      { key: 'website', label: 'LLC Website', href: '/' },
-                      { key: 'erp', label: 'LLC ERP', action: handleLLCERPClick },
-                    ]
-                    items.sort((a, b) => (a.key === current ? -1 : b.key === current ? 1 : 0))
-
-                    return items.map((it) => {
-                      const selected = it.key === current
-                      const base = 'flex items-center gap-3 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 transition-colors w-full text-left'
-                      const hover = 'hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
-                      const selCls = selected ? 'bg-emerald-50 dark:bg-emerald-950/30 font-medium' : hover
-
-                      if (it.href) {
-                        return (
-                          <Link
-                            href={it.href}
-                            key={it.key}
-                            className={`${base} ${selCls}`}
-                            onClick={() => setAppDropdownOpen(false)}
-                          >
-                            <img src="/favicon.png" alt="logo" className="w-6 h-6 object-contain" />
-                            <span className="font-medium">{it.label}</span>
-                            {selected && <span className="ml-auto text-brand">✓</span>}
-                          </Link>
-                        )
-                      }
-
-                      return (
-                        <button
-                          key={it.key}
-                          onClick={() => {
-                            setAppDropdownOpen(false)
-                            it.action && it.action()
-                          }}
-                          className={`${base} ${selCls}`}
-                        >
-                          <img src="/favicon.png" alt="logo" className="w-6 h-6 object-contain" />
-                          <span className="font-medium">{it.label}</span>
-                          {selected && <span className="ml-auto text-brand">✓</span>}
-                        </button>
-                      )
-                    })
-                  })()}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* main nav - hidden on small screens */}
@@ -660,5 +603,6 @@ export default function Header({ title = 'LLC ERP', onOpenTokenSidebar }: Header
         </div>
       )}
     </header>
+    </>
   )
 }

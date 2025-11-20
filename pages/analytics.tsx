@@ -119,7 +119,7 @@ export default function AnalyticsPage() {
                 {/* Key Metrics Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     {/* Inventory Metrics */}
-                    <div className="card bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
+                    <div className="card bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-800 border-blue-200 dark:border-blue-800">
                         <div className="flex items-start justify-between">
                             <div>
                                 <div className="text-sm text-muted mb-1">Total Products</div>
@@ -134,7 +134,7 @@ export default function AnalyticsPage() {
                         </div>
                     </div>
 
-                    <div className="card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
+                    <div className="card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 border-green-200 dark:border-green-800">
                         <div className="flex items-start justify-between">
                             <div>
                                 <div className="text-sm text-muted mb-1">Stock Value</div>
@@ -148,7 +148,7 @@ export default function AnalyticsPage() {
                     </div>
 
                     {/* Supplier Metrics */}
-                    <div className="card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
+                    <div className="card bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900 dark:to-purple-800 border-purple-200 dark:border-purple-800">
                         <div className="flex items-start justify-between">
                             <div>
                                 <div className="text-sm text-muted mb-1">Active Suppliers</div>
@@ -161,7 +161,7 @@ export default function AnalyticsPage() {
                         </div>
                     </div>
 
-                    <div className="card bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800">
+                    <div className="card bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900 dark:to-orange-800 border-orange-200 dark:border-orange-800">
                         <div className="flex items-start justify-between">
                             <div>
                                 <div className="text-sm text-muted mb-1">Accounts Receivable</div>
@@ -177,7 +177,7 @@ export default function AnalyticsPage() {
 
                 {/* Financial Summary */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                         <div className="relative">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -193,11 +193,11 @@ export default function AnalyticsPage() {
                                 <span className="text-sm">Pending Orders</span>
                                 <span className="font-semibold text-yellow-600">{pendingPOs}</span>
                             </div>
-                            <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                            <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900 rounded-lg">
                                 <span className="text-sm font-semibold">Total Purchase Value</span>
                                 <span className="font-bold text-blue-600 dark:text-blue-400">₹{totalPurchaseValue.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                            <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900 rounded-lg">
                                 <span className="text-sm font-semibold">Supplier Outstanding</span>
                                 <span className="font-bold text-red-600 dark:text-red-400">₹{totalSupplierOutstanding.toLocaleString()}</span>
                             </div>
@@ -205,7 +205,7 @@ export default function AnalyticsPage() {
                         </div>
                     </div>
 
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                         <div className="relative">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -221,11 +221,11 @@ export default function AnalyticsPage() {
                                 <span className="text-sm">Unpaid/Partial</span>
                                 <span className="font-semibold text-red-600">{unpaidInvoices}</span>
                             </div>
-                            <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                            <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900 rounded-lg">
                                 <span className="text-sm font-semibold">Total Revenue</span>
                                 <span className="font-bold text-green-600 dark:text-green-400">₹{totalInvoiceValue.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                            <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900 rounded-lg">
                                 <span className="text-sm font-semibold">Amount Due</span>
                                 <span className="font-bold text-orange-600 dark:text-orange-400">₹{totalReceivables.toLocaleString()}</span>
                             </div>
@@ -236,7 +236,7 @@ export default function AnalyticsPage() {
 
                 {/* Stock Alerts */}
                 {(lowStockProducts.length > 0 || outOfStockProducts.length > 0) && (
-                    <div className="card mb-6 bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800">
+                    <div className="card mb-6 bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-800">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
                             <span>⚠️</span>
                             <span>Stock Alerts</span>
@@ -247,7 +247,7 @@ export default function AnalyticsPage() {
                                 <h4 className="font-semibold text-red-600 dark:text-red-400 mb-2">Out of Stock ({outOfStockProducts.length})</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                                     {outOfStockProducts.slice(0, 6).map(p => (
-                                        <div key={p.id} className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm">
+                                        <div key={p.id} className="p-2 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded text-sm">
                                             <div className="font-semibold">{p.name}</div>
                                             <div className="text-xs text-muted">{p.category?.name || 'Uncategorized'}</div>
                                         </div>
@@ -264,7 +264,7 @@ export default function AnalyticsPage() {
                                 <h4 className="font-semibold text-yellow-600 dark:text-yellow-400 mb-2">Low Stock ({lowStockProducts.length})</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                                     {lowStockProducts.slice(0, 6).map(p => (
-                                        <div key={p.id} className="p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-sm">
+                                        <div key={p.id} className="p-2 bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-800 rounded text-sm">
                                             <div className="font-semibold">{p.name}</div>
                                             <div className="text-xs text-muted">
                                                 Stock: {p.quantity} / Threshold: {p.threshold || 10}
@@ -282,7 +282,7 @@ export default function AnalyticsPage() {
 
                 {/* Top & Slow Movers */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                         <div className="relative">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -310,7 +310,7 @@ export default function AnalyticsPage() {
                         )}
                     </div>
 
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                         <div className="relative">
                         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -342,7 +342,7 @@ export default function AnalyticsPage() {
                 </div>
 
                 {/* Recent Stock Movements */}
-                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                     <div className="relative">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">

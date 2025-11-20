@@ -119,7 +119,7 @@ export default function UserDashboard() {
     return (
             <div className="py-6 space-y-6">
                 {/* Welcome Header */}
-                <div className="card bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20">
+                <div className="card bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900 dark:to-blue-900">
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-3xl font-bold mb-2">Welcome back, {data.user.name}! 👋</h1>
@@ -163,7 +163,7 @@ export default function UserDashboard() {
                 </div>
 
                 {/* Upcoming Appointments */}
-                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                     <div className="relative">
                     <div className="flex items-center justify-between mb-4">
@@ -192,7 +192,7 @@ export default function UserDashboard() {
                     ) : (
                         <div className="space-y-3">
                             {data.upcomingAppointments.map((visit: any) => (
-                                <div key={visit.id} className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                <div key={visit.id} className="p-4 bg-green-50 dark:bg-green-900 rounded-lg border border-green-200 dark:border-green-800">
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <p className="font-semibold text-lg">Next Visit Scheduled</p>
@@ -216,7 +216,7 @@ export default function UserDashboard() {
                 {/* Two Column Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Recent Prescriptions */}
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                         <div className="relative">
                         <div className="flex items-center justify-between mb-4">
@@ -258,7 +258,7 @@ export default function UserDashboard() {
                     </div>
 
                     {/* Visit History */}
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                         <div className="relative">
                         <div className="flex items-center justify-between mb-4">
@@ -300,35 +300,35 @@ export default function UserDashboard() {
                 </div>
 
                 {/* Quick Actions */}
-                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                     <div className="relative">
                     <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <Link
                             href="/user-signup"
-                            className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:shadow-md transition-all text-center"
+                            className="p-4 bg-blue-50 dark:bg-blue-900 rounded-lg hover:shadow-md transition-all text-center"
                         >
                             <span className="text-3xl block mb-2">📅</span>
                             <span className="text-sm font-medium">Book Appointment</span>
                         </Link>
                         <Link
                             href="/prescriptions"
-                            className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg hover:shadow-md transition-all text-center"
+                            className="p-4 bg-green-50 dark:bg-green-900 rounded-lg hover:shadow-md transition-all text-center"
                         >
                             <span className="text-3xl block mb-2">💊</span>
                             <span className="text-sm font-medium">View Prescriptions</span>
                         </Link>
                         <Link
                             href="/visits"
-                            className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:shadow-md transition-all text-center"
+                            className="p-4 bg-purple-50 dark:bg-purple-900 rounded-lg hover:shadow-md transition-all text-center"
                         >
                             <span className="text-3xl block mb-2">🏥</span>
                             <span className="text-sm font-medium">Visit History</span>
                         </Link>
                         <Link
                             href="/profile"
-                            className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg hover:shadow-md transition-all text-center"
+                            className="p-4 bg-yellow-50 dark:bg-yellow-900 rounded-lg hover:shadow-md transition-all text-center"
                         >
                             <span className="text-3xl block mb-2">👤</span>
                             <span className="text-sm font-medium">My Profile</span>
@@ -338,7 +338,7 @@ export default function UserDashboard() {
                 </div>
 
                 {/* Contact Information */}
-                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-green-50/30 to-emerald-50/20 dark:from-gray-900 dark:via-green-950/20 dark:to-emerald-950/20 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-green-50 to-emerald-50 dark:from-gray-900 dark:via-green-950 dark:to-emerald-950 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-green-400/5 via-transparent to-emerald-500/5 pointer-events-none rounded-xl"></div>
                     <div className="relative">
                     <h2 className="text-xl font-semibold mb-4">Need Help?</h2>
