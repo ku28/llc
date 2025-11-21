@@ -270,12 +270,12 @@ export default function ImportNotifications() {
                                                 <span className="text-green-600 dark:text-green-400">
                                                     ✓ {task.summary.success} {task.operation === 'delete' ? 'deleted' : task.operation === 'generate' ? 'generated' : 'imported'}
                                                 </span>
-                                                {task.summary.skipped > 0 && (
+                                                {task.summary.skipped !== undefined && task.summary.skipped > 0 && (
                                                     <span className="text-yellow-600 dark:text-yellow-400 ml-2">
                                                         ⊘ {task.summary.skipped} skipped
                                                     </span>
                                                 )}
-                                                {task.summary.errors > 0 && (
+                                                {task.summary.errors !== undefined && task.summary.errors > 0 && (
                                                     <span className="text-orange-600 dark:text-orange-400 ml-2">
                                                         ⚠ {task.summary.errors} failed
                                                     </span>
