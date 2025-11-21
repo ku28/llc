@@ -50,6 +50,9 @@ export default function ImportNotifications() {
         if (operation === 'delete') {
             return status === 'deleting' ? 'Deleting' : 'Delete'
         }
+        if (operation === 'generate') {
+            return status === 'generating' ? 'Generating' : 'Generate'
+        }
         return status === 'importing' ? 'Importing' : 'Import'
     }
 
@@ -126,8 +129,8 @@ export default function ImportNotifications() {
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-96 rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-xl shadow-emerald-500/10 backdrop-blur-sm z-50 max-h-[500px] overflow-hidden flex flex-col">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
+                <div className="absolute right-0 mt-2 w-96 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-white/95 dark:bg-gray-900/95 shadow-xl shadow-emerald-500/20 backdrop-blur-md z-50 max-h-[500px] overflow-hidden flex flex-col">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/40 via-transparent to-green-50/30 dark:from-emerald-950/40 dark:via-transparent dark:to-green-950/30 pointer-events-none rounded-lg"></div>
                     <div className="relative flex flex-col h-full">
                     {/* Header */}
                     <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -173,14 +176,16 @@ export default function ImportNotifications() {
                                     <div 
                                         key={task.id} 
                                         className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
-                                        onClick={() => (task.status === 'importing' || task.status === 'deleting') && handleTaskClick(task)}
+                                        onClick={() => (task.status === 'importing' || task.status === 'deleting' || task.status === 'generating') && handleTaskClick(task)}
                                     >
                                         <div className="flex items-start justify-between mb-2">
                                             <div className="flex items-center gap-2">
-                                                {(task.status === 'importing' || task.status === 'deleting') && (
+                                                {(task.status === 'importing' || task.status === 'deleting' || task.status === 'generating') && (
                                                     <div className={`animate-spin rounded-full h-4 w-4 border-2 ${
                                                         task.operation === 'delete' 
                                                             ? 'border-red-600 border-t-transparent' 
+                                                            : task.operation === 'generate'
+                                                            ? 'border-emerald-600 border-t-transparent'
                                                             : 'border-blue-600 border-t-transparent'
                                                     }`}></div>
                                                 )}
@@ -204,7 +209,7 @@ export default function ImportNotifications() {
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                {(task.status === 'importing' || task.status === 'deleting') && (
+                                                {(task.status === 'importing' || task.status === 'deleting' || task.status === 'generating') && (
                                                     <button
                                                         onClick={(e) => handleCancelTask(task.id, e)}
                                                         className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
@@ -235,7 +240,7 @@ export default function ImportNotifications() {
                                             </div>
                                         </div>
 
-                                        {(task.status === 'importing' || task.status === 'deleting') && (
+                                        {(task.status === 'importing' || task.status === 'deleting' || task.status === 'generating') && (
                                             <>
                                                 <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
                                                     <span>{task.progress.current} / {task.progress.total}</span>
@@ -250,6 +255,8 @@ export default function ImportNotifications() {
                                                         className={`h-1.5 rounded-full transition-all duration-300 ${
                                                             task.operation === 'delete'
                                                                 ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                                                : task.operation === 'generate'
+                                                                ? 'bg-gradient-to-r from-emerald-500 to-emerald-600'
                                                                 : 'bg-blue-600'
                                                         }`}
                                                         style={{ width: `${(task.progress.current / task.progress.total) * 100}%` }}
@@ -261,8 +268,13 @@ export default function ImportNotifications() {
                                         {task.status === 'success' && task.summary && (
                                             <div className="text-xs text-gray-600 dark:text-gray-400">
                                                 <span className="text-green-600 dark:text-green-400">
-                                                    ✓ {task.summary.success} {task.operation === 'delete' ? 'deleted' : 'imported'}
+                                                    ✓ {task.summary.success} {task.operation === 'delete' ? 'deleted' : task.operation === 'generate' ? 'generated' : 'imported'}
                                                 </span>
+                                                {task.summary.skipped > 0 && (
+                                                    <span className="text-yellow-600 dark:text-yellow-400 ml-2">
+                                                        ⊘ {task.summary.skipped} skipped
+                                                    </span>
+                                                )}
                                                 {task.summary.errors > 0 && (
                                                     <span className="text-orange-600 dark:text-orange-400 ml-2">
                                                         ⚠ {task.summary.errors} failed

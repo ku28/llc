@@ -30,6 +30,8 @@ export default function EditHomePage() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [deleteIndex, setDeleteIndex] = useState<number | null>(null)
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+    const [selectedAchievements, setSelectedAchievements] = useState<Set<number>>(new Set())
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
 
     // Hero Section Content
     const [heroContent, setHeroContent] = useState({
@@ -96,14 +98,10 @@ export default function EditHomePage() {
     })
 
     useEffect(() => {
-        // Show loading modal immediately
-        setStatusModal({ isOpen: true, status: 'loading', message: 'Loading home page content...' })
-        
         fetch('/api/auth/me')
             .then(r => r.json())
             .then(d => {
                 if (!d.user || d.user.role !== 'admin') {
-                    setStatusModal({ isOpen: false, status: 'loading', message: '' })
                     router.push('/')
                     return
                 }
@@ -111,7 +109,6 @@ export default function EditHomePage() {
                 loadContent()
             })
             .catch(() => {
-                setStatusModal({ isOpen: false, status: 'loading', message: '' })
                 router.push('/')
             })
     }, [])
@@ -168,14 +165,13 @@ export default function EditHomePage() {
             }
 
             setLoading(false)
-            setStatusModal({ isOpen: false, status: 'loading', message: '' })
         } catch (error) {
             console.error('Error loading content:', error)
             setLoading(false)
-            setStatusModal({ 
-                isOpen: true, 
-                status: 'error', 
-                message: 'Failed to load content. Please try again.' 
+            setStatusModal({
+                isOpen: true,
+                status: 'error',
+                message: 'Failed to load content. Please try again.'
             })
         }
     }
@@ -189,10 +185,10 @@ export default function EditHomePage() {
     ]
 
     const handleSave = async () => {
-        setStatusModal({ 
-            isOpen: true, 
-            status: 'loading', 
-            message: `Saving ${sidebarItems.find(s => s.id === activeTab)?.label}...` 
+        setStatusModal({
+            isOpen: true,
+            status: 'loading',
+            message: `Saving ${sidebarItems.find(s => s.id === activeTab)?.label}...`
         })
         try {
             let endpoint = ''
@@ -228,10 +224,10 @@ export default function EditHomePage() {
             })
 
             if (res.ok) {
-                setStatusModal({ 
-                    isOpen: true, 
-                    status: 'success', 
-                    message: `${sidebarItems.find(s => s.id === activeTab)?.label} saved successfully!` 
+                setStatusModal({
+                    isOpen: true,
+                    status: 'success',
+                    message: `${sidebarItems.find(s => s.id === activeTab)?.label} saved successfully!`
                 })
             } else {
                 const errorData = await res.json().catch(() => ({}))
@@ -239,10 +235,10 @@ export default function EditHomePage() {
             }
         } catch (error: any) {
             console.error('Save error:', error)
-            setStatusModal({ 
-                isOpen: true, 
-                status: 'error', 
-                message: error.message || 'Failed to save content. Please try again.' 
+            setStatusModal({
+                isOpen: true,
+                status: 'error',
+                message: error.message || 'Failed to save content. Please try again.'
             })
         }
     }
@@ -255,7 +251,6 @@ export default function EditHomePage() {
             const file = e.target.files?.[0]
             if (!file) return
 
-            setStatusModal({ isOpen: true, status: 'loading', message: 'Uploading hero image...' })
             try {
                 // Convert to base64
                 const reader = new FileReader()
@@ -273,10 +268,10 @@ export default function EditHomePage() {
                     const data = await res.json()
                     if (data.url) {
                         setHeroContent({ ...heroContent, imageUrl: data.url })
-                        setStatusModal({ 
-                            isOpen: true, 
-                            status: 'success', 
-                            message: 'Hero image uploaded successfully!' 
+                        setStatusModal({
+                            isOpen: true,
+                            status: 'success',
+                            message: 'Hero image uploaded successfully!'
                         })
                     } else {
                         throw new Error('Upload failed')
@@ -284,10 +279,10 @@ export default function EditHomePage() {
                 }
             } catch (error: any) {
                 console.error('Upload error:', error)
-                setStatusModal({ 
-                    isOpen: true, 
-                    status: 'error', 
-                    message: error.message || 'Failed to upload image. Please try again.' 
+                setStatusModal({
+                    isOpen: true,
+                    status: 'error',
+                    message: error.message || 'Failed to upload image. Please try again.'
                 })
             }
         }
@@ -313,43 +308,59 @@ export default function EditHomePage() {
         const input = document.createElement('input')
         input.type = 'file'
         input.accept = 'image/*'
+        input.multiple = true // Allow multiple file selection
         input.onchange = async (e: any) => {
-            const file = e.target.files[0]
-            if (!file) return
+            const files = Array.from(e.target.files || []) as File[]
+            if (files.length === 0) return
 
-            setStatusModal({ isOpen: true, status: 'loading', message: 'Uploading achievement image...' })
             try {
-                const reader = new FileReader()
-                reader.readAsDataURL(file)
-                reader.onloadend = async () => {
-                    const base64 = reader.result as string
-                    const uploadRes = await fetch('/api/upload-image', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            image: base64,
-                            folder: 'achievements'
-                        })
+                let uploadedCount = 0
+                const newAchievements: AchievementImage[] = []
+
+                for (const file of files) {
+                    const reader = new FileReader()
+                    await new Promise((resolve, reject) => {
+                        reader.onloadend = async () => {
+                            try {
+                                const base64 = reader.result as string
+                                const uploadRes = await fetch('/api/upload-image', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        image: base64,
+                                        folder: 'achievements'
+                                    })
+                                })
+                                const uploadData = await uploadRes.json()
+
+                                if (uploadData.url) {
+                                    newAchievements.push({ imageUrl: uploadData.url, order: achievements.length + newAchievements.length })
+                                    uploadedCount++
+                                    resolve(uploadData.url)
+                                } else {
+                                    reject(new Error(uploadData.error || 'Upload failed'))
+                                }
+                            } catch (error) {
+                                reject(error)
+                            }
+                        }
+                        reader.onerror = reject
+                        reader.readAsDataURL(file)
                     })
-                    const uploadData = await uploadRes.json()
-                    
-                    if (uploadData.url) {
-                        setAchievements([...achievements, { imageUrl: uploadData.url, order: achievements.length }])
-                        setStatusModal({ 
-                            isOpen: true, 
-                            status: 'success', 
-                            message: 'Achievement image uploaded successfully!' 
-                        })
-                    } else {
-                        throw new Error(uploadData.error || 'Upload failed')
-                    }
                 }
+
+                setAchievements([...achievements, ...newAchievements])
+                setStatusModal({
+                    isOpen: true,
+                    status: 'success',
+                    message: `${uploadedCount} achievement(s) uploaded successfully!`
+                })
             } catch (error: any) {
-                console.error('Error uploading achievement:', error)
-                setStatusModal({ 
-                    isOpen: true, 
-                    status: 'error', 
-                    message: error.message || 'Failed to upload image. Please try again.' 
+                console.error('Error uploading achievements:', error)
+                setStatusModal({
+                    isOpen: true,
+                    status: 'error',
+                    message: error.message || 'Failed to upload some achievements. Please try again.'
                 })
             }
         }
@@ -364,7 +375,6 @@ export default function EditHomePage() {
             const file = e.target.files[0]
             if (!file) return
 
-            setStatusModal({ isOpen: true, status: 'loading', message: 'Uploading replacement image...' })
             try {
                 const reader = new FileReader()
                 reader.readAsDataURL(file)
@@ -373,21 +383,21 @@ export default function EditHomePage() {
                     const uploadRes = await fetch('/api/upload-image', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
+                        body: JSON.stringify({
                             image: base64,
                             folder: 'achievements'
                         })
                     })
                     const uploadData = await uploadRes.json()
-                    
+
                     if (uploadData.url) {
                         const updatedAchievements = [...achievements]
                         updatedAchievements[index].imageUrl = uploadData.url
                         setAchievements(updatedAchievements)
-                        setStatusModal({ 
-                            isOpen: true, 
-                            status: 'success', 
-                            message: 'Achievement image replaced successfully!' 
+                        setStatusModal({
+                            isOpen: true,
+                            status: 'success',
+                            message: 'Achievement image replaced successfully!'
                         })
                     } else {
                         throw new Error(uploadData.error || 'Upload failed')
@@ -395,10 +405,10 @@ export default function EditHomePage() {
                 }
             } catch (error: any) {
                 console.error('Error uploading achievement:', error)
-                setStatusModal({ 
-                    isOpen: true, 
-                    status: 'error', 
-                    message: error.message || 'Failed to upload image. Please try again.' 
+                setStatusModal({
+                    isOpen: true,
+                    status: 'error',
+                    message: error.message || 'Failed to upload image. Please try again.'
                 })
             }
         }
@@ -416,9 +426,61 @@ export default function EditHomePage() {
             // Reorder after deletion
             const reordered = newAchievements.map((img, i) => ({ ...img, order: i }))
             setAchievements(reordered)
+            // Remove from selected if it was selected
+            const newSelected = new Set(selectedAchievements)
+            newSelected.delete(deleteIndex)
+            // Adjust indices for items after deleted one
+            const adjustedSelected = new Set<number>()
+            newSelected.forEach(idx => {
+                if (idx > deleteIndex) {
+                    adjustedSelected.add(idx - 1)
+                } else if (idx < deleteIndex) {
+                    adjustedSelected.add(idx)
+                }
+            })
+            setSelectedAchievements(adjustedSelected)
         }
         setShowDeleteConfirm(false)
         setDeleteIndex(null)
+    }
+
+    const toggleAchievementSelection = (index: number) => {
+        const newSelected = new Set(selectedAchievements)
+        if (newSelected.has(index)) {
+            newSelected.delete(index)
+        } else {
+            newSelected.add(index)
+        }
+        setSelectedAchievements(newSelected)
+    }
+
+    const selectAllAchievements = () => {
+        if (selectedAchievements.size === achievements.length) {
+            setSelectedAchievements(new Set())
+        } else {
+            setSelectedAchievements(new Set(achievements.map((_, i) => i)))
+        }
+    }
+
+    const bulkDeleteAchievements = () => {
+        if (selectedAchievements.size > 0) {
+            setShowBulkDeleteConfirm(true)
+        }
+    }
+
+    const confirmBulkDeleteAchievements = () => {
+        const indicesToDelete = Array.from(selectedAchievements).sort((a, b) => b - a)
+        let newAchievements = [...achievements]
+
+        indicesToDelete.forEach(index => {
+            newAchievements = newAchievements.filter((_, i) => i !== index)
+        })
+
+        // Reorder after deletion
+        const reordered = newAchievements.map((img, i) => ({ ...img, order: i }))
+        setAchievements(reordered)
+        setSelectedAchievements(new Set())
+        setShowBulkDeleteConfirm(false)
     }
 
     const handleDragStart = (index: number) => {
@@ -433,12 +495,12 @@ export default function EditHomePage() {
         const draggedAchievement = newAchievements[draggedIndex]
         newAchievements.splice(draggedIndex, 1)
         newAchievements.splice(index, 0, draggedAchievement)
-        
+
         // Update order
         newAchievements.forEach((img, idx) => {
             img.order = idx
         })
-        
+
         setAchievements(newAchievements)
         setDraggedIndex(index)
     }
@@ -640,16 +702,83 @@ export default function EditHomePage() {
             case 'achievements':
                 return (
                     <div className="space-y-6">
+                        {/* Bulk Actions Bar */}
+                        <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={selectAllAchievements}
+                                    className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    <div className={`w-5 h-5 border-2 border-green-400 dark:border-green-600 rounded bg-white dark:bg-gray-700 transition-all duration-200 flex items-center justify-center shadow-sm ${
+                                        selectedAchievements.size === achievements.length && achievements.length > 0 
+                                        ? 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-500 shadow-lg shadow-green-500/50' 
+                                        : ''
+                                    }`}>
+                                        <svg className={`w-3 h-3 text-white transition-opacity duration-200 ${
+                                            selectedAchievements.size === achievements.length && achievements.length > 0 
+                                            ? 'opacity-100' 
+                                            : 'opacity-0'
+                                        }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    Select All
+                                </button>
+
+                                {selectedAchievements.size > 0 && (
+                                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                                        {selectedAchievements.size} selected
+                                    </span>
+                                )}
+                            </div>
+
+                            {selectedAchievements.size > 0 && (
+                                <button
+                                    onClick={bulkDeleteAchievements}
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Delete Selected ({selectedAchievements.size})
+                                </button>
+                            )}
+                        </div>
+
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                             {achievements.map((img, index) => (
-                                <div 
-                                    key={index} 
-                                    className={`relative group border-2 ${draggedIndex === index ? 'border-green-500 scale-105' : 'border-gray-300 dark:border-gray-600'} rounded-lg overflow-hidden cursor-move transition-all`}
+                                <div
+                                    key={index}
+                                    className={`relative group border-2 ${selectedAchievements.has(index)
+                                        ? 'border-green-500 ring-2 ring-green-500'
+                                        : draggedIndex === index
+                                            ? 'border-green-500 scale-105'
+                                            : 'border-gray-300 dark:border-gray-600'
+                                        } rounded-lg overflow-hidden cursor-move transition-all`}
                                     draggable
                                     onDragStart={() => handleDragStart(index)}
                                     onDragOver={(e) => handleDragOver(e, index)}
                                     onDragEnd={handleDragEnd}
                                 >
+                                    {/* Selection Checkbox */}
+                                    <div className="absolute top-2 left-2 z-10">
+                                        <label className="relative cursor-pointer group/checkbox">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedAchievements.has(index)}
+                                                onChange={() => toggleAchievementSelection(index)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="peer sr-only"
+                                            />
+                                            <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                                <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                            <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                        </label>
+                                    </div>
+
                                     <Image
                                         src={img.imageUrl}
                                         alt={`Achievement ${index + 1}`}
@@ -694,7 +823,8 @@ export default function EditHomePage() {
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                 </svg>
-                                <span className="text-gray-600 dark:text-gray-400">Add Achievement</span>
+                                <span className="text-gray-600 dark:text-gray-400">Add Achievements</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-500 mt-1">(multiple)</span>
                             </button>
                         </div>
 
@@ -706,10 +836,12 @@ export default function EditHomePage() {
                                 <div>
                                     <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Achievement Management Tips</h3>
                                     <ul className="text-sm text-blue-800 dark:text-blue-200 mt-1 space-y-1">
-                                        <li>• Click &quot;Add Achievement&quot; to upload new achievement images</li>
+                                        <li>• Click &quot;Add Achievements&quot; to upload multiple achievement images at once</li>
+                                        <li>• Use checkboxes to select multiple images for bulk deletion</li>
+                                        <li>• Click &quot;Select All&quot; to select/deselect all images</li>
                                         <li>• Drag and drop images to reorder them</li>
                                         <li>• Hover over an image and click the blue edit icon to replace it</li>
-                                        <li>• Hover over an image and click the red trash icon to delete it</li>
+                                        <li>• Hover over an image and click the red trash icon to delete a single image</li>
                                         <li>• Images are automatically numbered based on their order</li>
                                     </ul>
                                 </div>
@@ -731,7 +863,7 @@ export default function EditHomePage() {
                                 placeholder="e.g., Our Specialities"
                             />
                         </div>
-                        
+
                         <div>
                             <label className="block text-sm font-medium mb-2">Description</label>
                             <textarea
@@ -742,7 +874,7 @@ export default function EditHomePage() {
                                 placeholder="Enter the main description about your specialities..."
                             />
                         </div>
-                        
+
                         <div>
                             <label className="block text-sm font-medium mb-2">Inspirational Quote</label>
                             <textarea
@@ -763,100 +895,107 @@ export default function EditHomePage() {
             <div className="max-w-7xl mx-auto px-4 pb-20">
                 <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Edit Home Page</h1>
 
-                {/* Mobile Tabs */}
-                <div className="md:hidden mb-4">
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                        <div className="relative flex gap-1 p-2 min-w-max overflow-x-auto">
-                            {sidebarItems.map((item) => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => setActiveTab(item.id)}
-                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-200 whitespace-nowrap text-sm ${
-                                        activeTab === item.id
-                                            ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md'
-                                            : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
-                                    }`}
-                                >
-                                    <span>{item.icon}</span>
-                                    <span className="font-medium">{item.label}</span>
-                                </button>
-                            ))}
-                        </div>
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+                        <p className="text-gray-600 dark:text-gray-400">Loading home page content...</p>
                     </div>
-                </div>
-
-                <div className="flex gap-6">
-                    {/* Desktop Sidebar */}
-                    <div className="hidden md:block w-64 flex-shrink-0">
-                        <div className="rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sticky top-24 overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                            <nav className="space-y-1">
-                                {sidebarItems.map((item) => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => setActiveTab(item.id)}
-                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left ${
-                                            activeTab === item.id
-                                                ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/30 font-medium'
-                                                : 'hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-md'
-                                        }`}
-                                    >
-                                        <span className="text-xl">{item.icon}</span>
-                                        <span>{item.label}</span>
-                                    </button>
-                                ))}
-                            </nav>
-                        </div>
-                    </div>
-
-                    {/* Main Content */}
-                    <div className="flex-1 min-w-0">
-                        <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sm:p-6 md:p-8 overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                            <div className="relative">
-                            <div className="flex items-center justify-between mb-6">
-                                <div>
-                                    <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-                                        {sidebarItems.find(s => s.id === activeTab)?.label}
-                                    </h2>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                        Edit the content for this section
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={handleSave}
-                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg font-medium"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Save Changes
-                                </button>
-                            </div>
-
-                            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                                {renderEditor()}
-                            </div>
-                            </div>
-                        </div>
-
-                        {/* Info Card */}
-                        <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <div>
-                                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Preview Changes</h3>
-                                    <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
-                                        Changes are saved locally. Click "Save Changes" to persist them to the database. Visit the landing page to see your changes live.
-                                    </p>
+                ) : (
+                    <>
+                        {/* Mobile Tabs */}
+                        <div className="md:hidden mb-4">
+                            <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm overflow-hidden">
+                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                                <div className="relative flex gap-1 p-2 min-w-max overflow-x-auto">
+                                    {sidebarItems.map((item) => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => setActiveTab(item.id)}
+                                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-200 whitespace-nowrap text-sm ${activeTab === item.id
+                                                ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md'
+                                                : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                                                }`}
+                                        >
+                                            <span>{item.icon}</span>
+                                            <span className="font-medium">{item.label}</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+
+                        <div className="flex gap-6">
+                            {/* Desktop Sidebar */}
+                            <div className="hidden md:block w-64 flex-shrink-0">
+                                <div className="rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sticky top-24 overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                                    <nav className="space-y-1">
+                                        {sidebarItems.map((item) => (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => setActiveTab(item.id)}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left ${activeTab === item.id
+                                                    ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg shadow-green-500/30 font-medium'
+                                                    : 'hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-md'
+                                                    }`}
+                                            >
+                                                <span className="text-xl">{item.icon}</span>
+                                                <span>{item.label}</span>
+                                            </button>
+                                        ))}
+                                    </nav>
+                                </div>
+                            </div>
+
+                            {/* Main Content */}
+                            <div className="flex-1 min-w-0">
+                                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sm:p-6 md:p-8 overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                                    <div className="relative">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <div>
+                                                <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+                                                    {sidebarItems.find(s => s.id === activeTab)?.label}
+                                                </h2>
+                                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                    Edit the content for this section
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={handleSave}
+                                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg font-medium"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                Save Changes
+                                            </button>
+                                        </div>
+
+                                        <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                                            {renderEditor()}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Info Card */}
+                                <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Preview Changes</h3>
+                                            <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                                                Changes are saved locally. Click "Save Changes" to persist them to the database. Visit the landing page to see your changes live.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             <StatusModal
@@ -872,6 +1011,17 @@ export default function EditHomePage() {
                 message="Are you sure you want to delete this achievement image? This action cannot be undone."
                 onConfirm={confirmDeleteAchievement}
                 onCancel={() => setShowDeleteConfirm(false)}
+            />
+
+            <ConfirmModal
+                isOpen={showBulkDeleteConfirm}
+                title="Delete Selected Achievements"
+                message={`Are you sure you want to delete ${selectedAchievements.size} achievement(s)? This action cannot be undone.`}
+                confirmText="Delete All"
+                cancelText="Cancel"
+                variant="danger"
+                onConfirm={confirmBulkDeleteAchievements}
+                onCancel={() => setShowBulkDeleteConfirm(false)}
             />
         </EditLayout>
     )

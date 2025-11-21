@@ -4,10 +4,22 @@
 
 html, body, #__next {
   height: 100%;
+  overflow-x: hidden;
 }
 
 html {
   scroll-behavior: smooth;
+  font-size: 95%;
+}
+
+body {
+  overflow-y: overlay;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+body::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 /* Theme defaults: white background, black text, brand green accents */
@@ -26,6 +38,16 @@ html {
   --text: #f1f5f9; /* slate-100 */
   --muted: #94a3b8; /* slate-400 */
   --brand: #34d399; /* lighter green for dark */
+}
+
+/* Hide all scrollbars globally */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 body {
@@ -688,10 +710,16 @@ a:hover {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2), 0 10px 20px rgba(0, 0, 0, 0.15) !important;
   max-height: 300px;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   z-index: 99999 !important;
   animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0.5rem;
   isolation: isolate;
+}
+
+.custom-select-dropdown::-webkit-scrollbar {
+  display: none;
 }
 
 .dark .custom-select-dropdown {

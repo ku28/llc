@@ -19,6 +19,8 @@ export default function EditGalleryPage() {
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   
   // Status modal states
   const [statusModal, setStatusModal] = useState({
@@ -28,14 +30,10 @@ export default function EditGalleryPage() {
   });
 
   useEffect(() => {
-    // Show loading modal immediately
-    setStatusModal({ isOpen: true, status: 'loading', message: 'Loading gallery...' })
-    
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
         if (!d.user || d.user.role !== 'admin') {
-          setStatusModal({ isOpen: false, status: 'loading', message: '' })
           router.push('/');
           return;
         }
@@ -43,7 +41,6 @@ export default function EditGalleryPage() {
         loadGallery();
       })
       .catch(() => {
-        setStatusModal({ isOpen: false, status: 'loading', message: '' })
         router.push('/');
       });
   }, []);
@@ -53,7 +50,6 @@ export default function EditGalleryPage() {
       const res = await fetch('/api/gallery-content');
       const data = await res.json();
       setImages(data);
-      setStatusModal({ isOpen: false, status: 'loading', message: '' })
       setLoading(false);
     } catch (error) {
       console.error('Error loading gallery:', error);
@@ -70,44 +66,59 @@ export default function EditGalleryPage() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    input.multiple = true; // Allow multiple file selection
     input.onchange = async (e: any) => {
-      const file = e.target.files[0];
-      if (!file) return;
+      const files = Array.from(e.target.files || []) as File[];
+      if (files.length === 0) return;
 
-      setStatusModal({ isOpen: true, status: 'loading', message: 'Uploading image...' })
       try {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onloadend = async () => {
-          const base64 = reader.result as string;
-          const uploadRes = await fetch('/api/upload-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              image: base64,
-              folder: 'gallery'
-            })
+        let uploadedCount = 0;
+        const newImages: GalleryImage[] = [];
+        
+        for (const file of files) {
+          const reader = new FileReader();
+          await new Promise((resolve, reject) => {
+            reader.onloadend = async () => {
+              try {
+                const base64 = reader.result as string;
+                const uploadRes = await fetch('/api/upload-image', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    image: base64,
+                    folder: 'gallery'
+                  })
+                });
+                const uploadData = await uploadRes.json();
+                
+                if (uploadData.url) {
+                  newImages.push({ imageUrl: uploadData.url, order: images.length + newImages.length });
+                  uploadedCount++;
+                  resolve(uploadData.url);
+                } else {
+                  reject(new Error(uploadData.error || 'Upload failed'));
+                }
+              } catch (error) {
+                reject(error);
+              }
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
           });
-          const uploadData = await uploadRes.json();
-          
-          if (uploadData.url) {
-            // Add new image to the end of the array
-            setImages([...images, { imageUrl: uploadData.url, order: images.length }]);
-            setStatusModal({ 
-              isOpen: true, 
-              status: 'success', 
-              message: 'Image uploaded successfully!' 
-            })
-          } else {
-            throw new Error(uploadData.error || 'Upload failed')
-          }
-        };
+        }
+        
+        setImages([...images, ...newImages]);
+        setStatusModal({ 
+          isOpen: true, 
+          status: 'success', 
+          message: `${uploadedCount} image(s) uploaded successfully!` 
+        })
       } catch (error: any) {
-        console.error('Error uploading image:', error);
+        console.error('Error uploading images:', error);
         setStatusModal({ 
           isOpen: true, 
           status: 'error', 
-          message: error.message || 'Failed to upload image. Please try again.' 
+          message: error.message || 'Failed to upload some images. Please try again.' 
         })
       }
     };
@@ -125,13 +136,64 @@ export default function EditGalleryPage() {
       // Reorder after deletion
       const reordered = newImages.map((img, i) => ({ ...img, order: i }));
       setImages(reordered);
+      // Remove from selected if it was selected
+      const newSelected = new Set(selectedImages);
+      newSelected.delete(deleteIndex);
+      // Adjust indices for items after deleted one
+      const adjustedSelected = new Set<number>();
+      newSelected.forEach(idx => {
+        if (idx > deleteIndex) {
+          adjustedSelected.add(idx - 1);
+        } else if (idx < deleteIndex) {
+          adjustedSelected.add(idx);
+        }
+      });
+      setSelectedImages(adjustedSelected);
     }
     setShowDeleteConfirm(false);
     setDeleteIndex(null);
   }
 
+  function toggleImageSelection(index: number) {
+    const newSelected = new Set(selectedImages);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
+    }
+    setSelectedImages(newSelected);
+  }
+
+  function selectAllImages() {
+    if (selectedImages.size === images.length) {
+      setSelectedImages(new Set());
+    } else {
+      setSelectedImages(new Set(images.map((_, i) => i)));
+    }
+  }
+
+  function bulkDeleteImages() {
+    if (selectedImages.size > 0) {
+      setShowBulkDeleteConfirm(true);
+    }
+  }
+
+  function confirmBulkDelete() {
+    const indicesToDelete = Array.from(selectedImages).sort((a, b) => b - a);
+    let newImages = [...images];
+    
+    indicesToDelete.forEach(index => {
+      newImages = newImages.filter((_, i) => i !== index);
+    });
+    
+    // Reorder after deletion
+    const reordered = newImages.map((img, i) => ({ ...img, order: i }));
+    setImages(reordered);
+    setSelectedImages(new Set());
+    setShowBulkDeleteConfirm(false);
+  }
+
   async function handleSave() {
-    setStatusModal({ isOpen: true, status: 'loading', message: 'Saving gallery...' })
     try {
       const res = await fetch('/api/gallery-content', {
         method: 'POST',
@@ -167,7 +229,6 @@ export default function EditGalleryPage() {
       const file = e.target.files[0];
       if (!file) return;
 
-      setStatusModal({ isOpen: true, status: 'loading', message: 'Uploading replacement image...' })
       try {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -242,19 +303,95 @@ export default function EditGalleryPage() {
           <p className="text-sm text-gray-600 dark:text-gray-400">Upload and manage gallery images</p>
         </div>
 
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading gallery...</p>
+          </div>
+        ) : (
+        <>
         <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 md:p-8 mb-6 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
           <div className="relative">
+          
+          {/* Bulk Actions Bar */}
+          <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={selectAllImages}
+                className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <div className={`w-5 h-5 border-2 border-green-400 dark:border-green-600 rounded bg-white dark:bg-gray-700 transition-all duration-200 flex items-center justify-center shadow-sm ${
+                  selectedImages.size === images.length && images.length > 0 
+                  ? 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-500 shadow-lg shadow-green-500/50' 
+                  : ''
+                }`}>
+                  <svg className={`w-3 h-3 text-white transition-opacity duration-200 ${
+                    selectedImages.size === images.length && images.length > 0 
+                    ? 'opacity-100' 
+                    : 'opacity-0'
+                  }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                Select All
+              </button>
+              
+              {selectedImages.size > 0 && (
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {selectedImages.size} selected
+                </span>
+              )}
+            </div>
+            
+            {selectedImages.size > 0 && (
+              <button
+                onClick={bulkDeleteImages}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete Selected ({selectedImages.size})
+              </button>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {images.map((img, index) => (
               <div 
                 key={index} 
-                className={`relative group border-2 ${draggedIndex === index ? 'border-green-500 scale-105' : 'border-gray-300 dark:border-gray-600'} rounded-lg overflow-hidden cursor-move transition-all`}
+                className={`relative group border-2 ${
+                  selectedImages.has(index) 
+                    ? 'border-green-500 ring-2 ring-green-500' 
+                    : draggedIndex === index 
+                    ? 'border-green-500 scale-105' 
+                    : 'border-gray-300 dark:border-gray-600'
+                } rounded-lg overflow-hidden cursor-move transition-all`}
                 draggable
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
               >
+                {/* Selection Checkbox */}
+                <div className="absolute top-2 left-2 z-10">
+                  <label className="relative cursor-pointer group/checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedImages.has(index)}
+                      onChange={() => toggleImageSelection(index)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="peer sr-only"
+                    />
+                    <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                      <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                  </label>
+                </div>
+
                 <Image
                   src={img.imageUrl}
                   alt={`Gallery ${index + 1}`}
@@ -299,7 +436,8 @@ export default function EditGalleryPage() {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <span className="text-gray-600 dark:text-gray-400">Add Image</span>
+              <span className="text-gray-600 dark:text-gray-400">Add Images</span>
+              <span className="text-xs text-gray-500 dark:text-gray-500 mt-1">(multiple)</span>
             </button>
           </div>
           </div>
@@ -328,16 +466,20 @@ export default function EditGalleryPage() {
             <div>
               <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Gallery Management Tips</h3>
               <ul className="text-sm text-blue-800 dark:text-blue-200 mt-1 space-y-1">
-                <li>• Click &quot;Add Image&quot; to upload new images to the gallery</li>
+                <li>• Click &quot;Add Images&quot; to upload multiple new images at once</li>
+                <li>• Use checkboxes to select multiple images for bulk deletion</li>
+                <li>• Click &quot;Select All&quot; to select/deselect all images</li>
                 <li>• Drag and drop images to reorder them</li>
                 <li>• Hover over an image and click the blue edit icon to replace it</li>
-                <li>• Hover over an image and click the red trash icon to delete it</li>
+                <li>• Hover over an image and click the red trash icon to delete a single image</li>
                 <li>• Images are automatically numbered based on their order</li>
                 <li>• Click &quot;Save Changes&quot; to update the gallery on the website</li>
               </ul>
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       <StatusModal
@@ -355,6 +497,16 @@ export default function EditGalleryPage() {
         variant="danger"
         onConfirm={confirmDelete}
         onCancel={() => setShowDeleteConfirm(false)}
+      />
+      <ConfirmModal
+        isOpen={showBulkDeleteConfirm}
+        title="Delete Selected Images"
+        message={`Are you sure you want to delete ${selectedImages.size} image(s)? This action cannot be undone.`}
+        confirmText="Delete All"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setShowBulkDeleteConfirm(false)}
       />
     </EditLayout>
   );

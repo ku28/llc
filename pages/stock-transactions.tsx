@@ -169,7 +169,7 @@ export default function StockTransactionsPage() {
         switch (type) {
             case 'IN': return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
             case 'OUT': return 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
-            case 'ADJUSTMENT': return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+            case 'ADJUSTMENT': return 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200'
             case 'RETURN': return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
             default: return 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200'
         }
@@ -479,7 +479,7 @@ export default function StockTransactionsPage() {
                             setIsAnimating(false)
                             setTimeout(() => setIsAnimating(true), 10)
                         }}
-                        className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg shadow-lg flex items-center gap-2 transition-all duration-200 font-medium"
+                        className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg shadow-lg flex items-center gap-2 transition-all duration-200 font-medium"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -519,12 +519,12 @@ export default function StockTransactionsPage() {
             )}
 
                 {/* Info Card */}
-                <div className="card mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                <div className="card mb-4 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800">
                     <div className="flex items-start gap-3">
                         <div className="text-3xl">ℹ️</div>
                         <div>
-                            <h3 className="font-semibold mb-1 text-blue-900 dark:text-blue-100">About Inventory History</h3>
-                            <p className="text-sm text-blue-800 dark:text-blue-200">
+                            <h3 className="font-semibold mb-1 text-emerald-900 dark:text-emerald-100">About Inventory History</h3>
+                            <p className="text-sm text-emerald-800 dark:text-emerald-200">
                                 This page shows all inventory movements. Transactions are automatically created when you receive purchase orders or create customer invoices. 
                                 Use "Manual Adjustment" to correct stock levels, record returns, or make other inventory changes.
                             </p>
@@ -533,8 +533,9 @@ export default function StockTransactionsPage() {
                 </div>
 
                 {/* Filter Bar */}
-                <div className="card mb-4">
-                    <div className="flex items-center gap-3 flex-wrap">
+                <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 mb-4">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                    <div className="relative flex items-center gap-3 flex-wrap">
                         <div className="min-w-[200px]">
                             <CustomSelect
                                 value={filterProduct}
@@ -696,7 +697,7 @@ export default function StockTransactionsPage() {
                                     <button
                                         type="submit"
                                         disabled={!user}
-                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     >
                                         Record Transaction
                                     </button>
@@ -719,21 +720,26 @@ export default function StockTransactionsPage() {
                                     onChange={toggleSelectAll}
                                     className="peer sr-only"
                                 />
-                                <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
                                     <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
                                     </svg>
                                 </div>
-                                <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
                             </label>
-                            <span>Transaction History {selectedTransactionIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-bold">({selectedTransactionIds.size} selected)</span>}</span>
+                            <span className="font-bold text-gray-900 dark:text-gray-100">Transaction Records {selectedTransactionIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">({selectedTransactionIds.size} selected)</span>}</span>
                         </h3>
                         <span className="badge">
-                            {filteredTransactions.length} movements
+                            {filteredTransactions.length} transactions
                         </span>
                     </div>
 
-                    {filteredTransactions.length === 0 ? (
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-12">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+                            <p className="text-muted">Loading transactions...</p>
+                        </div>
+                    ) : filteredTransactions.length === 0 ? (
                         <div className="text-center py-8 text-muted">
                             <p className="text-lg mb-2">
                                 {filterProduct || filterType ? 'No transactions match your filters' : 'No transactions yet'}
@@ -743,9 +749,9 @@ export default function StockTransactionsPage() {
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             {filteredTransactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(txn => (
-                                <div key={txn.id} className={`border dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${selectedTransactionIds.has(txn.id) ? 'ring-2 ring-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/30' : ''}`}>
+                                <div key={txn.id} className={`border dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${selectedTransactionIds.has(txn.id) ? 'ring-2 ring-green-500 bg-green-50/30 dark:bg-green-950/30' : ''}`}>
                                     <div className="flex items-start gap-4">
                                         {/* Checkbox */}
                                         <label className="relative group/checkbox cursor-pointer flex-shrink-0 mt-1">
@@ -756,12 +762,12 @@ export default function StockTransactionsPage() {
                                                 onClick={(e) => e.stopPropagation()}
                                                 className="peer sr-only"
                                             />
-                                            <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                            <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
                                                 <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
                                                 </svg>
                                             </div>
-                                            <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                            <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
                                         </label>
                                         
                                         {/* Icon */}
@@ -817,7 +823,7 @@ export default function StockTransactionsPage() {
                                                 </div>
                                                 <div>
                                                     <div className="text-xs text-muted mb-1">Balance After</div>
-                                                    <div className="font-semibold text-blue-600 dark:text-blue-400">
+                                                    <div className="font-semibold text-emerald-600 dark:text-emerald-400">
                                                         {txn.balanceQuantity}
                                                     </div>
                                                 </div>
@@ -1032,10 +1038,12 @@ export default function StockTransactionsPage() {
                 </button>
             )}
 
-            <LoadingModal 
-                isOpen={loading || submitting} 
-                message={loading ? 'Loading transactions...' : 'Recording transaction...'}
-            />
+            {submitting && (
+                <LoadingModal 
+                    isOpen={true} 
+                    message="Recording transaction..."
+                />
+            )}
 
             <ToastNotification toasts={toasts} removeToast={removeToast} />
         </div>

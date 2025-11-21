@@ -28,6 +28,9 @@ export default function App({ Component, pageProps }: AppProps) {
   const editPages = ['/edit', '/edit-about', '/edit-services', '/edit-gallery', '/edit-contact']
   const isEditPage = editPages.includes(router.pathname)
 
+  // Determine page title based on route
+  const pageTitle = landingPages.includes(router.pathname) ? 'Last Leaf Care' : 'LLC ERP'
+
   useEffect(() => {
     // Skip auth check for public pages
     if (isPublicPage) {
@@ -87,7 +90,7 @@ export default function App({ Component, pageProps }: AppProps) {
           <ImportProvider>
           <ToastNotification toasts={toasts} removeToast={removeToast} />
         <Head>
-          <title>LLC ERP</title>
+          <title>{pageTitle}</title>
           {/* Prefer a PNG file (browsers reliably show PNG); keep .ico for legacy */}
           <link rel="icon" href="/favicon.png" type="image/png" />
           <link rel="icon" href="/favicon.ico" type="image/x-icon" />

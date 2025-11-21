@@ -676,32 +676,6 @@ export default function PurchaseOrdersPage() {
                     )}
                 </div>
 
-                {/* Bulk Action Bar */}
-                {selectedPOIds.size > 0 && (
-                    <div className="p-4 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 border border-emerald-200 dark:border-emerald-700 rounded-xl backdrop-blur-sm">
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                                {selectedPOIds.size} purchase order(s) selected
-                            </span>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setSelectedPOIds(new Set())}
-                                    className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 rounded-lg transition-colors"
-                                >
-                                    Clear Selection
-                                </button>
-                                <button
-                                    onClick={openBulkDeleteConfirm}
-                                    disabled={deleting}
-                                    className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-400 rounded-lg transition-colors"
-                                >
-                                    {deleting ? 'Deleting...' : '🗑️ Delete Selected'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 {/* Demand List Builder */}
                 <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
@@ -714,14 +688,14 @@ export default function PurchaseOrdersPage() {
                                 onClick={addManualItem}
                                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
                             >
-                                ➕ Add Item
+                                + Add Item
                             </button>
                             <button
                                 onClick={openSupplierModal}
                                 disabled={demandList.length === 0}
-                                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
                             >
-                                📧 Send Demand
+                                Send Demand
                             </button>
                         </div>
                     </div>
@@ -838,8 +812,8 @@ export default function PurchaseOrdersPage() {
                 {/* Sent Demands History */}
                 <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                    <h2 className="relative text-xl font-semibold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
-                        Sent Demands
+                    <h2 className="relative text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                        <span className="font-bold">Purchase Order Records {selectedPOIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">({selectedPOIds.size} selected)</span>}</span>
                     </h2>
                     
                     {/* Tabs */}
@@ -898,7 +872,12 @@ export default function PurchaseOrdersPage() {
                         />
                     </div>
 
-                    {filteredDemands.length === 0 ? (
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-12">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+                            <p className="text-muted">Loading purchase orders...</p>
+                        </div>
+                    ) : filteredDemands.length === 0 ? (
                         <div className="relative text-center py-12 text-gray-500 dark:text-gray-400">
                             <p className="text-lg">No demands sent yet</p>
                         </div>
@@ -915,12 +894,12 @@ export default function PurchaseOrdersPage() {
                                                     onChange={toggleSelectAll}
                                                     className="peer sr-only"
                                                 />
-                                                <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
                                                     <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
                                                     </svg>
                                                 </div>
-                                                <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                                <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
                                             </label>
                                         </th>
                                         <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('poNumber')}>
@@ -942,7 +921,7 @@ export default function PurchaseOrdersPage() {
                                 </thead>
                                 <tbody className="divide-y divide-emerald-100 dark:divide-emerald-900/30">
                                     {filteredDemands.map((demand) => (
-                                        <tr key={demand.id} className={`hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors ${selectedPOIds.has(demand.id) ? 'ring-2 ring-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/30' : ''}`}>
+                                        <tr key={demand.id} className={`hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors ${selectedPOIds.has(demand.id) ? 'ring-2 ring-green-500 bg-green-50/30 dark:bg-green-950/30' : ''}`}>
                                             <td className="px-4 py-3">
                                                 <label className="relative group/checkbox cursor-pointer">
                                                     <input
@@ -952,12 +931,12 @@ export default function PurchaseOrdersPage() {
                                                         onClick={(e) => e.stopPropagation()}
                                                         className="peer sr-only"
                                                     />
-                                                    <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                    <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
                                                         <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
                                                         </svg>
                                                     </div>
-                                                    <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                                    <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
                                                 </label>
                                             </td>
                                             <td className="px-4 py-3 font-medium font-mono">{demand.poNumber}</td>
@@ -1412,15 +1391,12 @@ export default function PurchaseOrdersPage() {
                 </button>
             )}
 
-            {/* Loading Modal (for single deletes or when minimized) */}
-            {((deleting && deleteProgress.total === 0) || (deleting && isDeleteMinimized)) && (
-                <LoadingModal isOpen={true} message="Deleting purchase order..." />
+            {(sendingEmail || receiving) && (
+                <LoadingModal 
+                    isOpen={true} 
+                    message={sendingEmail ? 'Sending demand...' : 'Receiving goods...'}
+                />
             )}
-
-            <LoadingModal 
-                isOpen={loading || sendingEmail || receiving} 
-                message={loading ? 'Loading...' : sendingEmail ? 'Sending demand...' : receiving ? 'Receiving goods...' : 'Processing...'}
-            />
 
             <ToastNotification toasts={toasts} removeToast={removeToast} />
         </>

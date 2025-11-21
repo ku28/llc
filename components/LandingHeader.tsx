@@ -51,12 +51,12 @@ export default function LandingHeader() {
                 user={user}
             />
             
-            <header className="sticky top-5 z-50 w-[90%] md:w-[70%] lg:w-[75%] lg:max-w-screen-xl mx-auto rounded-2xl shadow-inner bg-white/80 dark:bg-black/15 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 py-2">
-            <div className="mx-auto px-2 sm:px-4 flex justify-between items-center">
+            <header className="sticky top-5 z-50 w-[90%] md:w-[70%] lg:w-[75%] lg:max-w-screen-xl mx-auto rounded-full shadow-inner bg-white/80 dark:bg-black/15 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 py-3">
+            <div className="mx-auto px-4 sm:px-6 flex justify-between items-center">
                 <div className="flex items-center gap-3 sm:gap-6">
                     <button
                         onClick={() => setMobileOpen(!mobileOpen)}
-                        className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-800 dark:text-white"
+                        className="md:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-800 dark:text-white"
                         aria-label="Toggle menu"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,7 +76,7 @@ export default function LandingHeader() {
                         {/* App Switcher Icon Button */}
                         <button
                             onClick={() => setAppSwitcherModalOpen(true)}
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-200 group"
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-all duration-200 group"
                             aria-label="Switch application"
                             title="Switch between Last Leaf Care and LLC ERP"
                         >
@@ -92,16 +92,16 @@ export default function LandingHeader() {
                     </div>
 
                     <nav className="hidden md:flex items-center gap-1">
-                        <Link href="/" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Home</Link>
-                        <Link href="/about" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">About</Link>
-                        <Link href="/services" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Services</Link>
-                        <Link href="/gallery" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Gallery</Link>
-                        <Link href="/contact" className="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Contact</Link>
+                        <Link href="/" className="px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Home</Link>
+                        <Link href="/about" className="px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">About</Link>
+                        <Link href="/services" className="px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Services</Link>
+                        <Link href="/gallery" className="px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Gallery</Link>
+                        <Link href="/contact" className="px-3 py-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Contact</Link>
                     </nav>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <a href="https://github.com/ku28/lastleafcare.git" target="_blank" rel="noreferrer" className="px-4 py-2 bg-brand text-white rounded-lg text-sm font-medium hover:bg-brand-600 transition-colors">Connect With Us</a>
+                    <a href="https://github.com/ku28/lastleafcare.git" target="_blank" rel="noreferrer" className="px-4 py-2 bg-brand text-white rounded-full text-sm font-medium hover:bg-brand-600 transition-colors">Connect With Us</a>
                     <button
                         aria-label="Toggle theme"
                         aria-pressed={dark}
@@ -127,13 +127,13 @@ export default function LandingHeader() {
             {mobileOpen && (
                 <div className="md:hidden mt-4 px-4 border-t border-gray-200 dark:border-gray-700/50 pt-4">
                     <nav className="flex flex-col gap-2">
-                        <Link href="/" className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Home</Link>
-                        <Link href="/about" className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">About</Link>
-                        <Link href="/services" className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Services</Link>
-                        <Link href="/gallery" className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Gallery</Link>
-                        <Link href="/contact" className="px-4 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Contact</Link>
+                        <Link href="/" className="px-4 py-3 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Home</Link>
+                        <Link href="/about" className="px-4 py-3 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">About</Link>
+                        <Link href="/services" className="px-4 py-3 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Services</Link>
+                        <Link href="/gallery" className="px-4 py-3 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Gallery</Link>
+                        <Link href="/contact" className="px-4 py-3 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors font-medium text-sm text-gray-800 dark:text-white">Contact</Link>
                         <div className="flex gap-2 mt-2">
-                            <a href="https://github.com/ku28/lastleafcare.git" target="_blank" rel="noreferrer" className="flex-1 text-center px-4 py-3 bg-brand text-white rounded-lg hover:bg-brand-600 transition-colors">Connect</a>
+                            <a href="https://github.com/ku28/lastleafcare.git" target="_blank" rel="noreferrer" className="flex-1 text-center px-4 py-3 bg-brand text-white rounded-full hover:bg-brand-600 transition-colors">Connect</a>
                         </div>
                     </nav>
                 </div>

@@ -22,14 +22,10 @@ export default function EditAboutPage() {
     })
 
     useEffect(() => {
-        // Show loading modal immediately
-        setStatusModal({ isOpen: true, status: 'loading', message: 'Loading about content...' })
-        
         fetch('/api/auth/me')
             .then(r => r.json())
             .then(d => {
                 if (!d.user || d.user.role !== 'admin') {
-                    setStatusModal({ isOpen: false, status: 'loading', message: '' })
                     router.push('/')
                     return
                 }
@@ -37,7 +33,6 @@ export default function EditAboutPage() {
                 loadContent()
             })
             .catch(() => {
-                setStatusModal({ isOpen: false, status: 'loading', message: '' })
                 router.push('/')
             })
     }, [])
@@ -54,7 +49,6 @@ export default function EditAboutPage() {
                 })
             }
             setLoading(false)
-            setStatusModal({ isOpen: false, status: 'loading', message: '' })
         } catch (error) {
             console.error('Error loading content:', error)
             setLoading(false)
@@ -67,7 +61,6 @@ export default function EditAboutPage() {
     }
 
     const handleSave = async () => {
-        setStatusModal({ isOpen: true, status: 'loading', message: 'Saving about content...' })
         try {
             const res = await fetch('/api/about-content', {
                 method: 'POST',
@@ -103,6 +96,13 @@ export default function EditAboutPage() {
                     <p className="text-sm text-gray-600 dark:text-gray-400">Customize testimonials and team sections</p>
                 </div>
 
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+                        <p className="text-gray-600 dark:text-gray-400">Loading about content...</p>
+                    </div>
+                ) : (
+                <>
                 <div className="bg-white p-6 rounded-lg shadow-md space-y-6">
                     <div>
                         <label className="block text-sm font-medium mb-2">Title</label>
@@ -159,6 +159,8 @@ export default function EditAboutPage() {
                         </button>
                     </div>
                 </div>
+                </>
+                )}
             </div>
 
             <StatusModal

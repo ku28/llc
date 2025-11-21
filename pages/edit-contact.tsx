@@ -29,14 +29,10 @@ export default function EditContactPage() {
   });
 
   useEffect(() => {
-    // Show loading modal immediately
-    setStatusModal({ isOpen: true, status: 'loading', message: 'Loading contact information...' })
-    
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
         if (!d.user || d.user.role !== 'admin') {
-          setStatusModal({ isOpen: false, status: 'loading', message: '' })
           router.push('/');
           return;
         }
@@ -44,7 +40,6 @@ export default function EditContactPage() {
         loadContent();
       })
       .catch(() => {
-        setStatusModal({ isOpen: false, status: 'loading', message: '' })
         router.push('/');
       });
   }, []);
@@ -55,7 +50,6 @@ export default function EditContactPage() {
       const data = await res.json();
       setContent(data);
       setLoading(false);
-      setStatusModal({ isOpen: false, status: 'loading', message: '' })
     } catch (error) {
       console.error('Error loading contact info:', error);
       setLoading(false);
@@ -68,7 +62,6 @@ export default function EditContactPage() {
   }
 
   async function handleSave() {
-    setStatusModal({ isOpen: true, status: 'loading', message: 'Saving contact information...' })
     try {
       const res = await fetch('/api/contact-info', {
         method: 'POST',
@@ -104,6 +97,13 @@ export default function EditContactPage() {
           <p className="text-sm text-gray-600 dark:text-gray-400">Update your contact information</p>
         </div>
 
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading contact information...</p>
+          </div>
+        ) : (
+        <>
         <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 md:p-8 space-y-6 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
           <div className="relative">
@@ -170,6 +170,8 @@ export default function EditContactPage() {
             <li>Use the navigation above to edit other pages</li>
           </ul>
         </div>
+        </>
+        )}
       </div>
 
       <StatusModal

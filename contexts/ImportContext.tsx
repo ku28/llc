@@ -2,9 +2,9 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 
 export interface ImportTask {
     id: string
-    type: 'visits' | 'patients' | 'products' | 'treatments'
-    operation: 'import' | 'delete'
-    status: 'importing' | 'deleting' | 'success' | 'error' | 'cancelled'
+    type: 'visits' | 'patients' | 'products' | 'treatments' | 'invoices'
+    operation: 'import' | 'delete' | 'generate'
+    status: 'importing' | 'deleting' | 'generating' | 'success' | 'error' | 'cancelled'
     progress: {
         current: number
         total: number
@@ -12,6 +12,7 @@ export interface ImportTask {
     summary?: {
         success: number
         errors: number
+        skipped?: number
     }
     error?: string
     startTime: number
@@ -102,7 +103,7 @@ export function ImportProvider({ children }: { children: ReactNode }) {
     }
 
     const clearCompletedTasks = () => {
-        setTasks(prev => prev.filter(task => task.status === 'importing' || task.status === 'deleting'))
+        setTasks(prev => prev.filter(task => task.status === 'importing' || task.status === 'deleting' || task.status === 'generating'))
     }
 
     return (

@@ -28,14 +28,10 @@ export default function EditServicesPage() {
     })
 
     useEffect(() => {
-        // Show loading modal immediately
-        setStatusModal({ isOpen: true, status: 'loading', message: 'Loading services...' })
-        
         fetch('/api/auth/me')
             .then(r => r.json())
             .then(d => {
                 if (!d.user || d.user.role !== 'admin') {
-                    setStatusModal({ isOpen: false, status: 'loading', message: '' })
                     router.push('/')
                     return
                 }
@@ -43,7 +39,6 @@ export default function EditServicesPage() {
                 loadServices()
             })
             .catch(() => {
-                setStatusModal({ isOpen: false, status: 'loading', message: '' })
                 router.push('/')
             })
     }, [])
@@ -54,7 +49,6 @@ export default function EditServicesPage() {
             if (res.ok) {
                 const data = await res.json()
                 setServices(data)
-                setStatusModal({ isOpen: false, status: 'loading', message: '' })
             } else {
                 throw new Error('Failed to load services')
             }
@@ -71,7 +65,6 @@ export default function EditServicesPage() {
     }
 
     const handleSave = async () => {
-        setStatusModal({ isOpen: true, status: 'loading', message: 'Saving services...' })
         try {
             const res = await fetch('/api/services-content', {
                 method: 'POST',
@@ -177,6 +170,13 @@ export default function EditServicesPage() {
                     <p className="text-gray-600 dark:text-gray-400">Manage service cards that appear on the Services page. Numbers are auto-calculated.</p>
                 </div>
 
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+                        <p className="text-gray-600 dark:text-gray-400">Loading services...</p>
+                    </div>
+                ) : (
+                <>
                 <div className="space-y-6">
                     {services.map((service, index) => (
                         <div key={index} className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 overflow-hidden">
@@ -314,6 +314,8 @@ export default function EditServicesPage() {
                         </button>
                     </div>
                 </div>
+                </>
+                )}
             </div>
 
             <StatusModal

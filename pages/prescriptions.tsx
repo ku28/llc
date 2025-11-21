@@ -1369,11 +1369,11 @@ export default function PrescriptionsPage() {
                                 <p className="text-sm text-muted">Comprehensive visit recording with prescriptions and patient updates</p>
                             </div>
                             {!isEditMode && hasDraft && (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
-                                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg">
+                                    <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Draft Auto-Saved</span>
+                                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Draft Auto-Saved</span>
                                 </div>
                             )}
                         </div>
@@ -1384,7 +1384,7 @@ export default function PrescriptionsPage() {
                         {toasts.map(toast => (
                             <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-slideIn ${toast.type === 'success' ? 'bg-green-500 text-white' :
                                 toast.type === 'error' ? 'bg-red-500 text-white' :
-                                    'bg-blue-500 text-white'
+                                    'bg-emerald-500 text-white'
                                 }`}>
                                 <span className="flex-1">{toast.message}</span>
                                 <button onClick={() => removeToast(toast.id)} className="text-white hover:text-gray-200">
@@ -1563,14 +1563,14 @@ export default function PrescriptionsPage() {
 
                                 {/* Patient Image Display - Improved Layout */}
                                 {form.patientId && (
-                                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 rounded-lg p-6 my-4">
+                                    <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-gray-800 dark:to-gray-700 rounded-lg p-6 my-4">
                                         <div className="flex items-center gap-6">
                                             {/* Patient Image */}
                                             <div className="flex-shrink-0">
                                                 <img
                                                     src={patients.find(p => String(p.id) === String(form.patientId))?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''}
                                                     alt="Patient"
-                                                    className="w-24 h-24 object-cover rounded-lg border-3 border-white shadow-lg ring-2 ring-blue-200"
+                                                    className="w-24 h-24 object-cover rounded-lg border-3 border-white shadow-lg ring-2 ring-emerald-200"
                                                 />
                                             </div>
                                             {/* Patient Info */}
@@ -1814,7 +1814,7 @@ export default function PrescriptionsPage() {
                                     <div className="space-y-2">
                                         {/* File Upload & Camera Controls */}
                                         <div className="flex items-center gap-2">
-                                            <label className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-xs">
+                                            <label className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors text-xs">
                                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                                 </svg>
@@ -2384,7 +2384,7 @@ export default function PrescriptionsPage() {
                                                                 onClick={() => {
                                                                     updatePrescription(i, { comp4: '' })
                                                                 }}
-                                                                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors text-sm font-bold"
+                                                                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition-colors text-sm font-bold"
                                                                 title="Add spagyric 4"
                                                             >
                                                                 +
@@ -2398,7 +2398,7 @@ export default function PrescriptionsPage() {
                                                                 onClick={() => {
                                                                     updatePrescription(i, { comp5: '' })
                                                                 }}
-                                                                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors text-sm font-bold"
+                                                                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition-colors text-sm font-bold"
                                                                 title="Add spagyric 5"
                                                             >
                                                                 +
@@ -2872,7 +2872,7 @@ export default function PrescriptionsPage() {
                                                 showError(error.message || 'Failed to create treatment plan')
                                             }
                                         }}
-                                        className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                                        className="w-full px-4 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg transition-colors font-medium"
                                     >
                                         Create New Treatment Plan
                                     </button>
@@ -2978,7 +2978,7 @@ export default function PrescriptionsPage() {
                                                 router.push(`/treatments/${createdTreatmentId}`)
                                             }
                                         }}
-                                        className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+                                        className="w-full px-4 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -3040,7 +3040,7 @@ function UserPrescriptionsContent({ user }: { user: any }) {
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
                 <p className="text-muted">Loading your prescriptions...</p>
             </div>
         )

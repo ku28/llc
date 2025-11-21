@@ -925,30 +925,30 @@ function ProductsPage() {
 
             {/* Stock Status Summary */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div className="card bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900 dark:to-emerald-800 border-emerald-200 dark:border-emerald-800">
+                <div className="card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 border-green-200 dark:border-green-800">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">Total Products</p>
-                            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{items.length}</p>
+                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{items.length}</p>
                         </div>
-                        <div className="p-3 bg-emerald-200 dark:bg-emerald-800/50 rounded-full">
-                            <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="p-3 bg-green-200 dark:bg-green-800/50 rounded-full">
+                            <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                             </svg>
                         </div>
                     </div>
                 </div>
 
-                <div className="card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 border-green-200 dark:border-green-800">
+                <div className="card bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900 dark:to-emerald-800 border-emerald-200 dark:border-emerald-800">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">In Stock</p>
-                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                                 {items.filter(p => (p.quantity || 0) >= (p.category?.reorderLevel || 10)).length}
                             </p>
                         </div>
-                        <div className="p-3 bg-green-200 dark:bg-green-800/50 rounded-full">
-                            <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="p-3 bg-emerald-200 dark:bg-emerald-800/50 rounded-full">
+                            <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
@@ -1441,7 +1441,12 @@ function ProductsPage() {
                     </span>
                     <span className="badge">{getFilteredProducts().length} products</span>
                 </h3>
-                {getFilteredProducts().length === 0 ? (
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+                        <p className="text-muted">Loading products...</p>
+                    </div>
+                ) : getFilteredProducts().length === 0 ? (
                     <div className="text-center py-12 text-muted">
                         <p className="text-lg mb-2">No products found</p>
                         <p className="text-sm">Try adjusting your search or filter criteria</p>

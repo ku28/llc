@@ -19,6 +19,7 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
   const [appSwitcherModalOpen, setAppSwitcherModalOpen] = useState(false)
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null)
   const navRef = useRef<HTMLDivElement>(null)
+  const submenuNavRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   // Determine current app and title
@@ -100,29 +101,51 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
   // Update indicator position when route changes
   useEffect(() => {
     const updateIndicator = () => {
-      if (!navRef.current) return
+      // Check if we're on an accounting page
+      const isAccountingPage = ['/suppliers', '/purchase-orders', '/invoices', '/stock-transactions', '/analytics'].includes(router.pathname)
       
-      const activeLink = navRef.current.querySelector('[data-active="true"]') as HTMLElement
-      if (activeLink) {
-        const navRect = navRef.current.getBoundingClientRect()
-        const linkRect = activeLink.getBoundingClientRect()
-        setIndicatorStyle({
-          left: linkRect.left - navRect.left,
-          width: linkRect.width
-        })
-      } else {
-        setIndicatorStyle(null)
+      if (isAccountingPage && submenuNavRef.current && accountingOpen) {
+        // Use submenu nav for accounting pages
+        const activeLink = submenuNavRef.current.querySelector('[data-active="true"]') as HTMLElement
+        if (activeLink) {
+          const navRect = submenuNavRef.current.getBoundingClientRect()
+          const linkRect = activeLink.getBoundingClientRect()
+          setIndicatorStyle({
+            left: linkRect.left - navRect.left,
+            width: linkRect.width
+          })
+          return
+        }
+      }
+      
+      // Use main nav for other pages
+      if (navRef.current) {
+        const activeLink = navRef.current.querySelector('[data-active="true"]') as HTMLElement
+        if (activeLink) {
+          const navRect = navRef.current.getBoundingClientRect()
+          const linkRect = activeLink.getBoundingClientRect()
+          setIndicatorStyle({
+            left: linkRect.left - navRect.left,
+            width: linkRect.width
+          })
+        } else {
+          setIndicatorStyle(null)
+        }
       }
     }
 
     // Update on mount and route change
     updateIndicator()
     
-    // Update after a small delay to ensure DOM is ready
-    const timer = setTimeout(updateIndicator, 50)
+    // Update after delays to ensure DOM is ready
+    const timer1 = setTimeout(updateIndicator, 100)
+    const timer2 = setTimeout(updateIndicator, 300)
     
-    return () => clearTimeout(timer)
-  }, [router.pathname, user])
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+    }
+  }, [router.pathname, user, accountingOpen])
 
   function toggleTheme() {
     const next = !dark
@@ -158,9 +181,11 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
         user={user}
       />
       
-      <header className="border-b border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-white via-emerald-50/20 to-green-50/10 dark:from-gray-900 dark:via-emerald-950/10 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-md py-4 mb-8 sticky top-0 z-50">
+      <header className={`border-b border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-white via-emerald-50/20 to-green-50/10 dark:from-gray-900 dark:via-emerald-950/10 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-md mb-8 sticky top-0 z-50 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]`}>
       <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/3 via-transparent to-green-500/3 pointer-events-none"></div>
-      <div className="relative max-w-7xl mx-auto px-2 sm:px-4 flex justify-between items-center">
+      
+      <div className={`relative max-w-7xl mx-auto px-2 sm:px-4 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${accountingOpen ? 'py-4' : 'py-4'}`}>
+      <div className="flex justify-between items-center min-h-[56px]">
         <div className="flex items-center gap-3 sm:gap-6">
           {/* Mobile Menu Button */}
           <button
@@ -207,7 +232,7 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
           {/* main nav - hidden on small screens */}
           <nav ref={navRef} className="hidden md:flex items-center gap-1 relative">
             {/* Sliding indicator */}
-            {indicatorStyle && (
+            {indicatorStyle && !['/suppliers', '/purchase-orders', '/invoices', '/stock-transactions', '/analytics'].includes(router.pathname) && (
               <span 
                 className="absolute bottom-0 h-0.5 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full transition-all duration-300 ease-out"
                 style={{ 
@@ -268,78 +293,18 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                   </Link>
                 )}
                 
-                {/* Accounting Dropdown - only show for non-reception users who can access accounting features */}
+                {/* Accounting Expandable Menu - only show for non-reception users who can access accounting features */}
                 {!isReception && (canAccess('/suppliers') || canAccess('/purchase-orders') || canAccess('/invoices') || canAccess('/stock-transactions') || canAccess('/analytics')) && (
-                <div className="relative">
                   <button
                     data-active={['/suppliers', '/purchase-orders', '/invoices', '/stock-transactions', '/analytics'].includes(router.pathname)}
-                    onMouseEnter={() => setAccountingOpen(true)}
                     onClick={() => setAccountingOpen(!accountingOpen)}
                     className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-1 relative ${['/suppliers', '/purchase-orders', '/invoices', '/stock-transactions', '/analytics'].includes(router.pathname) ? 'text-green-600 dark:text-green-400' : ''}`}
                   >
                     Accounting
-                    <svg className={`w-4 h-4 transition-transform ${accountingOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className={`w-4 h-4 transition-transform duration-300 ${accountingOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
-                  
-                  {accountingOpen && (
-                    <div 
-                      className="absolute top-full left-0 mt-1 w-48 rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/10 backdrop-blur-sm py-1 z-50 overflow-hidden"
-                      onMouseEnter={() => setAccountingOpen(true)}
-                      onMouseLeave={() => setAccountingOpen(false)}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
-                      <div className="relative">
-                      {canAccess('/suppliers') && (
-                        <Link 
-                          href="/suppliers" 
-                          className={`block px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-sm ${router.pathname === '/suppliers' ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
-                          onClick={() => setAccountingOpen(false)}
-                        >
-                          Suppliers
-                        </Link>
-                      )}
-                      {canAccess('/purchase-orders') && (
-                        <Link 
-                          href="/purchase-orders" 
-                          className={`block px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-sm ${router.pathname === '/purchase-orders' ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
-                          onClick={() => setAccountingOpen(false)}
-                        >
-                          Purchase Orders
-                        </Link>
-                      )}
-                      {canAccess('/invoices') && (
-                        <Link 
-                          href="/invoices" 
-                          className={`block px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-sm ${router.pathname === '/invoices' ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
-                          onClick={() => setAccountingOpen(false)}
-                        >
-                          Invoices
-                        </Link>
-                      )}
-                      {canAccess('/stock-transactions') && (
-                        <Link 
-                          href="/stock-transactions" 
-                          className={`block px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-sm ${router.pathname === '/stock-transactions' ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
-                          onClick={() => setAccountingOpen(false)}
-                        >
-                          Inventory History
-                        </Link>
-                      )}
-                      {canAccess('/analytics') && (
-                        <Link 
-                          href="/analytics" 
-                          className={`block px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-sm ${router.pathname === '/analytics' ? 'text-green-600 dark:text-green-400 font-semibold' : ''}`}
-                          onClick={() => setAccountingOpen(false)}
-                        >
-                          Analytics
-                        </Link>
-                      )}
-                      </div>
-                    </div>
-                  )}
-                </div>
                 )}
               </>
             )}
@@ -473,7 +438,76 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
+      {/* Accounting Submenu Row - Appears below main navbar when accounting is expanded */}
+      <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${accountingOpen ? 'max-h-[60px] opacity-100 mt-3' : 'max-h-0 opacity-0'}`}>
+        {!isReception && (canAccess('/suppliers') || canAccess('/purchase-orders') || canAccess('/invoices') || canAccess('/stock-transactions') || canAccess('/analytics')) && (
+        <div className="flex items-center gap-3 sm:gap-6">
+          {/* Empty space to match logo width */}
+          <div className="flex items-center gap-2 sm:gap-3" style={{ width: '170px' }}>
+            {/* Spacer matching logo area */}
+          </div>
+          <nav ref={submenuNavRef} className="hidden md:flex items-center gap-1 relative">
+            {/* Sliding indicator for accounting submenu */}
+            {indicatorStyle && accountingOpen && ['/suppliers', '/purchase-orders', '/invoices', '/stock-transactions', '/analytics'].includes(router.pathname) && (
+              <span 
+                className="absolute bottom-0 h-0.5 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full transition-all duration-300 ease-out"
+                style={{ 
+                  left: `${indicatorStyle.left}px`, 
+                  width: `${indicatorStyle.width}px` 
+                }}
+              />
+            )}
+            {canAccess('/suppliers') && (
+              <Link 
+                href="/suppliers" 
+                data-active={router.pathname === '/suppliers'}
+                className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm ${router.pathname === '/suppliers' ? 'text-green-600 dark:text-green-400' : ''}`}
+              >
+                Suppliers
+              </Link>
+            )}
+            {canAccess('/purchase-orders') && (
+              <Link 
+                href="/purchase-orders" 
+                data-active={router.pathname === '/purchase-orders'}
+                className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm ${router.pathname === '/purchase-orders' ? 'text-green-600 dark:text-green-400' : ''}`}
+              >
+                Purchase Orders
+              </Link>
+            )}
+            {canAccess('/invoices') && (
+              <Link 
+                href="/invoices" 
+                data-active={router.pathname === '/invoices'}
+                className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm ${router.pathname === '/invoices' ? 'text-green-600 dark:text-green-400' : ''}`}
+              >
+                Invoices
+              </Link>
+            )}
+            {canAccess('/stock-transactions') && (
+              <Link 
+                href="/stock-transactions" 
+                data-active={router.pathname === '/stock-transactions'}
+                className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm ${router.pathname === '/stock-transactions' ? 'text-green-600 dark:text-green-400' : ''}`}
+              >
+                Inventory History
+              </Link>
+            )}
+            {canAccess('/analytics') && (
+              <Link 
+                href="/analytics" 
+                data-active={router.pathname === '/analytics'}
+                className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm ${router.pathname === '/analytics' ? 'text-green-600 dark:text-green-400' : ''}`}
+              >
+                Analytics
+              </Link>
+            )}
+          </nav>
+        </div>
+        )}
+      </div>
+      </div>
+      </header>
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-gray-200 dark:border-gray-700 mt-4 pt-4 px-2 sm:px-4">
           <nav className="flex flex-col space-y-1">
@@ -602,7 +636,6 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
           </nav>
         </div>
       )}
-    </header>
     </>
   )
 }

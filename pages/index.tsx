@@ -33,7 +33,7 @@ export default function LandingPage() {
       {!loading && user && user.role === 'admin' && (
         <button
           onClick={() => router.push('/edit')}
-          className="fixed top-4 right-4 z-[9999] flex items-center gap-2 px-4 py-2.5 bg-white/10 dark:bg-gray-900/30 backdrop-blur-md text-white rounded-full shadow-xl transition-all duration-300 font-semibold text-sm border border-white/20 hover:bg-green-500/20 hover:border-green-400 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:scale-110"
+          className="fixed top-4 right-4 z-[9999] flex items-center gap-2 px-4 py-2.5 bg-gray-900/80 dark:bg-gray-900/30 backdrop-blur-md text-white rounded-full shadow-xl transition-all duration-300 font-semibold text-sm border border-gray-700/50 dark:border-white/20 hover:bg-green-500/90 dark:hover:bg-green-500/20 hover:border-green-400 hover:shadow-[0_0_20px_rgba(34,197,94,0.6)] hover:scale-110"
           title="Edit Landing Page Content"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

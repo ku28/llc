@@ -1537,7 +1537,7 @@ export default function PatientsPage() {
                                         <div className="flex items-center gap-2 flex-shrink-0">
                                             <button
                                                 onClick={() => editPatient(p)}
-                                                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+                                                className="px-3 py-1.5 text-xs bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded"
                                                 title="Edit"
                                             >
                                                 ✏️ Edit

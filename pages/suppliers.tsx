@@ -491,44 +491,17 @@ export default function SuppliersPage() {
                 </div>
             </div>
 
-            {/* Bulk Action Bar */}
-            {selectedSupplierIds.size > 0 && (
-                <div className="mb-4 p-4 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border border-emerald-200/30 dark:border-emerald-700/30 rounded-lg">
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
-                            {selectedSupplierIds.size} supplier(s) selected
-                        </span>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setSelectedSupplierIds(new Set())}
-                                className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-300 dark:border-gray-600"
-                            >
-                                Clear Selection
-                            </button>
-                            <button
-                                onClick={openBulkDeleteConfirm}
-                                className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition-colors flex items-center gap-1"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                Delete Selected
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
                 {/* Search and Filter Bar */}
-                <div className="card mb-4">
-                    <div className="flex items-center gap-3 flex-wrap">
+                <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 mb-4">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                    <div className="relative flex items-center gap-3 flex-wrap">
                         <div className="flex-1 relative min-w-[250px]">
                             <input
                                 type="text"
                                 placeholder="🔍 Search suppliers by name, contact, phone, or email..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full p-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
+                                className="w-full p-3 pr-10 border border-emerald-200 dark:border-emerald-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
                             />
                         </div>
                         <div className="w-48">
@@ -760,24 +733,30 @@ export default function SuppliersPage() {
                     </div>
                 )}
 
-                {/* Suppliers Table */}
+                {/* Suppliers List */}
                 <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                     <div className="relative">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                checked={selectedSupplierIds.size === filteredSuppliers.length && filteredSuppliers.length > 0}
-                                onChange={toggleSelectAll}
-                                className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                            />
-                            <span>Suppliers</span>
-                        </h3>
-                        <span className="badge">
-                            {filteredSuppliers.length} of {suppliers.length} suppliers
+                    <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
+                        <span className="flex items-center gap-3">
+                            <label className="relative group/checkbox cursor-pointer flex-shrink-0">
+                                <input
+                                    type="checkbox"
+                                    checked={filteredSuppliers.length > 0 && selectedSupplierIds.size === filteredSuppliers.length}
+                                    onChange={toggleSelectAll}
+                                    className="peer sr-only"
+                                />
+                                <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                    <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                            </label>
+                            <span className="font-bold text-gray-900 dark:text-gray-100">Supplier Records {selectedSupplierIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">({selectedSupplierIds.size} selected)</span>}</span>
                         </span>
-                    </div>
+                        <span className="badge">{filteredSuppliers.length} suppliers</span>
+                    </h3>
 
                     {filteredSuppliers.length === 0 ? (
                         <div className="text-center py-8 text-muted">
@@ -789,20 +768,32 @@ export default function SuppliersPage() {
                             </p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <>
+                        <div className="space-y-2">
                             {filteredSuppliers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(s => {
                                 const isExpanded = expandedRows.has(s.id)
                                 return (
-                                    <div key={s.id} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                                    <div key={s.id} className={`border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden transition-all duration-300 ${selectedSupplierIds.has(s.id) ? 'ring-2 ring-green-500 shadow-xl shadow-green-100 dark:shadow-green-900/30 bg-gradient-to-r from-green-50/30 to-emerald-50/30 dark:from-gray-800 dark:to-gray-800' : ''}`}>
                                         {/* Summary Row */}
                                         <div className="bg-gray-50 dark:bg-gray-800 p-3 flex items-center gap-3">
                                             {/* Checkbox */}
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedSupplierIds.has(s.id)}
-                                                onChange={() => toggleSelectSupplier(s.id)}
-                                                className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500 flex-shrink-0"
-                                            />
+                                            <div className="flex-shrink-0">
+                                                <label className="relative group/checkbox cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedSupplierIds.has(s.id)}
+                                                        onChange={() => toggleSelectSupplier(s.id)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="peer sr-only"
+                                                    />
+                                                    <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
+                                                        <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    </div>
+                                                    <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                                </label>
+                                            </div>
                                             
                                             {/* Supplier Info */}
                                             <div className="flex-1 min-w-0">
@@ -933,7 +924,6 @@ export default function SuppliersPage() {
                                 )
                             })}
                         </div>
-                    )}
 
                             {/* Pagination Controls */}
                             {filteredSuppliers.length > itemsPerPage && (
@@ -963,6 +953,8 @@ export default function SuppliersPage() {
                                     </button>
                                 </div>
                             )}
+                        </>
+                    )}
                 </div>
 
             {/* Confirm Delete Modal */}
@@ -1061,15 +1053,9 @@ export default function SuppliersPage() {
                 </div>
             )}
 
-            {/* Loading Modal (for single deletes or when minimized) */}
-            {((deleting && deleteProgress.total === 0) || (deleting && isDeleteMinimized)) && (
-                <LoadingModal isOpen={true} message="Deleting supplier..." />
+            {submitting && (
+                <LoadingModal isOpen={true} message="Saving supplier..." />
             )}
-
-            <LoadingModal 
-                isOpen={loading || submitting} 
-                message={loading ? 'Loading suppliers...' : 'Saving supplier...'}
-            />
 
             <ToastNotification toasts={toasts} removeToast={removeToast} />
             </div>
