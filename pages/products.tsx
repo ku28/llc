@@ -9,6 +9,8 @@ import { requireStaffOrAbove } from '../lib/withAuth'
 import { useImportContext } from '../contexts/ImportContext'
 import { useDataCache } from '../contexts/DataCacheContext'
 import RefreshButton from '../components/RefreshButton'
+import categoriesData from '../data/categories.json'
+import unitTypes from '../data/unitTypes.json'
 
 function ProductsPage() {
     const [items, setItems] = useState<any[]>([])
@@ -50,6 +52,14 @@ function ProductsPage() {
     const [sendingEmail, setSendingEmail] = useState(false)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
     const [successMessage, setSuccessMessage] = useState('')
+    const [isFilterCategoryOpen, setIsFilterCategoryOpen] = useState(false)
+    const [isFilterStockOpen, setIsFilterStockOpen] = useState(false)
+    const [isFilterPriceOpen, setIsFilterPriceOpen] = useState(false)
+    const [isModalCategoryOpen, setIsModalCategoryOpen] = useState(false)
+    const [isUnitTypeOpen, setIsUnitTypeOpen] = useState(false)
+    const [isSupplierOpen, setIsSupplierOpen] = useState(false)
+    const [isPurchaseQtyLocked, setIsPurchaseQtyLocked] = useState(true)
+    const [isSalesQtyLocked, setIsSalesQtyLocked] = useState(true)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const { addTask, updateTask } = useImportContext()
     const { getCache, setCache } = useDataCache()
@@ -63,7 +73,8 @@ function ProductsPage() {
     const emptyForm = {
         name: '',
         categoryId: '',
-        unit: '',
+        unitQuantity: '',
+        unitType: '',
         priceRupees: '',
         purchasePriceRupees: '',
         totalPurchased: '',
@@ -149,7 +160,7 @@ function ProductsPage() {
 
     // Auto-calculate all formula fields
     useEffect(() => {
-        const unit = Number(form.unit) || 0
+        const unit = Number(form.unitQuantity) || 0
     const ratePerUnit = Number(form.priceRupees) || 0
         const purchase = Number(form.totalPurchased) || 0
         const sales = Number(form.totalSales) || 0
@@ -181,15 +192,25 @@ function ProductsPage() {
             salesValue: calculatedSalesValue > 0 ? String(calculatedSalesValue) : '',
             actualInventory: calculatedActualInventory > 0 ? String(calculatedActualInventory.toFixed(0)) : prev.actualInventory
         }))
-    }, [form.unit, form.priceRupees, form.totalPurchased, form.totalSales])
+    }, [form.unitQuantity, form.priceRupees, form.totalPurchased, form.totalSales])
 
     async function create(e: any) {
         e.preventDefault()
         try {
+            // Find category ID by name from database categories
+            const categoryIdValue = form.categoryId ? 
+                categories.find((c: any) => c.name === form.categoryId)?.id || null 
+                : null
+            
+            // Combine unitQuantity and unitType into unit field
+            const unitValue = form.unitQuantity && form.unitType ? 
+                `${form.unitQuantity} ${form.unitType}` : 
+                form.unitQuantity || ''
+            
             const payload = {
                 name: form.name,
-                categoryId: form.categoryId ? Number(form.categoryId) : null,
-                unit: form.unit,
+                categoryId: categoryIdValue,
+                unit: unitValue,
                 priceRupees: Number(form.priceRupees) || 0,
                 purchasePriceRupees: Number(form.purchasePriceRupees) || 0,
                 totalPurchased: Number(form.totalPurchased) || 0,
@@ -232,11 +253,21 @@ function ProductsPage() {
         e.preventDefault()
         if (!editingId) return
         
+        // Find category ID by name from database categories
+        const categoryIdValue = form.categoryId ? 
+            categories.find((c: any) => c.name === form.categoryId)?.id || null 
+            : null
+        
+        // Combine unitQuantity and unitType into unit field
+        const unitValue = form.unitQuantity && form.unitType ? 
+            `${form.unitQuantity} ${form.unitType}` : 
+            form.unitQuantity || ''
+        
         const payload = {
             id: editingId,
             name: form.name,
-            categoryId: form.categoryId ? Number(form.categoryId) : null,
-            unit: form.unit,
+            categoryId: categoryIdValue,
+            unit: unitValue,
             priceRupees: Number(form.priceRupees) || 0,
             purchasePriceRupees: Number(form.purchasePriceRupees) || 0,
             totalPurchased: Number(form.totalPurchased) || 0,
@@ -277,10 +308,25 @@ function ProductsPage() {
 
     function editProduct(product: any) {
         setEditingId(product.id)
+        
+        // Split unit field into quantity and type
+        let unitQuantity = ''
+        let unitType = ''
+        if (product.unit) {
+            const unitParts = String(product.unit).trim().split(/\s+/)
+            if (unitParts.length >= 2) {
+                unitQuantity = unitParts[0]
+                unitType = unitParts[1].toUpperCase()
+            } else {
+                unitQuantity = unitParts[0]
+            }
+        }
+        
         setForm({
             name: product.name,
-            categoryId: product.categoryId ? String(product.categoryId) : '',
-            unit: product.unit || '',
+            categoryId: product.category?.name || '',
+            unitQuantity: unitQuantity,
+            unitType: unitType,
             priceRupees: String(product.priceRupees || 0),
             purchasePriceRupees: String(product.purchasePriceRupees || 0),
             totalPurchased: String(product.totalPurchased || 0),
@@ -291,6 +337,8 @@ function ProductsPage() {
             salesValue: String(product.salesValue || ''),
             actualInventory: product.actualInventory ? String(product.actualInventory) : ''
         })
+        setIsPurchaseQtyLocked(true)
+        setIsSalesQtyLocked(true)
         setIsModalOpen(true)
         document.body.style.overflow = 'hidden'
         setIsAnimating(false)
@@ -438,23 +486,23 @@ function ProductsPage() {
                 }
             }
             // Category filter
-            if (filterCategory && String(product.categoryId) !== filterCategory) {
+            if (filterCategory && product.category?.name !== filterCategory) {
                 return false
             }
             // Stock status filter
             if (filterStockStatus) {
                 const qty = product.quantity || 0
                 const reorderLevel = product.category?.reorderLevel || 10
-                if (filterStockStatus === 'low' && qty >= reorderLevel) return false
-                if (filterStockStatus === 'out' && qty > 0) return false
-                if (filterStockStatus === 'in' && qty <= 0) return false
+                if (filterStockStatus === 'low-stock' && qty >= reorderLevel) return false
+                if (filterStockStatus === 'out-of-stock' && qty > 0) return false
+                if (filterStockStatus === 'in-stock' && qty <= 0) return false
             }
             // Price range filter
             if (filterPriceRange) {
                 const price = product.priceRupees || 0
-                if (filterPriceRange === 'low' && price >= 5000) return false
-                if (filterPriceRange === 'medium' && (price < 5000 || price >= 20000)) return false
-                if (filterPriceRange === 'high' && price < 20000) return false
+                if (filterPriceRange === '0-5000' && (price < 0 || price > 5000)) return false
+                if (filterPriceRange === '5000-20000' && (price < 5000 || price > 20000)) return false
+                if (filterPriceRange === '5000+' && price < 5000) return false
             }
             return true
         })
@@ -912,6 +960,8 @@ function ProductsPage() {
                     </button>
                     <button 
                         onClick={() => {
+                            setIsPurchaseQtyLocked(false)
+                            setIsSalesQtyLocked(false)
                             setIsModalOpen(true)
                             setIsAnimating(false)
                             setTimeout(() => setIsAnimating(true), 10)
@@ -925,68 +975,68 @@ function ProductsPage() {
 
             {/* Stock Status Summary */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div className="card bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900 dark:to-green-800 border-green-200 dark:border-green-800">
-                    <div className="flex items-center justify-between">
+                <div className="relative rounded-xl border border-green-200/30 dark:border-green-700/30 bg-gradient-to-br from-white via-green-50/30 to-green-50/20 dark:from-gray-900 dark:via-green-950/20 dark:to-gray-900 shadow-lg shadow-green-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+                    <div className="relative flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Total Products</p>
-                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{items.length}</p>
-                        </div>
-                        <div className="p-3 bg-green-200 dark:bg-green-800/50 rounded-full">
-                            <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                            </svg>
+                            <p className="text-sm text-muted mb-1">Total Products</p>
+                            {loading ? (
+                                <div className="animate-pulse h-8 bg-green-200 dark:bg-green-700 rounded w-16"></div>
+                            ) : (
+                                <p className="text-2xl font-bold">{items.length}</p>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                <div className="card bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900 dark:to-emerald-800 border-emerald-200 dark:border-emerald-800">
-                    <div className="flex items-center justify-between">
+                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+                    <div className="relative flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">In Stock</p>
-                            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                                {items.filter(p => (p.quantity || 0) >= (p.category?.reorderLevel || 10)).length}
-                            </p>
-                        </div>
-                        <div className="p-3 bg-emerald-200 dark:bg-emerald-800/50 rounded-full">
-                            <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            <p className="text-sm text-muted mb-1">In Stock</p>
+                            {loading ? (
+                                <div className="animate-pulse h-8 bg-emerald-200 dark:bg-emerald-700 rounded w-16"></div>
+                            ) : (
+                                <p className="text-2xl font-bold">
+                                    {items.filter(p => (p.quantity || 0) >= (p.category?.reorderLevel || 10)).length}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                <div className="card bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900 dark:to-yellow-800 border-yellow-200 dark:border-yellow-800">
-                    <div className="flex items-center justify-between">
+                <div className="relative rounded-xl border border-yellow-200/30 dark:border-yellow-700/30 bg-gradient-to-br from-white via-yellow-50/30 to-yellow-50/20 dark:from-gray-900 dark:via-yellow-950/20 dark:to-gray-900 shadow-lg shadow-yellow-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/5 via-transparent to-yellow-500/5 pointer-events-none"></div>
+                    <div className="relative flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Low Stock</p>
-                            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                                {items.filter(p => {
-                                    const qty = p.quantity || 0
-                                    const reorder = p.category?.reorderLevel || 10
-                                    return qty < reorder && qty > 0
-                                }).length}
-                            </p>
-                        </div>
-                        <div className="p-3 bg-yellow-200 dark:bg-yellow-800/50 rounded-full">
-                            <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
+                            <p className="text-sm text-muted mb-1">Low Stock</p>
+                            {loading ? (
+                                <div className="animate-pulse h-8 bg-yellow-200 dark:bg-yellow-700 rounded w-16"></div>
+                            ) : (
+                                <p className="text-2xl font-bold">
+                                    {items.filter(p => {
+                                        const qty = p.quantity || 0
+                                        const reorder = p.category?.reorderLevel || 10
+                                        return qty < reorder && qty > 0
+                                    }).length}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                <div className="card bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900 dark:to-red-800 border-red-200 dark:border-red-800">
-                    <div className="flex items-center justify-between">
+                <div className="relative rounded-xl border border-red-200/30 dark:border-red-700/30 bg-gradient-to-br from-white via-red-50/30 to-red-50/20 dark:from-gray-900 dark:via-red-950/20 dark:to-gray-900 shadow-lg shadow-red-500/5 backdrop-blur-sm p-4 overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 via-transparent to-red-500/5 pointer-events-none"></div>
+                    <div className="relative flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Out of Stock</p>
-                            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                                {items.filter(p => (p.quantity || 0) <= 0).length}
-                            </p>
-                        </div>
-                        <div className="p-3 bg-red-200 dark:bg-red-800/50 rounded-full">
-                            <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                            <p className="text-sm text-muted mb-1">Out of Stock</p>
+                            {loading ? (
+                                <div className="animate-pulse h-8 bg-red-200 dark:bg-red-700 rounded w-16"></div>
+                            ) : (
+                                <p className="text-2xl font-bold">
+                                    {items.filter(p => (p.quantity || 0) <= 0).length}
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1225,24 +1275,25 @@ function ProductsPage() {
                     <div className="border-t dark:border-gray-700 pt-4 mt-2">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ overflow: 'visible' }}>
                             {/* Category Filter */}
-                            <div>
+                            <div className={isFilterCategoryOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                 <label className="block text-sm font-medium mb-2">Category</label>
                                 <CustomSelect
                                     value={filterCategory}
                                     onChange={(value) => setFilterCategory(value)}
                                     options={[
                                         { value: '', label: 'All Categories' },
-                                        ...categories.map(cat => ({
-                                            value: cat.id.toString(),
-                                            label: cat.name
+                                        ...categoriesData.map(cat => ({
+                                            value: cat,
+                                            label: cat
                                         }))
                                     ]}
                                     placeholder="All Categories"
+                                    onOpenChange={setIsFilterCategoryOpen}
                                 />
                             </div>
 
                             {/* Stock Status Filter */}
-                            <div>
+                            <div className={isFilterStockOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                 <label className="block text-sm font-medium mb-2">Stock Status</label>
                                 <CustomSelect
                                     value={filterStockStatus}
@@ -1254,11 +1305,12 @@ function ProductsPage() {
                                         { value: 'out-of-stock', label: 'Out of Stock' }
                                     ]}
                                     placeholder="All Stock Levels"
+                                    onOpenChange={setIsFilterStockOpen}
                                 />
                             </div>
 
                             {/* Price Range Filter */}
-                            <div>
+                            <div className={isFilterPriceOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                 <label className="block text-sm font-medium mb-2">Price Range</label>
                                 <CustomSelect
                                     value={filterPriceRange}
@@ -1272,6 +1324,7 @@ function ProductsPage() {
                                         { value: '5000+', label: '₹5,000+' }
                                     ]}
                                     placeholder="All Prices"
+                                    onOpenChange={setIsFilterPriceOpen}
                                 />
                             </div>
                         </div>
@@ -1282,7 +1335,7 @@ function ProductsPage() {
                                 <span className="text-sm font-medium">Active Filters:</span>
                                 {filterCategory && (
                                     <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 rounded-full text-sm flex items-center gap-2">
-                                        {categories.find(c => c.id === Number(filterCategory))?.name}
+                                        {filterCategory}
                                         <button onClick={() => setFilterCategory('')} className="hover:text-emerald-600">×</button>
                                     </span>
                                 )}
@@ -1362,21 +1415,43 @@ function ProductsPage() {
                                                     <input required placeholder="e.g. DRP CANCEROMIN/R1" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all" />
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div>
+                                                    <div className={isModalCategoryOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Category</label>
                                                         <CustomSelect
                                                             value={form.categoryId}
                                                             onChange={(val) => setForm({ ...form, categoryId: val })}
                                                             options={[
                                                                 { value: '', label: 'Select category' },
-                                                                ...(Array.isArray(categories) ? categories.map(c => ({ value: String(c.id), label: c.name })) : [])
+                                                                ...categoriesData.map(cat => ({
+                                                                    value: cat,
+                                                                    label: cat
+                                                                }))
                                                             ]}
                                                             placeholder="Select category"
+                                                            onOpenChange={setIsModalCategoryOpen}
+                                                            allowCustom={true}
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Unit</label>
-                                                        <input type="number" placeholder="30" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all" />
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Units</label>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <input 
+                                                                type="number" 
+                                                                placeholder="30" 
+                                                                value={form.unitQuantity} 
+                                                                onChange={e => setForm({ ...form, unitQuantity: e.target.value })} 
+                                                                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all" 
+                                                            />
+                                                            <div className={isUnitTypeOpen ? 'relative z-[10000]' : 'relative z-0'}>
+                                                                <CustomSelect
+                                                                    value={form.unitType}
+                                                                    onChange={(val) => setForm({ ...form, unitType: val })}
+                                                                    options={unitTypes}
+                                                                    placeholder="Unit"
+                                                                    onOpenChange={setIsUnitTypeOpen}
+                                                                />
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1392,11 +1467,65 @@ function ProductsPage() {
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Purchase Qty</label>
-                                                    <input type="number" placeholder="150000" value={form.totalPurchased} onChange={e => setForm({ ...form, totalPurchased: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all" />
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            placeholder="150000" 
+                                                            value={form.totalPurchased} 
+                                                            onChange={e => setForm({ ...form, totalPurchased: e.target.value })} 
+                                                            disabled={!!editingId && isPurchaseQtyLocked}
+                                                            className="w-full px-3 py-2.5 pr-10 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:bg-gray-100 dark:disabled:bg-gray-900 disabled:cursor-not-allowed" 
+                                                        />
+                                                        {editingId && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setIsPurchaseQtyLocked(!isPurchaseQtyLocked)}
+                                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                                                                title={isPurchaseQtyLocked ? "Unlock to edit" : "Lock field"}
+                                                            >
+                                                                {isPurchaseQtyLocked ? (
+                                                                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                                    </svg>
+                                                                ) : (
+                                                                    <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                                                    </svg>
+                                                                )}
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <div className="col-span-2">
                                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Sales Qty</label>
-                                                    <input type="number" placeholder="304" value={form.totalSales} onChange={e => setForm({ ...form, totalSales: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all" />
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            placeholder="304" 
+                                                            value={form.totalSales} 
+                                                            onChange={e => setForm({ ...form, totalSales: e.target.value })} 
+                                                            disabled={!!editingId && isSalesQtyLocked}
+                                                            className="w-full px-3 py-2.5 pr-10 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all disabled:bg-gray-100 dark:disabled:bg-gray-900 disabled:cursor-not-allowed" 
+                                                        />
+                                                        {editingId && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setIsSalesQtyLocked(!isSalesQtyLocked)}
+                                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                                                                title={isSalesQtyLocked ? "Unlock to edit" : "Lock field"}
+                                                            >
+                                                                {isSalesQtyLocked ? (
+                                                                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                                    </svg>
+                                                                ) : (
+                                                                    <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                                                    </svg>
+                                                                )}
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1511,8 +1640,21 @@ function ProductsPage() {
                                                         })()}
                                                     </div>
                                                     <div className="text-xs text-muted mt-0.5">
-                                                        {p.category && <span className="mr-2">📦 {p.category.name}</span>}
-                                                        <span className="mr-2">Unit: {p.unit || 'N/A'}</span>
+                                                        {p.category && p.unit && (() => {
+                                                            const unitParts = String(p.unit).trim().split(/\s+/)
+                                                            const unitType = unitParts.length >= 2 ? unitParts[1] : ''
+                                                            return unitType ? (
+                                                                <span className="mr-2">📦 {p.category.name} ({unitType})</span>
+                                                            ) : (
+                                                                <span className="mr-2">📦 {p.category.name}</span>
+                                                            )
+                                                        })()}
+                                                        {p.category && !p.unit && (
+                                                            <span className="mr-2">📦 {p.category.name}</span>
+                                                        )}
+                                                        {!p.category && p.unit && (
+                                                            <span className="mr-2">Unit: {p.unit}</span>
+                                                        )}
                                                         <span>₹{(p.priceRupees || 0).toFixed(2)}</span>
                                                     </div>
                                                 </div>
@@ -1760,7 +1902,7 @@ function ProductsPage() {
                             </div>
 
                             {/* Supplier Selection */}
-                            <div className="mb-6">
+                            <div className={`mb-6 ${isSupplierOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
                                 <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
                                     Select Supplier *
                                 </label>
@@ -1773,6 +1915,7 @@ function ProductsPage() {
                                     }))}
                                     placeholder="Select supplier to send order"
                                     required
+                                    onOpenChange={setIsSupplierOpen}
                                 />
                                 {suppliers.length === 0 && (
                                     <p className="text-sm text-red-600 dark:text-red-400 mt-2">

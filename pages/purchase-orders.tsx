@@ -45,6 +45,9 @@ export default function PurchaseOrdersPage() {
     const [isDeleteMinimized, setIsDeleteMinimized] = useState(false)
     const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; deleteMultiple?: boolean; message?: string }>({ open: false })
     const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
+    const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false)
+    const [isFilterSupplierOpen, setIsFilterSupplierOpen] = useState(false)
+    const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false)
 
     useEffect(() => {
         // Check cache first
@@ -734,13 +737,16 @@ export default function PurchaseOrdersPage() {
                                                             <div className="text-xs text-gray-500">ID: {item.productId}</div>
                                                         </div>
                                                     ) : (
+                                                        <div className={isProductDropdownOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                                         <CustomSelect
                                                             value={item.productId?.toString() || ''}
                                                             onChange={(value) => updateItem(index, 'productId', value)}
                                                             options={products.map(p => ({ value: p.id.toString(), label: p.name }))}
                                                             placeholder="Select Product"
                                                             className="min-w-[200px]"
+                                                            onOpenChange={setIsProductDropdownOpen}
                                                         />
+                                                        </div>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -863,13 +869,16 @@ export default function PurchaseOrdersPage() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="flex-1 px-4 py-2 border border-emerald-200 dark:border-emerald-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                         />
+                        <div className={isFilterSupplierOpen ? 'relative z-[10000]' : 'relative z-0'}>
                         <CustomSelect
                             value={filterSupplier}
                             onChange={(value) => setFilterSupplier(value)}
                             options={suppliers.map(s => ({ value: s.id.toString(), label: s.name }))}
                             placeholder="All Suppliers"
                             className="w-64"
+                            onOpenChange={setIsFilterSupplierOpen}
                         />
+                        </div>
                     </div>
 
                     {loading ? (
@@ -996,6 +1005,7 @@ export default function PurchaseOrdersPage() {
                                 Choose a supplier to send this demand to. An email will be sent automatically.
                             </p>
                             
+                            <div className={isSupplierModalOpen ? 'relative z-[10000]' : 'relative z-0'}>
                             <CustomSelect
                                 value={selectedSupplier}
                                 onChange={(value) => setSelectedSupplier(value)}
@@ -1005,7 +1015,9 @@ export default function PurchaseOrdersPage() {
                                 }))}
                                 placeholder="Select Supplier"
                                 className="mb-6"
+                                onOpenChange={setIsSupplierModalOpen}
                             />
+                            </div>
 
                             {selectedSupplier && (
                                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">

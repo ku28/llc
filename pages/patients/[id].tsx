@@ -18,9 +18,9 @@ export default function PatientDetail() {
         const p = await (await fetch('/api/patients')).json()
         const found = p.find((x: any) => String(x.id) === String(id))
         setPatient(found)
-        // fetch visits for this patient
-        const all = await (await fetch('/api/visits')).json()
-        const my = all.filter((v: any) => String(v.patientId) === String(id)).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        // fetch visits for this patient directly
+        const visitsData = await (await fetch(`/api/visits?patientId=${id}&includePrescriptions=false`)).json()
+        const my = visitsData.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
         setVisits(my)
     }
 

@@ -34,6 +34,8 @@ export default function SuppliersPage() {
     // Sorting state
     const [sortField, setSortField] = useState<string>('name')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+    const [isFilterStatusOpen, setIsFilterStatusOpen] = useState(false)
+    const [isPaymentTermsOpen, setIsPaymentTermsOpen] = useState(false)
     
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const { getCache, setCache } = useDataCache()
@@ -504,7 +506,7 @@ export default function SuppliersPage() {
                                 className="w-full p-3 pr-10 border border-emerald-200 dark:border-emerald-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
                             />
                         </div>
-                        <div className="w-48">
+                        <div className={`w-48 ${isFilterStatusOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
                             <CustomSelect
                                 value={filterStatus}
                                 onChange={(value) => setFilterStatus(value)}
@@ -514,6 +516,7 @@ export default function SuppliersPage() {
                                     { value: 'inactive', label: 'Inactive' }
                                 ]}
                                 placeholder="All Status"
+                                onOpenChange={setIsFilterStatusOpen}
                             />
                         </div>
                         {(searchQuery || filterStatus) && (
@@ -667,7 +670,7 @@ export default function SuppliersPage() {
                                             <h3 className="text-lg font-semibold mb-4 text-emerald-600 dark:text-emerald-400">Payment & Credit</h3>
                                         </div>
 
-                                        <div>
+                                        <div className={isPaymentTermsOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                             <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Payment Terms</label>
                                             <CustomSelect
                                                 value={form.paymentTerms}
@@ -682,6 +685,7 @@ export default function SuppliersPage() {
                                                     { value: 'Advance', label: 'Advance Payment' }
                                                 ]}
                                                 placeholder="Select payment terms"
+                                                onOpenChange={setIsPaymentTermsOpen}
                                             />
                                         </div>
 

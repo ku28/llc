@@ -51,6 +51,7 @@ export default function PatientsPage() {
     const [showSuccessModal, setShowSuccessModal] = useState(false)
     const [successMessage, setSuccessMessage] = useState('')
     const [itemsPerPage] = useState(10)
+    const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const { addTask, updateTask } = useImportContext()
     const { getCache, setCache, clearCache } = useDataCache()
@@ -1165,7 +1166,7 @@ export default function PatientsPage() {
                                             </div>
 
                                             {/* Personal Info */}
-                                            <div>
+                                            <div className={isGenderDropdownOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Personal Information</h3>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
@@ -1186,7 +1187,7 @@ export default function PatientsPage() {
                                                     </div>
                                                     <div className="col-span-2">
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Gender</label>
-                                                        <CustomSelect value={(form as any).gender || ''} onChange={(val) => setForm({ ...form, gender: val })} options={genderOptions} placeholder="Select gender" allowCustom={true} />
+                                                        <CustomSelect value={(form as any).gender || ''} onChange={(val) => setForm({ ...form, gender: val })} options={genderOptions} placeholder="Select gender" allowCustom={true} onOpenChange={setIsGenderDropdownOpen} />
                                                     </div>
                                                 </div>
                                             </div>

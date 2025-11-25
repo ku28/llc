@@ -31,6 +31,10 @@ export default function StockTransactionsPage() {
     const [showExportDropdown, setShowExportDropdown] = useState(false)
     const [sortField, setSortField] = useState<string>('createdAt')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+    const [isFilterProductOpen, setIsFilterProductOpen] = useState(false)
+    const [isFilterTypeOpen, setIsFilterTypeOpen] = useState(false)
+    const [isModalProductOpen, setIsModalProductOpen] = useState(false)
+    const [isModalTransactionTypeOpen, setIsModalTransactionTypeOpen] = useState(false)
     
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const { getCache, setCache } = useDataCache()
@@ -536,7 +540,7 @@ export default function StockTransactionsPage() {
                 <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 mb-4">
                     <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                     <div className="relative flex items-center gap-3 flex-wrap">
-                        <div className="min-w-[200px]">
+                        <div className={`min-w-[200px] ${isFilterProductOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
                             <CustomSelect
                                 value={filterProduct}
                                 onChange={(value) => setFilterProduct(value)}
@@ -548,9 +552,10 @@ export default function StockTransactionsPage() {
                                     }))
                                 ]}
                                 placeholder="All Products"
+                                onOpenChange={setIsFilterProductOpen}
                             />
                         </div>
-                        <div className="min-w-[180px]">
+                        <div className={`min-w-[180px] ${isFilterTypeOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
                             <CustomSelect
                                 value={filterType}
                                 onChange={(value) => setFilterType(value)}
@@ -562,6 +567,7 @@ export default function StockTransactionsPage() {
                                     { value: 'RETURN', label: 'Returns' }
                                 ]}
                                 placeholder="All Types"
+                                onOpenChange={setIsFilterTypeOpen}
                             />
                         </div>
                         {(filterProduct || filterType) && (
@@ -597,7 +603,7 @@ export default function StockTransactionsPage() {
                             {/* Form Content */}
                             <form onSubmit={handleSubmit}>
                                 <div className="space-y-4">
-                                    <div>
+                                    <div className={isModalProductOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                         <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Product *</label>
                                         <CustomSelect
                                             value={form.productId}
@@ -608,10 +614,11 @@ export default function StockTransactionsPage() {
                                             }))}
                                             placeholder="Select Product"
                                             required
+                                            onOpenChange={setIsModalProductOpen}
                                         />
                                     </div>
 
-                                    <div>
+                                    <div className={isModalTransactionTypeOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                         <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Transaction Type *</label>
                                         <CustomSelect
                                             value={form.transactionType}
@@ -624,6 +631,7 @@ export default function StockTransactionsPage() {
                                             ]}
                                             placeholder="Select transaction type"
                                             required
+                                            onOpenChange={setIsModalTransactionTypeOpen}
                                         />
                                     </div>
 

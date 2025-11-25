@@ -105,7 +105,7 @@ export default function PatientSelectionModal({ isOpen, onClose }: PatientSelect
                                 value={selectedPatientId}
                                 onChange={(value) => setSelectedPatientId(value)}
                                 options={[
-                                    { value: '', label: '-- Select patient --' },
+                                    { value: '', label: 'Select patient' },
                                     ...(() => {
                                         // Helper to check if patient is from today
                                         const isFromToday = (patient: any) => {
@@ -136,7 +136,7 @@ export default function PatientSelectionModal({ isOpen, onClose }: PatientSelect
                                         })
                                     })()
                                 ]}
-                                placeholder="-- Select patient --"
+                                placeholder="Select patient"
                             />
                         </div>
 

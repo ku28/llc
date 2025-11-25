@@ -20,6 +20,7 @@ import additions from '../data/additions.json'
 import procedure from '../data/procedure.json'
 import presentation from '../data/presentation.json'
 import administration from '../data/administration.json'
+import bottlePricing from '../data/bottlePricing.json'
 import { useToast } from '../hooks/useToast'
 
 // Prescriptions Page - Create and manage patient visits with prescriptions
@@ -44,6 +45,13 @@ export default function PrescriptionsPage() {
     const videoRef = useRef<HTMLVideoElement>(null)
     const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
     const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({})
+    
+    // Refs to track which field user is editing (prevent circular updates)
+    const isUpdatingHeightFromFeet = useRef(false)
+    const isUpdatingFeetFromHeight = useRef(false)
+    const isUpdatingDateFromCount = useRef(false)
+    const isUpdatingCountFromDate = useRef(false)
+    
     const [form, setForm] = useState<any>({
         patientId: '', opdNo: '', date: new Date().toISOString().split('T')[0], temperament: '', pulseDiagnosis: '', pulseDiagnosis2: '',
         majorComplaints: '', historyReports: '', investigations: '', reports: '', provisionalDiagnosis: '',
@@ -57,6 +65,7 @@ export default function PrescriptionsPage() {
     })
     const [prescriptions, setPrescriptions] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
+    const [dataLoading, setDataLoading] = useState(true)
     const [lastCreatedVisitId, setLastCreatedVisitId] = useState<number | null>(null)
     const [lastCreatedVisit, setLastCreatedVisit] = useState<any | null>(null)
     const [previousWeight, setPreviousWeight] = useState<string>('')
@@ -129,6 +138,14 @@ export default function PrescriptionsPage() {
     const [showRestoreDraftModal, setShowRestoreDraftModal] = useState(false)
     const [draftData, setDraftData] = useState<any>(null)
     const [currentStep, setCurrentStep] = useState(1)
+    const [isPatientSelectOpen, setIsPatientSelectOpen] = useState(false)
+    const [isGenderOpen, setIsGenderOpen] = useState(false)
+    const [isTemperamentOpen, setIsTemperamentOpen] = useState(false)
+    const [isPulseDiagnosisOpen, setIsPulseDiagnosisOpen] = useState(false)
+    const [isPulseDiagnosis2Open, setIsPulseDiagnosis2Open] = useState(false)
+    const [isTreatmentSelectOpen, setIsTreatmentSelectOpen] = useState(false)
+    const [isMedicineSelectOpen, setIsMedicineSelectOpen] = useState(false)
+    const [isPrescriptionDropdownOpen, setIsPrescriptionDropdownOpen] = useState<{[key: number]: {[field: string]: boolean}}>({})
 
     // Step configuration
     const steps = [
@@ -141,20 +158,35 @@ export default function PrescriptionsPage() {
     ]
 
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
+    
+    // Fetch all required data eagerly on mount
     useEffect(() => { 
-        fetch('/api/patients')
-            .then(r => r.json())
-            .then(data => {
-                console.log('Patients fetched:', data)
-                setPatients(Array.isArray(data) ? data : [])
-            })
-            .catch(err => {
-                console.error('Error fetching patients:', err)
+        const fetchData = async () => {
+            setDataLoading(true)
+            try {
+                const [patientsRes, treatmentsRes, productsRes] = await Promise.all([
+                    fetch('/api/patients'),
+                    fetch('/api/treatments'),
+                    fetch('/api/products')
+                ])
+                
+                const patientsData = await patientsRes.json()
+                const treatmentsData = await treatmentsRes.json()
+                const productsData = await productsRes.json()
+                
+                console.log('Patients fetched:', patientsData)
+                setPatients(Array.isArray(patientsData) ? patientsData : [])
+                setTreatments(treatmentsData)
+                setProducts(productsData)
+            } catch (err) {
+                console.error('Error fetching data:', err)
                 setPatients([])
-            })
+            } finally {
+                setDataLoading(false)
+            }
+        }
+        fetchData()
     }, [])
-    useEffect(() => { fetch('/api/treatments').then(r => r.json()).then(setTreatments) }, [])
-    useEffect(() => { fetch('/api/products').then(r => r.json()).then(setProducts) }, [])
 
     // Set patientId and visitNumber from URL query parameters
     useEffect(() => {
@@ -265,12 +297,33 @@ export default function PrescriptionsPage() {
         if (prescriptions.length === 0 || products.length === 0) return
         
         let totalAmount = 0
+        let spyBottleAdded = false
+        let additionsBottleAdded = false
+        
         prescriptions.forEach(pr => {
             const product = products.find(p => String(p.id) === String(pr.productId))
             if (product && product.priceRupees !== undefined) {
                 const quantity = parseInt(pr.quantity) || 1
                 // priceRupees is in rupees per unit
                 totalAmount += (Number(product.priceRupees) * quantity)
+            }
+            
+            // Add spy bottle price only once if any spy4-spy6 are filled
+            if (!spyBottleAdded && (pr.spy4 || pr.spy5 || pr.spy6) && pr.spyBottleSize) {
+                const bottlePrice = bottlePricing.find(b => b.value === pr.spyBottleSize)
+                if (bottlePrice) {
+                    totalAmount += bottlePrice.price
+                    spyBottleAdded = true
+                }
+            }
+            
+            // Add additions bottle price only once if any addition1-addition3 are filled
+            if (!additionsBottleAdded && (pr.addition1 || pr.addition2 || pr.addition3) && pr.additionsBottleSize) {
+                const bottlePrice = bottlePricing.find(b => b.value === pr.additionsBottleSize)
+                if (bottlePrice) {
+                    totalAmount += bottlePrice.price
+                    additionsBottleAdded = true
+                }
             }
         })
 
@@ -290,26 +343,45 @@ export default function PrescriptionsPage() {
 
     // Auto-convert height: cm to feet-inches
     useEffect(() => {
+        if (isUpdatingHeightFromFeet.current) {
+            isUpdatingHeightFromFeet.current = false
+            return
+        }
+        
         if (form.height && form.height !== '') {
             const cm = parseFloat(form.height)
-            if (!isNaN(cm)) {
+            if (!isNaN(cm) && cm > 0) {
                 const totalInches = cm / 2.54
                 const feet = Math.floor(totalInches / 12)
                 const inches = Math.round(totalInches % 12)
-                setForm((prev: any) => ({ ...prev, heightFeet: feet.toString(), heightInches: inches.toString() }))
+                const calculatedFeet = feet.toString()
+                const calculatedInches = inches.toString()
+                if (form.heightFeet !== calculatedFeet || form.heightInches !== calculatedInches) {
+                    isUpdatingFeetFromHeight.current = true
+                    setForm((prev: any) => ({ ...prev, heightFeet: calculatedFeet, heightInches: calculatedInches }))
+                }
             }
         }
     }, [form.height])
 
     // Auto-convert height: feet-inches to cm
     useEffect(() => {
+        if (isUpdatingFeetFromHeight.current) {
+            isUpdatingFeetFromHeight.current = false
+            return
+        }
+        
         if ((form.heightFeet !== '' || form.heightInches !== '') && form.heightFeet !== undefined && form.heightInches !== undefined) {
             const feet = parseFloat(form.heightFeet) || 0
             const inches = parseFloat(form.heightInches) || 0
-            const totalInches = (feet * 12) + inches
-            const cm = Math.round(totalInches * 2.54)
-            if (cm > 0) {
-                setForm((prev: any) => ({ ...prev, height: cm.toString() }))
+            if (feet > 0 || inches > 0) {
+                const totalInches = (feet * 12) + inches
+                const cm = Math.round(totalInches * 2.54)
+                const calculatedHeight = cm.toString()
+                if (form.height !== calculatedHeight) {
+                    isUpdatingHeightFromFeet.current = true
+                    setForm((prev: any) => ({ ...prev, height: calculatedHeight }))
+                }
             }
         }
     }, [form.heightFeet, form.heightInches])
@@ -467,15 +539,18 @@ export default function PrescriptionsPage() {
                         const loadedPrescriptions = visit.prescriptions.map((p: any) => ({
                             treatmentId: p.treatmentId ? String(p.treatmentId) : '',
                             productId: String(p.productId),
-                            comp1: p.comp1 || '',
-                            comp2: p.comp2 || '',
-                            comp3: p.comp3 || '',
-                            comp4: (p.comp4 && p.comp4.trim()) ? p.comp4 : undefined,
-                            comp5: (p.comp5 && p.comp5.trim()) ? p.comp5 : undefined,
+                            spy1: p.spy1 || '',
+                            spy2: p.spy2 || '',
+                            spy3: p.spy3 || '',
+                            spy4: p.spy4 || '',
+                            spy5: p.spy5 || '',
+                            spy6: p.spy6 || '',
                             quantity: p.quantity || 1,
                             timing: p.timing || '',
                             dosage: p.dosage || '',
-                            additions: p.additions || '',
+                            addition1: p.addition1 || '',
+                            addition2: p.addition2 || '',
+                            addition3: p.addition3 || '',
                             procedure: p.procedure || '',
                             presentation: p.presentation || '',
                             droppersToday: p.droppersToday?.toString() || '',
@@ -550,15 +625,18 @@ export default function PrescriptionsPage() {
                         const copiedPrescriptions = visit.prescriptions.map((p: any) => ({
                             treatmentId: p.treatmentId ? String(p.treatmentId) : '',
                             productId: String(p.productId),
-                            comp1: p.comp1 || '',
-                            comp2: p.comp2 || '',
-                            comp3: p.comp3 || '',
-                            comp4: (p.comp4 && p.comp4.trim()) ? p.comp4 : undefined,
-                            comp5: (p.comp5 && p.comp5.trim()) ? p.comp5 : undefined,
+                            spy1: p.spy1 || '',
+                            spy2: p.spy2 || '',
+                            spy3: p.spy3 || '',
+                            spy4: p.spy4 || '',
+                            spy5: p.spy5 || '',
+                            spy6: p.spy6 || '',
                             quantity: p.quantity || 1,
                             timing: p.timing || '',
                             dosage: p.dosage || '',
-                            additions: p.additions || '',
+                            addition1: p.addition1 || '',
+                            addition2: p.addition2 || '',
+                            addition3: p.addition3 || '',
                             procedure: p.procedure || '',
                             presentation: p.presentation || '',
                             droppersToday: p.droppersToday?.toString() || '',
@@ -596,6 +674,54 @@ export default function PrescriptionsPage() {
                 })
         }
     }, [router.query.copyFromVisitId, isEditMode])
+
+    // Auto-calculate followUpCount based on nextVisitDate
+    useEffect(() => {
+        if (isUpdatingDateFromCount.current) {
+            isUpdatingDateFromCount.current = false
+            return
+        }
+        
+        if (form.nextVisitDate) {
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            const nextVisit = new Date(form.nextVisitDate)
+            nextVisit.setHours(0, 0, 0, 0)
+            
+            const diffTime = nextVisit.getTime() - today.getTime()
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            
+            if (diffDays >= 0 && form.followUpCount !== diffDays.toString()) {
+                isUpdatingCountFromDate.current = true
+                setForm((prev: any) => ({ ...prev, followUpCount: diffDays.toString() }))
+            }
+        }
+    }, [form.nextVisitDate])
+
+    // Auto-calculate nextVisitDate based on followUpCount
+    useEffect(() => {
+        if (isUpdatingCountFromDate.current) {
+            isUpdatingCountFromDate.current = false
+            return
+        }
+        
+        if (form.followUpCount && form.followUpCount !== '' && !isNaN(Number(form.followUpCount))) {
+            const today = new Date()
+            const daysToAdd = parseInt(form.followUpCount, 10)
+            
+            if (daysToAdd >= 0) {
+                const nextDate = new Date(today)
+                nextDate.setDate(today.getDate() + daysToAdd)
+                
+                const formattedDate = nextDate.toISOString().split('T')[0]
+                
+                if (form.nextVisitDate !== formattedDate) {
+                    isUpdatingDateFromCount.current = true
+                    setForm((prev: any) => ({ ...prev, nextVisitDate: formattedDate }))
+                }
+            }
+        }
+    }, [form.followUpCount])
 
     async function handleAttachmentUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const files = e.target.files
@@ -912,11 +1038,13 @@ export default function PrescriptionsPage() {
 
         setPrescriptions([...prescriptions, {
             treatmentId: '', productId: String(prod.id),
-            comp1: '', comp2: '', comp3: '', comp4: undefined, comp5: undefined,
+            spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
             quantity: 1, timing: '', dosage: '',
-            additions: '', procedure: '', presentation: '',
+            addition1: '', addition2: '', addition3: '',
+            procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', patientHasMedicine: false
+            administration: '', patientHasMedicine: false,
+            spyBottleSize: '', additionsBottleSize: ''
         }])
     }
 
@@ -946,11 +1074,13 @@ export default function PrescriptionsPage() {
         const newPrescriptions = selectedMedicines.map(productId => ({
             treatmentId: selectedTreatmentId || '', // Use selected treatment plan if any
             productId: productId,
-            comp1: '', comp2: '', comp3: '', comp4: undefined, comp5: undefined,
+            spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
             quantity: 1, timing: '', dosage: '',
-            additions: '', procedure: '', presentation: '',
+            addition1: '', addition2: '', addition3: '',
+            procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', patientHasMedicine: false
+            administration: '', patientHasMedicine: false,
+            spyBottleSize: '', additionsBottleSize: ''
         }))
 
         setPrescriptions([...prescriptions, ...newPrescriptions])
@@ -1089,11 +1219,13 @@ export default function PrescriptionsPage() {
 
         setPrescriptions([...prescriptions, {
             treatmentId: '', productId: '',
-            comp1: '', comp2: '', comp3: '', comp4: undefined, comp5: undefined,
+            spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
             quantity: 1, timing: '', dosage: '',
-            additions: '', procedure: '', presentation: '',
+            addition1: '', addition2: '', addition3: '',
+            procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
-            administration: '', patientHasMedicine: false
+            administration: '', patientHasMedicine: false,
+            spyBottleSize: '', additionsBottleSize: ''
         }])
     }
 
@@ -1112,16 +1244,19 @@ export default function PrescriptionsPage() {
                     ...copy[i],
                     treatmentId: patch.treatmentId,
                     productId: String(firstProduct.productId),
-                    comp1: firstProduct.comp1 || '',
-                    comp2: firstProduct.comp2 || '',
-                    comp3: firstProduct.comp3 || '',
-                    // Treat empty strings as undefined to hide comp4/comp5
-                    comp4: (firstProduct.comp4 && firstProduct.comp4.trim()) ? firstProduct.comp4 : undefined,
-                    comp5: (firstProduct.comp5 && firstProduct.comp5.trim()) ? firstProduct.comp5 : undefined,
+                    spy1: firstProduct.spy1 || '',
+                    spy2: firstProduct.spy2 || '',
+                    spy3: firstProduct.spy3 || '',
+                    spy4: firstProduct.spy4 || '',
+                    spy5: firstProduct.spy5 || '',
+                    spy6: firstProduct.spy6 || '',
                     quantity: firstProduct.quantity || treatment.quantity || 1,
                     timing: firstProduct.timing || '',
                     dosage: firstProduct.dosage || treatment.dosage || '',
                     additions: firstProduct.additions || '',
+                    addition1: firstProduct.addition1 || '',
+                    addition2: firstProduct.addition2 || '',
+                    addition3: firstProduct.addition3 || '',
                     procedure: firstProduct.procedure || treatment.procedure || '',
                     presentation: firstProduct.presentation || '',
                     droppersToday: firstProduct.droppersToday?.toString() || '',
@@ -1208,8 +1343,8 @@ export default function PrescriptionsPage() {
             const original = originalTreatmentData[i]
 
             // Check if any field was modified
-            const fields = ['productId', 'comp1', 'comp2', 'comp3', 'comp4', 'comp5',
-                'quantity', 'timing', 'dosage', 'additions', 'procedure',
+            const fields = ['productId', 'spy1', 'spy2', 'spy3', 'spy4', 'spy5', 'spy6',
+                'quantity', 'timing', 'dosage', 'additions', 'addition1', 'addition2', 'addition3', 'procedure',
                 'presentation', 'droppersToday', 'medicineQuantity', 'administration']
 
             for (const field of fields) {
@@ -1329,6 +1464,16 @@ export default function PrescriptionsPage() {
             showError(`${isEditMode ? 'Update' : 'Save'} failed. Please try again.`)
         }
         setLoading(false)
+    }
+
+    // Show loading state while fetching initial data
+    if (dataLoading || (patients.length === 0 && products.length === 0)) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
+                <p className="text-muted">Loading patients and medicines...</p>
+            </div>
+        )
     }
 
     return (
@@ -1465,7 +1610,7 @@ export default function PrescriptionsPage() {
                         </div>
 
                         {/* Patient Selection Card - Green Futuristic Theme */}
-                        <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm"
+                        <div className={`relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm ${isPatientSelectOpen ? 'relative z-[999999]' : 'relative z-0'}`}
                             style={{ display: currentStep !== 1 ? 'none' : 'block' }}
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
@@ -1547,13 +1692,14 @@ export default function PrescriptionsPage() {
                                                     })
                                             }}
                                             options={[
-                                                { value: '', label: '-- select patient --' },
+                                                { value: '', label: 'Select patient' },
                                                 ...patients.map(p => ({
                                                     value: String(p.id),
                                                     label: `${p.firstName} ${p.lastName}${p.phone ? ' · ' + p.phone : ''}`
                                                 }))
                                             ]}
-                                            placeholder="-- select patient --"
+                                            placeholder="Select patient"
+                                            onOpenChange={setIsPatientSelectOpen}
                                         />
                                     </div>
                                     {fieldErrors.patientId && (
@@ -1624,7 +1770,7 @@ export default function PrescriptionsPage() {
                                         <label className="block text-sm font-medium mb-1.5">Age</label>
                                         <input type="number" placeholder="35" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} className="w-full p-2 border rounded" />
                                     </div>
-                                    <div>
+                                    <div className={isGenderOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                         <label className="block text-sm font-medium mb-1.5">Gender</label>
                                         <CustomSelect
                                             value={form.gender}
@@ -1632,6 +1778,7 @@ export default function PrescriptionsPage() {
                                             options={genderOptions}
                                             placeholder="Select gender"
                                             allowCustom={true}
+                                            onOpenChange={setIsGenderOpen}
                                         />
                                     </div>
                                     <div>
@@ -1726,7 +1873,7 @@ export default function PrescriptionsPage() {
                         )}
 
                         {/* Clinical Information Card */}
-                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6"
+                        <div className={`relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 ${isTemperamentOpen || isPulseDiagnosisOpen || isPulseDiagnosis2Open ? 'z-[10000]' : 'z-0'}`}
                             style={{ display: currentStep !== 2 ? 'none' : 'block' }}
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
@@ -1742,6 +1889,7 @@ export default function PrescriptionsPage() {
                                         options={temperamentOptions}
                                         placeholder="Select temperament"
                                         allowCustom={true}
+                                        onOpenChange={setIsTemperamentOpen}
                                     />
                                 </div>
                                 <div>
@@ -1752,6 +1900,7 @@ export default function PrescriptionsPage() {
                                         options={pulseDiagnosisOptions}
                                         placeholder="Select pulse diagnosis"
                                         allowCustom={true}
+                                        onOpenChange={setIsPulseDiagnosisOpen}
                                     />
                                 </div>
                                 <div>
@@ -1762,6 +1911,7 @@ export default function PrescriptionsPage() {
                                         options={pulseDiagnosis2Options}
                                         placeholder="Select pulse diagnosis 2"
                                         allowCustom={true}
+                                        onOpenChange={setIsPulseDiagnosis2Open}
                                     />
                                 </div>
                             </div>
@@ -1947,8 +2097,8 @@ export default function PrescriptionsPage() {
 
 
                         {/* Medicines Selection Card */}
-                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6"
-                            style={{ display: currentStep !== 4 ? 'none' : 'block', overflow: 'visible', position: 'relative', zIndex: 1 }}
+                        <div className={`relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 ${isTreatmentSelectOpen || isMedicineSelectOpen ? 'z-[10000]' : 'z-0'}`}
+                            style={{ display: currentStep !== 4 ? 'none' : 'block', overflow: 'visible', position: 'relative' }}
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
                             <h3 className="relative text-lg font-semibold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Medicine Selection</h3>
@@ -1969,21 +2119,27 @@ export default function PrescriptionsPage() {
                                                 const newPrescriptions = treatment.treatmentProducts.map((tp: any) => ({
                                                     treatmentId: String(treatment.id),
                                                     productId: String(tp.productId),
-                                                    comp1: tp.comp1 || '',
-                                                    comp2: tp.comp2 || '',
-                                                    comp3: tp.comp3 || '',
-                                                    comp4: tp.comp4 || '',
-                                                    comp5: tp.comp5 || '',
+                                                    spy1: tp.spy1 || '',
+                                                    spy2: tp.spy2 || '',
+                                                    spy3: tp.spy3 || '',
+                                                    spy4: tp.spy4 || '',
+                                                    spy5: tp.spy5 || '',
+                                                    spy6: tp.spy6 || '',
                                                     quantity: tp.quantity || treatment.quantity || 1,
                                                     timing: tp.timing || '',
                                                     dosage: tp.dosage || treatment.dosage || '',
                                                     additions: tp.additions || '',
+                                                    addition1: tp.addition1 || '',
+                                                    addition2: tp.addition2 || '',
+                                                    addition3: tp.addition3 || '',
                                                     procedure: tp.procedure || treatment.procedure || '',
                                                     presentation: tp.presentation || '',
                                                     droppersToday: tp.droppersToday?.toString() || '',
                                                     medicineQuantity: tp.medicineQuantity?.toString() || '',
                                                     administration: treatment.administration || '',
-                                                    patientHasMedicine: false
+                                                    patientHasMedicine: false,
+                                                    spyBottleSize: tp.spyBottleSize || '',
+                                                    additionsBottleSize: tp.additionsBottleSize || ''
                                                 }))
                                                 setPrescriptions(newPrescriptions) // Replace, not add
                                                 setSelectedTreatmentId(String(treatment.id))
@@ -2079,6 +2235,7 @@ export default function PrescriptionsPage() {
                             ]}
                             placeholder="-- select medicine from inventory --"
                             className="flex-1"
+                            onOpenChange={setIsMedicineSelectOpen}
                         />
                     </div>
 
@@ -2201,10 +2358,33 @@ export default function PrescriptionsPage() {
                                                         Medicine (from inventory)
                                                     </label>
                                                     {pr.productId ? (
-                                                        <div className="p-2 text-sm text-gray-700 dark:text-gray-300">
+                                                        <div className="p-2 text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2 flex-wrap">
                                                             {(() => {
                                                                 const product = products.find(p => String(p.id) === String(pr.productId))
-                                                                return product ? `${product.name} · Stock: ${product.quantity}` : `Product #${pr.productId}`
+                                                                return (
+                                                                    <>
+                                                                        <span className="px-2 py-1 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-xs font-bold">{i + 1}</span>
+                                                                        <span>{product ? product.name : `Product #${pr.productId}`}</span>
+                                                                        {product?.category && (() => {
+                                                                            const categoryName = typeof product.category === 'string' ? product.category : product.category.name
+                                                                            if (product.unit) {
+                                                                                const unitParts = String(product.unit).trim().split(/\s+/)
+                                                                                const unitType = unitParts.length >= 2 ? unitParts[1] : ''
+                                                                                return (
+                                                                                    <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full text-xs font-semibold">
+                                                                                        {categoryName} {unitType ? `(${unitType})` : ''}
+                                                                                    </span>
+                                                                                )
+                                                                            }
+                                                                            return (
+                                                                                <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full text-xs font-semibold">
+                                                                                    {categoryName}
+                                                                                </span>
+                                                                            )
+                                                                        })()}
+                                                                        {product && <span className="text-gray-500">· Stock: {product.quantity}</span>}
+                                                                    </>
+                                                                )
                                                             })()}
                                                         </div>
                                                     ) : (
@@ -2224,310 +2404,345 @@ export default function PrescriptionsPage() {
                                                     )}
                                                 </div>
 
-                                                {/* Spagyrics Section - All in single line */}
+                                                {/* SPY & Addition Components - Organized Grid Layout */}
                                                 <div className="sm:col-span-2 lg:col-span-3">
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Spagyrics (Name | Volume)</label>
-                                                    <div className={`flex flex-wrap gap-1 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
-                                                        {/* Spagyric 1 */}
-                                                        <div className="flex gap-0.5">
-                                                            <CustomSelect
-                                                                value={parseComponent(pr.comp1 || '').name}
-                                                                onChange={(val) => {
-                                                                    const parsed = parseComponent(pr.comp1 || '')
-                                                                    updatePrescription(i, { comp1: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                }}
-                                                                options={components}
-                                                                placeholder="Spy1"
-                                                                allowCustom={true}
-                                                                className="w-20"
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                value={parseComponent(pr.comp1 || '').volume}
-                                                                onChange={(e) => {
-                                                                    const parsed = parseComponent(pr.comp1 || '')
-                                                                    updatePrescription(i, { comp1: formatComponent(parsed.name, e.target.value) })
-                                                                }}
-                                                                placeholder="Vol"
-                                                                className="w-12 p-1.5 border rounded text-xs"
-                                                            />
-                                                        </div>
-                                                        
-                                                        {/* Spagyric 2 */}
-                                                        <div className="flex gap-0.5">
-                                                            <CustomSelect
-                                                                value={parseComponent(pr.comp2 || '').name}
-                                                                onChange={(val) => {
-                                                                    const parsed = parseComponent(pr.comp2 || '')
-                                                                    updatePrescription(i, { comp2: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                }}
-                                                                options={components}
-                                                                placeholder="Spy2"
-                                                                allowCustom={true}
-                                                                className="w-20"
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                value={parseComponent(pr.comp2 || '').volume}
-                                                                onChange={(e) => {
-                                                                    const parsed = parseComponent(pr.comp2 || '')
-                                                                    updatePrescription(i, { comp2: formatComponent(parsed.name, e.target.value) })
-                                                                }}
-                                                                placeholder="Vol"
-                                                                className="w-12 p-1.5 border rounded text-xs"
-                                                            />
-                                                        </div>
-                                                        
-                                                        {/* Spagyric 3 */}
-                                                        <div className="flex gap-0.5">
-                                                            <CustomSelect
-                                                                value={parseComponent(pr.comp3 || '').name}
-                                                                onChange={(val) => {
-                                                                    const parsed = parseComponent(pr.comp3 || '')
-                                                                    updatePrescription(i, { comp3: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                }}
-                                                                options={components}
-                                                                placeholder="Spy3"
-                                                                allowCustom={true}
-                                                                className="w-20"
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                value={parseComponent(pr.comp3 || '').volume}
-                                                                onChange={(e) => {
-                                                                    const parsed = parseComponent(pr.comp3 || '')
-                                                                    updatePrescription(i, { comp3: formatComponent(parsed.name, e.target.value) })
-                                                                }}
-                                                                placeholder="Vol"
-                                                                className="w-12 p-1.5 border rounded text-xs"
-                                                            />
-                                                        </div>
-
-                                                        {/* Show spagyric 4 if it exists */}
-                                                        {pr.comp4 !== undefined && (
-                                                            <div className="flex gap-0.5">
-                                                                <CustomSelect
-                                                                    value={parseComponent(pr.comp4 || '').name}
-                                                                    onChange={(val) => {
-                                                                        const parsed = parseComponent(pr.comp4 || '')
-                                                                        updatePrescription(i, { comp4: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                    }}
-                                                                    options={components}
-                                                                    placeholder="Spy4"
-                                                                    allowCustom={true}
-                                                                    className="w-20"
-                                                                />
-                                                                <input
-                                                                    type="text"
-                                                                    value={parseComponent(pr.comp4 || '').volume}
-                                                                    onChange={(e) => {
-                                                                        const parsed = parseComponent(pr.comp4 || '')
-                                                                        updatePrescription(i, { comp4: formatComponent(parsed.name, e.target.value) })
-                                                                    }}
-                                                                    placeholder="Vol"
-                                                                    className="w-12 p-1.5 border rounded text-xs"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        updatePrescription(i, { comp4: undefined, comp5: undefined })
-                                                                    }}
-                                                                    className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors text-sm font-bold"
-                                                                    title="Remove spagyric 4"
-                                                                >
-                                                                    −
-                                                                </button>
+                                                    <div className={`space-y-3 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
+                                                        {/* Spagyric Section */}
+                                                        <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                                                            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Spagyric Components</h4>
+                                                            {/* Row 1: SPY 1, 2, 3 */}
+                                                            <div className="grid grid-cols-3 gap-2 mb-2">
+                                                                <div>
+                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 1</label>
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(pr.spy1 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(pr.spy1 || '')
+                                                                                updatePrescription(i, { spy1: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                            }}
+                                                                            options={components}
+                                                                            placeholder="Name"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={parseComponent(pr.spy1 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(pr.spy1 || '')
+                                                                                updatePrescription(i, { spy1: formatComponent(parsed.name, e.target.value) })
+                                                                            }}
+                                                                            placeholder="Vol"
+                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 2</label>
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(pr.spy2 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(pr.spy2 || '')
+                                                                                updatePrescription(i, { spy2: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                            }}
+                                                                            options={components}
+                                                                            placeholder="Name"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={parseComponent(pr.spy2 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(pr.spy2 || '')
+                                                                                updatePrescription(i, { spy2: formatComponent(parsed.name, e.target.value) })
+                                                                            }}
+                                                                            placeholder="Vol"
+                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 3</label>
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(pr.spy3 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(pr.spy3 || '')
+                                                                                updatePrescription(i, { spy3: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                            }}
+                                                                            options={components}
+                                                                            placeholder="Name"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={parseComponent(pr.spy3 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(pr.spy3 || '')
+                                                                                updatePrescription(i, { spy3: formatComponent(parsed.name, e.target.value) })
+                                                                            }}
+                                                                            placeholder="Vol"
+                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
+                                                                        />
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                        )}
-
-                                                        {/* Show spagyric 5 if it exists */}
-                                                        {pr.comp5 !== undefined && (
-                                                            <div className="flex gap-0.5">
-                                                                <CustomSelect
-                                                                    value={parseComponent(pr.comp5 || '').name}
-                                                                    onChange={(val) => {
-                                                                        const parsed = parseComponent(pr.comp5 || '')
-                                                                        updatePrescription(i, { comp5: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                    }}
-                                                                    options={components}
-                                                                    placeholder="Spy5"
-                                                                    allowCustom={true}
-                                                                    className="w-20"
-                                                                />
-                                                                <input
-                                                                    type="text"
-                                                                    value={parseComponent(pr.comp5 || '').volume}
-                                                                    onChange={(e) => {
-                                                                        const parsed = parseComponent(pr.comp5 || '')
-                                                                        updatePrescription(i, { comp5: formatComponent(parsed.name, e.target.value) })
-                                                                    }}
-                                                                    placeholder="Vol"
-                                                                    className="w-12 p-1.5 border rounded text-xs"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        updatePrescription(i, { comp5: undefined })
-                                                                    }}
-                                                                    className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors text-sm font-bold"
-                                                                    title="Remove spagyric 5"
-                                                                >
-                                                                    −
-                                                                </button>
+                                                            {/* Row 2: SPY 4, 5, 6 */}
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                                <div>
+                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 4</label>
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(pr.spy4 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(pr.spy4 || '')
+                                                                                updatePrescription(i, { spy4: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                            }}
+                                                                            options={components}
+                                                                            placeholder="Name"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={parseComponent(pr.spy4 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(pr.spy4 || '')
+                                                                                updatePrescription(i, { spy4: formatComponent(parsed.name, e.target.value) })
+                                                                            }}
+                                                                            placeholder="Vol"
+                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 5</label>
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(pr.spy5 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(pr.spy5 || '')
+                                                                                updatePrescription(i, { spy5: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                            }}
+                                                                            options={components}
+                                                                            placeholder="Name"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={parseComponent(pr.spy5 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(pr.spy5 || '')
+                                                                                updatePrescription(i, { spy5: formatComponent(parsed.name, e.target.value) })
+                                                                            }}
+                                                                            placeholder="Vol"
+                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 6</label>
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(pr.spy6 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(pr.spy6 || '')
+                                                                                updatePrescription(i, { spy6: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                            }}
+                                                                            options={components}
+                                                                            placeholder="Name"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={parseComponent(pr.spy6 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(pr.spy6 || '')
+                                                                                updatePrescription(i, { spy6: formatComponent(parsed.name, e.target.value) })
+                                                                            }}
+                                                                            placeholder="Vol"
+                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
+                                                                        />
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                        )}
+                                                        </div>
 
-                                                        {/* Plus button - show if less than 5 components */}
-                                                        {pr.comp4 === undefined && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    updatePrescription(i, { comp4: '' })
-                                                                }}
-                                                                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition-colors text-sm font-bold"
-                                                                title="Add spagyric 4"
-                                                            >
-                                                                +
-                                                            </button>
-                                                        )}
-                                                        
-                                                        {/* Plus button for spy5 - show if spy4 exists but spy5 doesn't */}
-                                                        {pr.comp4 !== undefined && pr.comp5 === undefined && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    updatePrescription(i, { comp5: '' })
-                                                                }}
-                                                                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded transition-colors text-sm font-bold"
-                                                                title="Add spagyric 5"
-                                                            >
-                                                                +
-                                                            </button>
-                                                        )}
+                                                        {/* Bottle Size Row */}
+                                                        <div className="flex gap-2">
+                                                            <div className="flex-1">
+                                                                <label className="block text-[11px] font-semibold text-purple-600 dark:text-purple-400 mb-1">SPY Bottle Size</label>
+                                                                <CustomSelect
+                                                                    value={pr.spyBottleSize || ''}
+                                                                    onChange={(val) => updatePrescription(i, { spyBottleSize: val })}
+                                                                    options={bottlePricing}
+                                                                    placeholder="Select Size"
+                                                                    disabled={!pr.spy4 && !pr.spy5 && !pr.spy6}
+                                                                    className="text-xs h-8"
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Additions Section */}
+                                                        <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                                                            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Additions</h4>
+                                                            <div className="grid grid-cols-4 gap-2">
+                                                                <div>
+                                                                    <label className="block text-[11px] font-semibold text-blue-600 dark:text-blue-400 mb-1">Addition 1</label>
+                                                                    <CustomSelect
+                                                                        value={pr.addition1 || ''}
+                                                                        onChange={(val) => updatePrescription(i, { addition1: val.toUpperCase() })}
+                                                                        options={additions}
+                                                                        placeholder="Select"
+                                                                        allowCustom={true}
+                                                                        className="text-xs h-8"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[11px] font-semibold text-blue-600 dark:text-blue-400 mb-1">Addition 2</label>
+                                                                    <CustomSelect
+                                                                        value={pr.addition2 || ''}
+                                                                        onChange={(val) => updatePrescription(i, { addition2: val.toUpperCase() })}
+                                                                        options={additions}
+                                                                        placeholder="Select"
+                                                                        allowCustom={true}
+                                                                        className="text-xs h-8"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[11px] font-semibold text-blue-600 dark:text-blue-400 mb-1">Addition 3</label>
+                                                                    <CustomSelect
+                                                                        value={pr.addition3 || ''}
+                                                                        onChange={(val) => updatePrescription(i, { addition3: val.toUpperCase() })}
+                                                                        options={additions}
+                                                                        placeholder="Select"
+                                                                        allowCustom={true}
+                                                                        className="text-xs h-8"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="block text-[11px] font-semibold text-purple-600 dark:text-purple-400 mb-1">Bottle Size</label>
+                                                                    <CustomSelect
+                                                                        value={pr.additionsBottleSize || ''}
+                                                                        onChange={(val) => updatePrescription(i, { additionsBottleSize: val })}
+                                                                        options={bottlePricing}
+                                                                        placeholder="Select"
+                                                                        disabled={!pr.addition1 && !pr.addition2 && !pr.addition3}
+                                                                        className="text-xs h-8"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Qty, Timing, and Dosage in single line with separate sections */}
-                                                <div className="sm:col-span-2 lg:col-span-3">
-                                                    <div className="flex gap-4">
+                                                {/* Qty, Timing, and Dosage Section */}
+                                                <div className="sm:col-span-2 lg:col-span-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                                                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Dosage Information</h4>
+                                                    <div className="grid grid-cols-4 gap-2">
                                                         {/* Qty Section */}
                                                         <div>
-                                                            <label className="block text-xs font-medium mb-1 text-muted">Qty (Drops)</label>
+                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Qty (Drops)</label>
                                                             <input 
                                                                 type="number" 
                                                                 placeholder="0" 
                                                                 value={pr.quantity || ''} 
                                                                 onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} 
-                                                                className="w-14 p-2 border rounded text-sm" 
+                                                                className="w-full p-1.5 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800" 
                                                             />
                                                         </div>
                                                         
                                                         {/* Timing Section */}
                                                         <div>
-                                                            <label className="block text-xs font-medium mb-1 text-muted">Timing</label>
+                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Timing</label>
                                                             <CustomSelect
                                                                 value={pr.timing || ''}
                                                                 onChange={(val) => updatePrescription(i, { timing: val })}
                                                                 options={timing}
                                                                 placeholder="Select"
                                                                 allowCustom={true}
-                                                                className="w-28"
+                                                                className="text-xs h-8"
                                                             />
                                                         </div>
                                                         
-                                                        {/* Dosage Section */}
-                                                        <div className="flex-1">
-                                                            <label className="block text-xs font-medium mb-1 text-muted">Dosage (Dose | Timing | Dilution)</label>
-                                                            <div className="flex gap-2">
-                                                                <CustomSelect
-                                                                    value={parseDosage(pr.dosage || '').quantity}
-                                                                    onChange={(val) => {
-                                                                        const parsed = parseDosage(pr.dosage || '')
-                                                                        updatePrescription(i, { dosage: formatDosage(val, parsed.timing, parsed.dilution) })
-                                                                    }}
-                                                                    options={doseQuantity}
-                                                                    placeholder="Dose"
-                                                                    allowCustom={true}
-                                                                    className="w-20"
-                                                                />
-                                                                <CustomSelect
-                                                                    value={parseDosage(pr.dosage || '').timing}
-                                                                    onChange={(val) => {
-                                                                        const parsed = parseDosage(pr.dosage || '')
-                                                                        updatePrescription(i, { dosage: formatDosage(parsed.quantity, val, parsed.dilution) })
-                                                                    }}
-                                                                    options={doseTiming}
-                                                                    placeholder="Timing"
-                                                                    allowCustom={true}
-                                                                    className="w-24"
-                                                                />
-                                                                <CustomSelect
-                                                                    value={parseDosage(pr.dosage || '').dilution}
-                                                                    onChange={(val) => {
-                                                                        const parsed = parseDosage(pr.dosage || '')
-                                                                        updatePrescription(i, { dosage: formatDosage(parsed.quantity, parsed.timing, val) })
-                                                                    }}
-                                                                    options={dilution}
-                                                                    placeholder="Dilution"
-                                                                    allowCustom={true}
-                                                                    className="w-24"
-                                                                />
-                                                            </div>
+                                                        {/* Dosage - Dose */}
+                                                        <div>
+                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Dose</label>
+                                                            <CustomSelect
+                                                                value={parseDosage(pr.dosage || '').quantity}
+                                                                onChange={(val) => {
+                                                                    const parsed = parseDosage(pr.dosage || '')
+                                                                    updatePrescription(i, { dosage: formatDosage(val, parsed.timing, parsed.dilution) })
+                                                                }}
+                                                                options={doseQuantity}
+                                                                placeholder="Dose"
+                                                                allowCustom={true}
+                                                                className="text-xs h-8"
+                                                            />
+                                                        </div>
+                                                        
+                                                        {/* Dosage - Dilution */}
+                                                        <div>
+                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Dilution</label>
+                                                            <CustomSelect
+                                                                value={parseDosage(pr.dosage || '').dilution}
+                                                                onChange={(val) => {
+                                                                    const parsed = parseDosage(pr.dosage || '')
+                                                                    updatePrescription(i, { dosage: formatDosage(parsed.quantity, parsed.timing, val) })
+                                                                }}
+                                                                options={dilution}
+                                                                placeholder="Dilution"
+                                                                allowCustom={true}
+                                                                className="text-xs h-8"
+                                                            />
                                                         </div>
                                                     </div>
                                                 </div>
                                                 
-                                                {/* Remove old single dosage field */}
-                                                <div className="hidden">
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Dosage (Old)</label>
-                                                    <CustomSelect
-                                                        value={pr.dosage || ''}
-                                                        onChange={(val) => updatePrescription(i, { dosage: val.toUpperCase() })}
-                                                        options={dosage}
-                                                        placeholder="Select dosage"
-                                                        allowCustom={true}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Additions</label>
-                                                    <CustomSelect
-                                                        value={pr.additions || ''}
-                                                        onChange={(val) => updatePrescription(i, { additions: val.toUpperCase() })}
-                                                        options={additions}
-                                                        placeholder="Select addition"
-                                                        allowCustom={true}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Procedure</label>
-                                                    <CustomSelect
-                                                        value={pr.procedure || ''}
-                                                        onChange={(val) => updatePrescription(i, { procedure: val.toUpperCase() })}
-                                                        options={procedure}
-                                                        placeholder="Select procedure"
-                                                        allowCustom={true}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Presentation</label>
-                                                    <CustomSelect
-                                                        value={pr.presentation || ''}
-                                                        onChange={(val) => updatePrescription(i, { presentation: val.toUpperCase() })}
-                                                        options={presentation}
-                                                        placeholder="Select presentation"
-                                                        allowCustom={true}
-                                                    />
-                                                </div>
-                                                {/* Removed Droppers Today and Medicine Quantity fields */}
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1 text-muted">Administration</label>
-                                                    <CustomSelect
-                                                        value={pr.administration || ''}
-                                                        onChange={(val) => updatePrescription(i, { administration: val.toUpperCase() })}
-                                                        options={administration}
-                                                        placeholder="Select administration"
-                                                        allowCustom={true}
-                                                    />
+                                                {/* Procedure, Presentation, Administration Section */}
+                                                <div className="sm:col-span-2 lg:col-span-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
+                                                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Administration Details</h4>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <div>
+                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Procedure</label>
+                                                            <CustomSelect
+                                                                value={pr.procedure || ''}
+                                                                onChange={(val) => updatePrescription(i, { procedure: val.toUpperCase() })}
+                                                                options={procedure}
+                                                                placeholder="Select procedure"
+                                                                allowCustom={true}
+                                                                className="text-xs h-8"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Presentation</label>
+                                                            <CustomSelect
+                                                                value={pr.presentation || ''}
+                                                                onChange={(val) => updatePrescription(i, { presentation: val.toUpperCase() })}
+                                                                options={presentation}
+                                                                placeholder="Select presentation"
+                                                                allowCustom={true}
+                                                                className="text-xs h-8"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Administration</label>
+                                                            <CustomSelect
+                                                                value={pr.administration || ''}
+                                                                onChange={(val) => updatePrescription(i, { administration: val.toUpperCase() })}
+                                                                options={administration}
+                                                                placeholder="Select administration"
+                                                                allowCustom={true}
+                                                                className="text-xs h-8"
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 
                                                 {/* Taken Checkbox - Modern minimal design with green theme */}
@@ -3024,9 +3239,10 @@ function UserPrescriptionsContent({ user }: { user: any }) {
 
     useEffect(() => {
         if (!user) return
-        fetch('/api/visits')
+        fetch('/api/visits?limit=500&includePrescriptions=true')
             .then(r => r.json())
-            .then(data => {
+            .then(response => {
+                const data = response.data || response
                 // Filter visits that belong to this user
                 const userVisits = data.filter((v: any) =>
                     v.patient?.email === user.email || v.patient?.phone === user.phone

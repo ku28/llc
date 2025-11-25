@@ -43,6 +43,10 @@ export default function InvoicesPage() {
     const [showCancelGenerationConfirm, setShowCancelGenerationConfirm] = useState(false)
     const [cancelConfirmAnimating, setCancelConfirmAnimating] = useState(false)
     const [user, setUser] = useState<any>(null)
+    const [isFilterStatusOpen, setIsFilterStatusOpen] = useState(false)
+    const [isPatientSelectOpen, setIsPatientSelectOpen] = useState(false)
+    const [isProductSelectOpen, setIsProductSelectOpen] = useState<{[key: number]: boolean}>({})
+    const [isPaymentMethodOpen, setIsPaymentMethodOpen] = useState(false)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const { getCache, setCache } = useDataCache()
     const importContext = useImportContext()
@@ -1061,7 +1065,7 @@ export default function InvoicesPage() {
                             className="w-full p-3 pr-10 border border-emerald-200 dark:border-emerald-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
                         />
                     </div>
-                    <div className="w-48">
+                    <div className={`w-48 ${isFilterStatusOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
                         <CustomSelect
                             value={filterStatus}
                             onChange={(value) => setFilterStatus(value)}
@@ -1072,6 +1076,7 @@ export default function InvoicesPage() {
                                 { value: 'paid', label: 'Paid' }
                             ]}
                             placeholder="All Status"
+                            onOpenChange={setIsFilterStatusOpen}
                         />
                     </div>
                     {(searchQuery || filterStatus) && (
@@ -1332,7 +1337,7 @@ export default function InvoicesPage() {
                                     <div>
                                         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">👤 Customer Information</h3>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div>
+                                            <div className={isPatientSelectOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Patient (Optional)</label>
                                                 <CustomSelect
                                                     value={form.patientId}
@@ -1341,13 +1346,14 @@ export default function InvoicesPage() {
                                                         if (value) fillFromPatient(value)
                                                     }}
                                                     options={[
-                                                        { value: '', label: '-- Select Patient --' },
+                                                        { value: '', label: 'Select patient' },
                                                         ...patients.map(p => ({
                                                             value: p.id.toString(),
                                                             label: `${p.firstName} ${p.lastName}${p.opdNo ? ` (${p.opdNo})` : ''}`
                                                         }))
                                                     ]}
                                                     placeholder="Select patient"
+                                                    onOpenChange={setIsPatientSelectOpen}
                                                 />
                                             </div>
                                             <div>
@@ -1456,7 +1462,7 @@ export default function InvoicesPage() {
                                             {form.items.map((item, index) => (
                                                 <div key={index} className="relative p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
                                                     <div className="grid grid-cols-6 gap-3">
-                                                        <div className="col-span-2">
+                                                        <div className={`col-span-2 ${isProductSelectOpen[index] ? 'relative z-[10000]' : 'relative z-0'}`}>
                                                             <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">Product</label>
                                                             <CustomSelect
                                                                 value={item.productId}
@@ -1469,6 +1475,7 @@ export default function InvoicesPage() {
                                                                     }))
                                                                 ]}
                                                                 placeholder="Select product"
+                                                                onOpenChange={(isOpen) => setIsProductSelectOpen(prev => ({...prev, [index]: isOpen}))}
                                                             />
                                                         </div>
                                                         <div className="col-span-2">
@@ -1617,7 +1624,7 @@ export default function InvoicesPage() {
                                     />
                                 </div>
 
-                                <div>
+                                <div className={isPaymentMethodOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                     <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Payment Method *</label>
                                     <CustomSelect
                                         value={paymentForm.paymentMethod}
@@ -1631,6 +1638,7 @@ export default function InvoicesPage() {
                                         ]}
                                         placeholder="Select payment method"
                                         required
+                                        onOpenChange={setIsPaymentMethodOpen}
                                     />
                                 </div>
                             </div>

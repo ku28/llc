@@ -578,7 +578,7 @@ a:hover {
 }
 
 .custom-select.open {
-  z-index: 10001;
+  z-index: 999999;
 }
 
 /* New input wrapper style */
@@ -712,7 +712,7 @@ a:hover {
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  z-index: 99999 !important;
+  z-index: 9999999 !important;
   animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0.5rem;
   isolation: isolate;
@@ -791,6 +791,10 @@ a:hover {
   font-weight: 500;
   margin-bottom: 0.25rem;
   background: transparent;
+  font-size: 0.85rem; /* 15% smaller than base 1rem */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dark .custom-select-option {

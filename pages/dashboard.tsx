@@ -103,14 +103,15 @@ export default function Dashboard() {
         fetch('/api/purchase-orders'),
         fetch('/api/customer-invoices'),
         fetch('/api/stock-transactions'),
-        fetch('/api/visits')
+        fetch('/api/visits?limit=500&includePrescriptions=false')
       ])
 
       const products = await productsRes.json()
       const purchaseOrders = await poisRes.json()
       const invoices = await invoicesRes.json()
       const stockTransactions = await stockTxRes.json()
-      const visits = await visitsRes.json()
+      const visitsResponse = await visitsRes.json()
+      const visits = visitsResponse.data || visitsResponse
 
       // Calculate low stock products (quantity <= 10 or below reorder point)
       const lowStock = products.filter((p: any) => {

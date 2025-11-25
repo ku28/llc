@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface Option {
     value: string
@@ -15,6 +16,7 @@ interface CustomSelectProps {
     required?: boolean
     allowCustom?: boolean  // Allow typing custom values
     onOpenChange?: (isOpen: boolean) => void  // Callback when dropdown opens/closes
+    disabled?: boolean  // Disable the select
 }
 
 export default function CustomSelect({
@@ -25,15 +27,18 @@ export default function CustomSelect({
     className = '',
     required = false,
     allowCustom = false,
-    onOpenChange
+    onOpenChange,
+    disabled = false
 }: CustomSelectProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [inputValue, setInputValue] = useState('')
     const [highlightedIndex, setHighlightedIndex] = useState(0)
     const [hoveredOption, setHoveredOption] = useState<Option | null>(null)
+    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 })
     const containerRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
     const optionsRef = useRef<HTMLDivElement>(null)
+    const dropdownRef = useRef<HTMLDivElement>(null)
 
     // Update input value when value prop changes (for pre-filled forms)
     useEffect(() => {
@@ -62,7 +67,11 @@ export default function CustomSelect({
     // Close dropdown when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+            const target = event.target as Node
+            const clickedInContainer = containerRef.current && containerRef.current.contains(target)
+            const clickedInDropdown = dropdownRef.current && dropdownRef.current.contains(target)
+            
+            if (!clickedInContainer && !clickedInDropdown) {
                 setIsOpen(false)
                 // Keep the custom value or restore the selected option label
                 if (!isOpen) return
@@ -95,6 +104,42 @@ export default function CustomSelect({
             }
         }
     }, [highlightedIndex, isOpen])
+
+    // Update dropdown position when opened
+    useEffect(() => {
+        if (isOpen && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect()
+            setDropdownPosition({
+                top: rect.bottom + 8,
+                left: rect.left,
+                width: rect.width
+            })
+        }
+    }, [isOpen])
+
+    // Update dropdown position on scroll
+    useEffect(() => {
+        if (!isOpen) return
+        
+        const updatePosition = () => {
+            if (containerRef.current) {
+                const rect = containerRef.current.getBoundingClientRect()
+                setDropdownPosition({
+                    top: rect.bottom + 8,
+                    left: rect.left,
+                    width: rect.width
+                })
+            }
+        }
+        
+        window.addEventListener('scroll', updatePosition, true)
+        window.addEventListener('resize', updatePosition)
+        
+        return () => {
+            window.removeEventListener('scroll', updatePosition, true)
+            window.removeEventListener('resize', updatePosition)
+        }
+    }, [isOpen])
 
     // Filter options based on input value
     const filteredOptions = options.filter(option => 
@@ -205,7 +250,8 @@ export default function CustomSelect({
                     className="custom-select-input"
                     autoComplete="off"
                     required={required}
-                    style={{ cursor: 'pointer' }}
+                    disabled={disabled}
+                    style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
                 />
                 <svg
                     className={`arrow ${isOpen ? 'open' : ''}`}
@@ -233,15 +279,24 @@ export default function CustomSelect({
                 </svg>
             </div>
 
-            {isOpen && (
-                <div className="custom-select-dropdown">
+            {isOpen && typeof window !== 'undefined' && createPortal(
+                <div 
+                    ref={dropdownRef}
+                    className="custom-select-dropdown" 
+                    style={{
+                        position: 'fixed',
+                        top: `${dropdownPosition.top}px`,
+                        left: `${dropdownPosition.left}px`,
+                        width: `${dropdownPosition.width}px`,
+                    }}
+                >
                     <div className="max-h-60 overflow-y-auto" ref={optionsRef}>
                         {filteredOptions.length === 0 ? (
-                            <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
+                            <div className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 text-center">
                                 {inputValue.trim() ? (
                                     <div>
-                                        <div className="mb-2">No matching options</div>
-                                        <div className="text-xs text-green-600 dark:text-green-400 font-medium">
+                                        <div className="mb-2" style={{fontSize: '0.7rem'}}>No matching options</div>
+                                        <div style={{fontSize: '0.65rem'}} className="text-green-600 dark:text-green-400 font-medium">
                                             Press Enter to save: "{inputValue}"
                                         </div>
                                     </div>
@@ -269,26 +324,26 @@ export default function CustomSelect({
                                     style={{ cursor: 'pointer', position: 'relative' }}
                                 >
                                     {value === option.value && <span className="checkmark">✓ </span>}
-                                    <div className="flex items-center gap-2">
-                                        <span className="flex-1">{option.label}</span>
+                                    <div className="flex items-center gap-2" style={{ flexWrap: 'nowrap', minWidth: 0 }}>
+                                        <span className="flex-1" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{option.label}</span>
                                         {isSuggested && (
-                                            <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs rounded-full font-bold shadow-md">
+                                            <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full font-bold shadow-md flex-shrink-0" style={{fontSize: '0.65rem'}}>
                                                 SUGGESTED
                                             </span>
                                         )}
                                         {hasNoPhone && (
-                                            <span className="px-2 py-0.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs rounded-full font-bold shadow-md">
+                                            <span className="px-2 py-0.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full font-bold shadow-md flex-shrink-0" style={{fontSize: '0.65rem'}}>
                                                 NO PHONE NO.
                                             </span>
                                         )}
                                         {hasPhone && !isSuggested && (
-                                            <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs rounded-full font-medium shadow-sm">
+                                            <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full font-medium shadow-sm flex-shrink-0" style={{fontSize: '0.65rem'}}>
                                                 ✓
                                             </span>
                                         )}
                                     </div>
                                     {hoveredOption?.value === option.value && option.description && option.description !== 'SUGGESTED' && (
-                                        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-800 dark:to-emerald-900/30 border-2 border-emerald-400 dark:border-emerald-600 rounded-lg shadow-xl p-3 text-xs text-gray-700 dark:text-gray-200 backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-800 dark:to-emerald-900/30 border-2 border-emerald-400 dark:border-emerald-600 rounded-lg shadow-xl p-3 text-gray-700 dark:text-gray-200 backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-200" style={{fontSize: '0.7rem'}}>
                                             <div className="flex items-start gap-2">
                                                 <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
@@ -302,7 +357,8 @@ export default function CustomSelect({
                             })
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     )

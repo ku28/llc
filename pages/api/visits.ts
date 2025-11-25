@@ -1,13 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
-import { Prisma } from '@prisma/client'
 import { requireAuth } from '../../lib/auth'
 import { generateOpdNo } from '../../lib/utils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'GET') {
         try {
-            const { id, patientId } = req.query
+            const { id, patientId, limit, offset, includePrescriptions } = req.query
             
             // If ID is provided, fetch single visit
             if (id) {
@@ -36,31 +35,65 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     where: { patientId: Number(patientId) },
                     orderBy: { date: 'desc' },
                     include: {
-                        prescriptions: {
+                        prescriptions: includePrescriptions === 'true' ? {
                             include: {
                                 product: true
                             }
-                        },
+                        } : false,
                         patient: true
                     }
                 })
                 return res.status(200).json(items)
             }
             
-            // Otherwise fetch all visits
+            // Otherwise fetch all visits with pagination and minimal data
+            const limitNum = limit ? Math.min(Number(limit), 1000) : 100 // Default 100, max 1000
+            const offsetNum = offset ? Number(offset) : 0
+            
             const items = await prisma.visit.findMany({ 
+                take: limitNum,
+                skip: offsetNum,
                 orderBy: { date: 'desc' },
                 include: {
-                    prescriptions: {
+                    // Only include prescriptions if explicitly requested
+                    prescriptions: includePrescriptions === 'true' ? {
                         include: {
-                            product: true
+                            product: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                    category: true
+                                }
+                            }
                         }
-                    },
-                    patient: true
+                    } : false,
+                    patient: {
+                        select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            phone: true,
+                            gender: true,
+                            email: true
+                        }
+                    }
                 }
             })
-            return res.status(200).json(items)
+            
+            // Get total count for pagination
+            const total = await prisma.visit.count()
+            
+            return res.status(200).json({
+                data: items,
+                pagination: {
+                    total,
+                    limit: limitNum,
+                    offset: offsetNum,
+                    hasMore: offsetNum + limitNum < total
+                }
+            })
         } catch (err: any) {
+            console.error('Error fetching visits:', err)
             if (err?.code === 'P2021' || err?.code === 'P2022') return res.status(200).json([])
             return res.status(500).json({ error: String(err?.message || err) })
         }

@@ -12,6 +12,7 @@ export default function SignupPage() {
     const [role, setRole] = useState('')
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
+    const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false)
     const router = useRouter()
     const { toasts, removeToast, showError, showWarning } = useToast()
 
@@ -77,7 +78,7 @@ export default function SignupPage() {
     return (
         <>
             <ToastNotification toasts={toasts} removeToast={removeToast} />
-            <div className="max-w-md mx-auto mt-12 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+            <div className={`max-w-md mx-auto mt-12 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg ${isRoleDropdownOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
                 <h2 className="text-2xl font-bold mb-2">Staff Registration</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                     Register as Admin or Reception. Your request will be sent to the administrator for approval.
@@ -125,6 +126,7 @@ export default function SignupPage() {
                         options={roleOptions}
                         placeholder="Select your role"
                         allowCustom={false}
+                        onOpenChange={setIsRoleDropdownOpen}
                     />
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Select the role that matches your responsibilities

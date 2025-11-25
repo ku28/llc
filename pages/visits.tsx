@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 import Link from 'next/link'
 import ImportVisitsModal from '../components/ImportVisitsModal'
@@ -69,13 +69,32 @@ export default function VisitsPage() {
         }
     }, [])
 
-    async function fetchVisits() {
+    const fetchVisits = useCallback(async () => {
         setLoading(true)
         try {
-            const [visitsData, patientsData] = await Promise.all([
-                fetch('/api/visits').then(r => r.json()),
+            const [visitsResponse, patientsData] = await Promise.all([
+                fetch('/api/visits?limit=1000&includePrescriptions=false').then(r => r.json()),
                 fetch('/api/patients').then(r => r.json())
             ])
+            
+            console.log('API Response:', visitsResponse)
+            
+            // Check for API error
+            if (visitsResponse.error) {
+                console.error('API Error:', visitsResponse.error)
+                setVisits([])
+                setPatients(patientsData)
+                return
+            }
+            
+            console.log('Is data array?', Array.isArray(visitsResponse.data))
+            console.log('Is response array?', Array.isArray(visitsResponse))
+            
+            // Handle paginated response
+            const visitsData = Array.isArray(visitsResponse.data) ? visitsResponse.data : 
+                               Array.isArray(visitsResponse) ? visitsResponse : []
+            
+            console.log('Visits data length:', visitsData.length)
             
             // Filter visits for user role - show only their own visits
             let filteredVisits = visitsData
@@ -84,15 +103,20 @@ export default function VisitsPage() {
                     v.patient?.email === user.email || v.patient?.phone === user.phone
                 )
             }
+            
+            console.log('Filtered visits length:', filteredVisits.length)
+            
             setVisits(filteredVisits)
             setPatients(patientsData)
             setCache('visits', visitsData)
         } catch (err) {
-            console.error('Failed to fetch visits')
+            console.error('Failed to fetch visits', err)
+            setVisits([])
+            setPatients([])
         } finally {
             setLoading(false)
         }
-    }
+    }, [user, setCache])
 
     useEffect(() => {
         if (!user) return
@@ -116,17 +140,22 @@ export default function VisitsPage() {
         return () => {
             setVisits([])
         }
-    }, [user])
+    }, [user, fetchVisits, getCache])
 
     async function create(e: any) {
         e.preventDefault()
         const response = await fetch('/api/visits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
         if (response.ok) {
             const newVisit = await response.json()
-            const allVisits = await (await fetch('/api/visits')).json()
+            const allVisitsResponse = await (await fetch('/api/visits?limit=1000&includePrescriptions=false')).json()
+            const allVisits = Array.isArray(allVisitsResponse.data) ? allVisitsResponse.data : 
+                              Array.isArray(allVisitsResponse) ? allVisitsResponse : []
             setVisits(allVisits)
         } else {
-            setVisits(await (await fetch('/api/visits')).json())
+            const visitsResponse = await (await fetch('/api/visits?limit=1000&includePrescriptions=false')).json()
+            const visitsArray = Array.isArray(visitsResponse.data) ? visitsResponse.data : 
+                                Array.isArray(visitsResponse) ? visitsResponse : []
+            setVisits(visitsArray)
         }
         setForm({ patientId: '', opdNo: '', diagnoses: '' })
     }
@@ -165,8 +194,9 @@ export default function VisitsPage() {
                 // NOW update the list - item fades out first, then gets removed
                 showSuccess('Visit deleted successfully')
                 closeConfirmModal()
-                setVisits(visits.filter(v => v.id !== visitToDelete.id))
-                setCache('visits', visits.filter(v => v.id !== visitToDelete.id))
+                const visitsArray = Array.isArray(visits) ? visits : []
+                setVisits(visitsArray.filter(v => v.id !== visitToDelete.id))
+                setCache('visits', visitsArray.filter(v => v.id !== visitToDelete.id))
                 
                 setDeletingIds(new Set())
             } else {
@@ -194,7 +224,8 @@ export default function VisitsPage() {
     }
 
     function toggleSelectAll() {
-        const filteredVisits = visits.filter((v: any) => {
+        const visitsArray = Array.isArray(visits) ? visits : []
+        const filteredVisits = visitsArray.filter((v: any) => {
             const patientName = `${v.patient?.firstName || ''} ${v.patient?.lastName || ''}`.toLowerCase()
             const opdNo = (v.opdNo || '').toLowerCase()
             const search = searchQuery.toLowerCase()
@@ -260,7 +291,8 @@ export default function VisitsPage() {
                     
                     // Remove already deleted items from UI
                     if (deletedIds.length > 0) {
-                        setVisits(visits.filter(v => !deletedIds.includes(v.id)))
+                        const visitsArray = Array.isArray(visits) ? visits : []
+                        setVisits(visitsArray.filter(v => !deletedIds.includes(v.id)))
                         setSelectedVisitIds(new Set(idsArray.filter(id => !deletedIds.includes(id))))
                     }
                     
@@ -306,7 +338,8 @@ export default function VisitsPage() {
             }
             
             // Remove deleted visits from UI
-            setVisits(visits.filter(v => !deletedIds.includes(v.id)))
+            const visitsArray = Array.isArray(visits) ? visits : []
+            setVisits(visitsArray.filter(v => !deletedIds.includes(v.id)))
             setSelectedVisitIds(new Set())
             
             // Update task to success
@@ -363,7 +396,8 @@ export default function VisitsPage() {
                 return
             }
 
-            const selectedVisits = visits.filter((v: any) => selectedVisitIds.has(v.id))
+            const visitsArray = Array.isArray(visits) ? visits : []
+            const selectedVisits = visitsArray.filter((v: any) => selectedVisitIds.has(v.id))
 
             const dataToExport = selectedVisits.map((v: any) => {
                 const patientName = v.patient ? `${v.patient.firstName || ''} ${v.patient.lastName || ''}`.trim() : ''
@@ -504,8 +538,11 @@ export default function VisitsPage() {
     }
 
     function getFilteredAndSortedVisits() {
+        // Ensure visits is an array
+        const visitsArray = Array.isArray(visits) ? visits : []
+        
         // First filter by search query
-        let filtered = visits.filter(v => {
+        let filtered = visitsArray.filter(v => {
             if (!searchQuery) return true
             const patientName = (v.patient ? `${v.patient.firstName || ''} ${v.patient.lastName || ''}` : '').toLowerCase()
             const opdNo = (v.opdNo || '').toLowerCase()
@@ -1096,6 +1133,16 @@ export default function VisitsPage() {
                                             
                                             {/* Action Button */}
                                             <div className="flex items-center gap-2 flex-shrink-0">
+                                                <Link
+                                                    href={`/visits/compare?patientId=${patient?.id}`}
+                                                    className="px-4 py-2 text-xs font-semibold bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-lg shadow-sm transition-all duration-200 flex items-center gap-1.5"
+                                                    title="Compare Visits"
+                                                >
+                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                                    </svg>
+                                                    <span>Compare</span>
+                                                </Link>
                                                 <button
                                                     onClick={() => toggleRowExpansion(patientKey)}
                                                     className="px-4 py-2 text-xs font-semibold bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg shadow-sm transition-all duration-200 flex items-center gap-1.5"

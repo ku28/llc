@@ -4,19 +4,103 @@
         "label": "Select administration"
     },
     {
+        "value": "ALT",
+        "label": "ALT"
+    },
+    {
+        "value": "OR",
+        "label": "OR"
+    },
+    {
+        "value": "APPLY",
+        "label": "APPLY"
+    },
+    {
+        "value": "POUR",
+        "label": "POUR"
+    },
+    {
+        "value": "BATH",
+        "label": "BATH"
+    },
+    {
+        "value": "SITZ BATH",
+        "label": "SITZ BATH"
+    },
+    {
+        "value": "MESSAGE",
+        "label": "MESSAGE"
+    },
+    {
+        "value": "GARGLE",
+        "label": "GARGLE"
+    },
+    {
+        "value": "STEAM",
+        "label": "STEAM"
+    },
+    {
+        "value": "HOT COMPRESS",
+        "label": "HOT COMPRESS"
+    },
+    {
+        "value": "COLD COMPRESS",
+        "label": "COLD COMPRESS"
+    },
+    {
+        "value": "COMPRESS",
+        "label": "COMPRESS"
+    },
+    {
+        "value": "DOUCHE",
+        "label": "DOUCHE"
+    },
+    {
+        "value": "SPRINKLE",
+        "label": "SPRINKLE"
+    },
+    {
+        "value": "SPRAY",
+        "label": "SPRAY"
+    },
+    {
+        "value": "WASH",
+        "label": "WASH"
+    },
+    {
+        "value": "SPONGE",
+        "label": "SPONGE"
+    },
+    {
+        "value": "INJECTION",
+        "label": "INJECTION"
+    },
+    {
         "value": "ORAL",
         "label": "ORAL"
     },
     {
-        "value": "TOPICAL",
-        "label": "TOPICAL"
-    },
-    {
-        "value": "SUBLINGUAL",
-        "label": "SUBLINGUAL"
-    },
-    {
         "value": "EXTERNAL",
         "label": "EXTERNAL"
+    },
+    {
+        "value": "RUB",
+        "label": "RUB"
+    },
+    {
+        "value": "SMELL",
+        "label": "SMELL"
+    },
+    {
+        "value": "NEBULISE",
+        "label": "NEBULISE"
+    },
+    {
+        "value": "CHEW",
+        "label": "CHEW"
+    },
+    {
+        "value": "LICK",
+        "label": "LICK"
     }
 ]

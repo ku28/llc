@@ -53,9 +53,10 @@ export default function UserDashboard() {
         try {
             setLoading(true)
 
-            // Fetch user's appointments (visits)
-            const visitsRes = await fetch('/api/visits')
-            const visits = await visitsRes.json()
+            // Fetch user's appointments (visits) with minimal data
+            const visitsRes = await fetch('/api/visits?limit=500&includePrescriptions=false')
+            const visitsResponse = await visitsRes.json()
+            const visits = visitsResponse.data || visitsResponse
 
             // Fetch user's prescriptions
             const prescriptionsRes = await fetch('/api/prescriptions')

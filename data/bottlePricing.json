@@ -1,0 +1,17 @@
+[
+    {
+        "value": "30 ML",
+        "label": "30 ML",
+        "price": 25
+    },
+    {
+        "value": "60 ML",
+        "label": "60 ML",
+        "price": 50
+    },
+    {
+        "value": "100 ML",
+        "label": "100 ML",
+        "price": 100
+    }
+]

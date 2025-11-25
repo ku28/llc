@@ -8,27 +8,79 @@
         "label": "DROPS"
     },
     {
-        "value": "TABLET",
-        "label": "TABLET"
+        "value": "SYRUP",
+        "label": "SYRUP"
     },
     {
-        "value": "CAPSULE",
-        "label": "CAPSULE"
+        "value": "TABS",
+        "label": "TABS"
     },
     {
-        "value": "LIQUID",
-        "label": "LIQUID"
+        "value": "CAPS",
+        "label": "CAPS"
     },
     {
-        "value": "POWDER",
-        "label": "POWDER"
+        "value": "LOTION",
+        "label": "LOTION"
+    },
+    {
+        "value": "SOLUTION",
+        "label": "SOLUTION"
     },
     {
         "value": "CREAM",
         "label": "CREAM"
     },
     {
+        "value": "OIL",
+        "label": "OIL"
+    },
+    {
+        "value": "AEROSOL",
+        "label": "AEROSOL"
+    },
+    {
+        "value": "POWDER",
+        "label": "POWDER"
+    },
+    {
         "value": "OINTMENT",
         "label": "OINTMENT"
+    },
+    {
+        "value": "EYE DROPS",
+        "label": "EYE DROPS"
+    },
+    {
+        "value": "EAR DROPS",
+        "label": "EAR DROPS"
+    },
+    {
+        "value": "SHAMPOO",
+        "label": "SHAMPOO"
+    },
+    {
+        "value": "SOAP",
+        "label": "SOAP"
+    },
+    {
+        "value": "MOUTH WASH",
+        "label": "MOUTH WASH"
+    },
+    {
+        "value": "PASTE",
+        "label": "PASTE"
+    },
+    {
+        "value": "EMULSION",
+        "label": "EMULSION"
+    },
+    {
+        "value": "SUSPENSION",
+        "label": "SUSPENSION"
+    },
+    {
+        "value": "GEL",
+        "label": "GEL"
     }
 ]

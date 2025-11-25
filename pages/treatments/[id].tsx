@@ -11,6 +11,9 @@ import additions from '../../data/additions.json'
 import procedure from '../../data/procedure.json'
 import presentation from '../../data/presentation.json'
 import administration from '../../data/administration.json'
+import organ from '../../data/organ.json'
+import speciality from '../../data/speciality.json'
+import diseaseAction from '../../data/diseaseAction.json'
 
 function EditTreatmentPage() {
     const router = useRouter()
@@ -25,6 +28,10 @@ function EditTreatmentPage() {
     const [planNumber, setPlanNumber] = useState('01')
     const [allTreatments, setAllTreatments] = useState<any[]>([])
     const [uniqueDiagnoses, setUniqueDiagnoses] = useState<string[]>([])
+    const [isBasicInfoDropdownOpen, setIsBasicInfoDropdownOpen] = useState(false)
+    const [isOrganOpen, setIsOrganOpen] = useState(false)
+    const [isSpecialityOpen, setIsSpecialityOpen] = useState(false)
+    const [isDiseaseActionOpen, setIsDiseaseActionOpen] = useState(false)
     
     const emptyForm = {
         speciality: '',
@@ -92,16 +99,18 @@ function EditTreatmentPage() {
                     setMedicines(treatment.treatmentProducts.map((tp: any) => ({
                         id: tp.id,
                         productId: tp.productId.toString(),
-                        comp1: tp.comp1 || '',
-                        comp2: tp.comp2 || '',
-                        comp3: tp.comp3 || '',
-                        // Treat empty strings as undefined to hide comp4/comp5
-                        comp4: (tp.comp4 && tp.comp4.trim()) ? tp.comp4 : undefined,
-                        comp5: (tp.comp5 && tp.comp5.trim()) ? tp.comp5 : undefined,
+                        spy1: tp.spy1 || '',
+                        spy2: tp.spy2 || '',
+                        spy3: tp.spy3 || '',
+                        spy4: tp.spy4 || '',
+                        spy5: tp.spy5 || '',
+                        spy6: tp.spy6 || '',
                         quantity: tp.quantity || 1,
                         timing: tp.timing || '',
                         dosage: tp.dosage || '',
-                        additions: tp.additions || '',
+                        addition1: tp.addition1 || '',
+                        addition2: tp.addition2 || '',
+                        addition3: tp.addition3 || '',
                         procedure: tp.procedure || '',
                         presentation: tp.presentation || '',
                         droppersToday: tp.droppersToday?.toString() || '',
@@ -158,13 +167,11 @@ function EditTreatmentPage() {
     function addAllSelectedMedicinesToTreatment() {
         const newMedicines = selectedMedicines.map(productId => ({
             productId: productId,
-            comp1: '',
-            comp2: '',
-            comp3: '',
+            spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
             quantity: 0,
             timing: '',
             dosage: '',
-            additions: '',
+            addition1: '', addition2: '', addition3: '',
             procedure: '',
             presentation: '',
             droppersToday: '',
@@ -180,15 +187,11 @@ function EditTreatmentPage() {
         // Add medicine to the list
         setMedicines([...medicines, {
             productId: productId,
-            comp1: '',
-            comp2: '',
-            comp3: '',
-            comp4: undefined,
-            comp5: undefined,
+            spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
             quantity: 1,
             timing: '',
             dosage: '',
-            additions: '',
+            addition1: '', addition2: '', addition3: '',
             procedure: '',
             presentation: '',
             droppersToday: '',
@@ -206,7 +209,7 @@ function EditTreatmentPage() {
     function updateMedicine(index: number, field: string, value: any) {
         const updated = [...medicines]
         // Convert specific fields to uppercase
-        if (['comp1', 'comp2', 'comp3', 'comp4', 'comp5', 'dosage', 'additions', 'procedure', 'presentation'].includes(field)) {
+        if (['spy1', 'spy2', 'spy3', 'spy4', 'spy5', 'spy6', 'dosage', 'additions', 'addition1', 'addition2', 'addition3', 'procedure', 'presentation'].includes(field)) {
             value = typeof value === 'string' ? value.toUpperCase() : value
         }
         updated[index] = { ...updated[index], [field]: value }
@@ -231,15 +234,18 @@ function EditTreatmentPage() {
                 notes: form.notes.toUpperCase(),
                 products: medicines.filter((p: any) => p.productId).map((p: any) => ({
                     productId: p.productId,
-                    comp1: p.comp1?.toUpperCase() || '',
-                    comp2: p.comp2?.toUpperCase() || '',
-                    comp3: p.comp3?.toUpperCase() || '',
-                    comp4: p.comp4?.toUpperCase() || '',
-                    comp5: p.comp5?.toUpperCase() || '',
+                    spy1: p.spy1?.toUpperCase() || '',
+                    spy2: p.spy2?.toUpperCase() || '',
+                    spy3: p.spy3?.toUpperCase() || '',
+                    spy4: p.spy4?.toUpperCase() || '',
+                    spy5: p.spy5?.toUpperCase() || '',
+                    spy6: p.spy6?.toUpperCase() || '',
                     quantity: p.quantity,
                     timing: p.timing,
                     dosage: p.dosage?.toUpperCase() || '',
-                    additions: p.additions?.toUpperCase() || '',
+                    addition1: p.addition1?.toUpperCase() || '',
+                    addition2: p.addition2?.toUpperCase() || '',
+                    addition3: p.addition3?.toUpperCase() || '',
                     procedure: p.procedure?.toUpperCase() || '',
                     presentation: p.presentation?.toUpperCase() || '',
                     droppersToday: p.droppersToday ? parseInt(p.droppersToday) : null,
@@ -319,8 +325,8 @@ function EditTreatmentPage() {
             </div>
 
             <form onSubmit={update} className="space-y-6">
-                <div className="card">
-                    <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
+                <div className={`rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6 backdrop-blur-sm ${isBasicInfoDropdownOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
+                    <h3 className="text-lg font-semibold mb-4 text-emerald-900 dark:text-emerald-100">Basic Information</h3>
                     <div className="grid grid-cols-1 gap-3">
                         <div>
                             <label className="block text-sm font-medium mb-1.5">Provisional Diagnosis *</label>
@@ -342,44 +348,62 @@ function EditTreatmentPage() {
                         </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-                        <div>
+                        <div className={isSpecialityOpen ? 'relative z-[10000]' : 'relative z-0'}>
                             <label className="block text-sm font-medium mb-1.5">Speciality</label>
-                            <input 
-                                placeholder="CARDIOLOGY" 
-                                value={form.speciality} 
-                                onChange={e => setForm({ ...form, speciality: e.target.value.toUpperCase() })} 
-                                className="p-2 border rounded w-full uppercase" 
+                            <CustomSelect
+                                value={form.speciality}
+                                onChange={(val) => setForm({ ...form, speciality: val.toUpperCase() })}
+                                options={[
+                                    { value: '', label: 'Select speciality' },
+                                    ...speciality.map(s => ({ value: s, label: s }))
+                                ]}
+                                placeholder="Select speciality"
+                                allowCustom={true}
+                                className="w-full"
+                                onOpenChange={setIsSpecialityOpen}
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1.5">Organ</label>
-                            <input 
-                                placeholder="HEART" 
-                                value={form.organ} 
-                                onChange={e => setForm({ ...form, organ: e.target.value.toUpperCase() })} 
-                                className="p-2 border rounded w-full uppercase" 
+                        <div className={isOrganOpen ? 'relative z-[10000]' : 'relative z-0'}>
+                            <label className="block text-sm font-medium mb-1.5">Site</label>
+                            <CustomSelect
+                                value={form.organ}
+                                onChange={(val) => setForm({ ...form, organ: val })}
+                                options={[
+                                    { value: '', label: 'Select site' },
+                                    ...organ.map(o => ({ value: o, label: o }))
+                                ]}
+                                placeholder="Select site"
+                                allowCustom={true}
+                                className="w-full"
+                                onOpenChange={setIsOrganOpen}
                             />
                         </div>
-                        <div>
+                        <div className={isDiseaseActionOpen ? 'relative z-[10000]' : 'relative z-0'}>
                             <label className="block text-sm font-medium mb-1.5">Disease Action</label>
-                            <input 
-                                placeholder="ANTI-INFLAMMATORY" 
-                                value={form.diseaseAction} 
-                                onChange={e => setForm({ ...form, diseaseAction: e.target.value.toUpperCase() })} 
-                                className="p-2 border rounded w-full uppercase" 
+                            <CustomSelect
+                                value={form.diseaseAction}
+                                onChange={(val) => setForm({ ...form, diseaseAction: val.toUpperCase() })}
+                                options={[
+                                    { value: '', label: 'Select disease action' },
+                                    ...diseaseAction.map(d => ({ value: d, label: d }))
+                                ]}
+                                placeholder="Select disease action"
+                                allowCustom={true}
+                                className="w-full"
+                                onOpenChange={setIsDiseaseActionOpen}
                             />
                         </div>
                     </div>
                 </div>
                 
                 {/* Treatment Plan Section (Single Plan - Edit Mode) */}
-                <div className="card">
-                    <div className="border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20">
+                <div className="rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6 backdrop-blur-sm">
+                    <div className="border-2 border-emerald-300/50 dark:border-emerald-700/50 rounded-lg p-4 bg-gradient-to-br from-emerald-50/50 via-green-50/30 to-emerald-100/50 dark:from-emerald-950/30 dark:via-emerald-900/20 dark:to-emerald-950/30">
                         {/* Plan Header */}
-                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-blue-300 dark:border-blue-700">
+                        <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-emerald-300/50 dark:border-emerald-700/50">
                             <div className="flex items-center gap-3">
                                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Plan Number:</span>
-                                <span className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-bold">
+                                <span className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-sm font-bold shadow-md">
                                     {planNumber}
                                 </span>
                             </div>
@@ -420,8 +444,8 @@ function EditTreatmentPage() {
                         </div>
 
                         {/* Medicine Selection with List */}
-                        <div className="border-t border-blue-300 dark:border-blue-700 pt-4 mt-3">
-                            <h5 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">Select Medicines from Inventory</h5>
+                        <div className="border-t-2 border-emerald-300/50 dark:border-emerald-700/50 pt-4 mt-3">
+                            <h5 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100 mb-3">Select Medicines from Inventory</h5>
                             
                             {/* Medicine Dropdown */}
                             <div className="mb-3">
@@ -454,9 +478,9 @@ function EditTreatmentPage() {
                             </div>
 
                             {/* Selected Medicines List */}
-                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3">
+                            <div className="bg-gradient-to-br from-emerald-50/80 via-green-50/60 to-emerald-100/80 dark:from-emerald-950/40 dark:via-emerald-900/30 dark:to-emerald-950/40 border border-emerald-300/50 dark:border-emerald-700/50 rounded-lg p-3 mb-3 backdrop-blur-sm">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                                    <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
                                         Selected Medicines ({selectedMedicines.length})
                                     </span>
                                     {selectedMedicines.length > 0 && (
@@ -511,11 +535,37 @@ function EditTreatmentPage() {
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    {medicines.map((medicine: any, medicineIndex: number) => (
-                                        <div key={medicineIndex} className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-700 shadow-sm">
+                                    {medicines.map((medicine: any, medicineIndex: number) => {
+                                        const product = products.find(p => String(p.id) === String(medicine.productId))
+                                        return (
+                                        <div key={medicineIndex} className="border border-emerald-200/50 dark:border-emerald-700/50 rounded-lg p-3 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/30 dark:from-gray-800 dark:via-emerald-950/30 dark:to-gray-800 shadow-md shadow-emerald-500/10 backdrop-blur-sm">
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
                                                 <div>
                                                     <label className="block text-xs font-medium mb-1">Medicine</label>
+                                                    {medicine.productId && product ? (
+                                                        <div className="p-2 text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2 flex-wrap">
+                                                            <span className="px-2 py-1 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-xs font-bold">{medicineIndex + 1}</span>
+                                                            <span>{product.name}</span>
+                                                            {product.category && (() => {
+                                                                const categoryName = typeof product.category === 'string' ? product.category : product.category.name
+                                                                if (product.unit) {
+                                                                    const unitParts = String(product.unit).trim().split(/\s+/)
+                                                                    const unitType = unitParts.length >= 2 ? unitParts[1] : ''
+                                                                    return (
+                                                                        <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full text-xs font-semibold">
+                                                                            {categoryName} {unitType ? `(${unitType})` : ''}
+                                                                        </span>
+                                                                    )
+                                                                }
+                                                                return (
+                                                                    <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full text-xs font-semibold">
+                                                                        {categoryName}
+                                                                    </span>
+                                                                )
+                                                            })()}
+                                                            <span className="text-gray-500">· Stock: {product.quantity}</span>
+                                                        </div>
+                                                    ) : (
                                                     <CustomSelect
                                                         value={medicine.productId}
                                                         onChange={(value) => updateMedicine(medicineIndex, 'productId', value)}
@@ -529,115 +579,83 @@ function EditTreatmentPage() {
                                                         placeholder="-- select medicine --"
                                                         className="w-full"
                                                     />
+                                                    )}
                                                 </div>
                                                 
-                                                {/* Spagyrics Section */}
+                                                {/* SPY Components - 3x3 Grid */}
                                                 <div className="sm:col-span-2 lg:col-span-3">
-                                                    <label className="block text-xs font-medium mb-1">Spagyrics</label>
-                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                    <label className="block text-xs font-medium mb-2 text-emerald-700 dark:text-emerald-400">Spagyric</label>
+                                                    <div className="grid grid-cols-3 gap-2">
                                                         <CustomSelect
-                                                            value={medicine.comp1 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'comp1', val.toUpperCase())}
+                                                            value={medicine.spy1 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy1', val.toUpperCase())}
                                                             options={components}
-                                                            placeholder="Spy1"
+                                                            placeholder="SPY 1"
                                                             allowCustom={true}
-                                                            className="flex-1 min-w-[100px]"
                                                         />
                                                         <CustomSelect
-                                                            value={medicine.comp2 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'comp2', val.toUpperCase())}
+                                                            value={medicine.spy2 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy2', val.toUpperCase())}
                                                             options={components}
-                                                            placeholder="Spy2"
+                                                            placeholder="SPY 2"
                                                             allowCustom={true}
-                                                            className="flex-1 min-w-[100px]"
                                                         />
                                                         <CustomSelect
-                                                            value={medicine.comp3 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'comp3', val.toUpperCase())}
+                                                            value={medicine.spy3 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy3', val.toUpperCase())}
                                                             options={components}
-                                                            placeholder="Spy3"
+                                                            placeholder="SPY 3"
                                                             allowCustom={true}
-                                                            className="flex-1 min-w-[100px]"
                                                         />
-                                                        
-                                                        {/* Show comp4 if it exists */}
-                                                        {medicine.comp4 !== undefined && (
-                                                            <div className="flex-1 min-w-[100px] flex items-center gap-1">
-                                                                <CustomSelect
-                                                                    value={medicine.comp4 || ''}
-                                                                    onChange={(val) => updateMedicine(medicineIndex, 'comp4', val.toUpperCase())}
-                                                                    options={components}
-                                                                    placeholder="Spy4"
-                                                                    allowCustom={true}
-                                                                    className="flex-1"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        const updated = [...medicines]
-                                                                        updated[medicineIndex].comp4 = undefined
-                                                                        updated[medicineIndex].comp5 = undefined
-                                                                        setMedicines(updated)
-                                                                    }}
-                                                                    className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 text-xs"
-                                                                    title="Remove spagyric 4"
-                                                                >
-                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                                                    </svg>
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {/* Show comp5 if it exists */}
-                                                        {medicine.comp5 !== undefined && (
-                                                            <div className="flex-1 min-w-[100px] flex items-center gap-1">
-                                                                <CustomSelect
-                                                                    value={medicine.comp5 || ''}
-                                                                    onChange={(val) => updateMedicine(medicineIndex, 'comp5', val.toUpperCase())}
-                                                                    options={components}
-                                                                    placeholder="Spy5"
-                                                                    allowCustom={true}
-                                                                    className="flex-1"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        const updated = [...medicines]
-                                                                        updated[medicineIndex].comp5 = undefined
-                                                                        setMedicines(updated)
-                                                                    }}
-                                                                    className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 text-xs"
-                                                                    title="Remove spagyric 5"
-                                                                >
-                                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                                                    </svg>
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {/* Plus button */}
-                                                        {medicine.comp5 === undefined && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const updated = [...medicines]
-                                                                    if (medicine.comp4 === undefined) {
-                                                                        updated[medicineIndex].comp4 = ''
-                                                                    } else {
-                                                                        updated[medicineIndex].comp5 = ''
-                                                                    }
-                                                                    setMedicines(updated)
-                                                                }}
-                                                                className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-blue-500 text-white rounded hover:bg-blue-600"
-                                                                title="Add component"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                                                </svg>
-                                                            </button>
-                                                        )}
+                                                        <CustomSelect
+                                                            value={medicine.spy4 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy4', val.toUpperCase())}
+                                                            options={components}
+                                                            placeholder="SPY 4"
+                                                            allowCustom={true}
+                                                        />
+                                                        <CustomSelect
+                                                            value={medicine.spy5 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy5', val.toUpperCase())}
+                                                            options={components}
+                                                            placeholder="SPY 5"
+                                                            allowCustom={true}
+                                                        />
+                                                        <CustomSelect
+                                                            value={medicine.spy6 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy6', val.toUpperCase())}
+                                                            options={components}
+                                                            placeholder="SPY 6"
+                                                            allowCustom={true}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Addition Components */}
+                                                <div className="sm:col-span-2 lg:col-span-3">
+                                                    <label className="block text-xs font-medium mb-2 text-blue-700 dark:text-blue-400">Addition Components</label>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        <CustomSelect
+                                                            value={medicine.addition1 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'addition1', val.toUpperCase())}
+                                                            options={additions}
+                                                            placeholder="Addition 1"
+                                                            allowCustom={true}
+                                                        />
+                                                        <CustomSelect
+                                                            value={medicine.addition2 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'addition2', val.toUpperCase())}
+                                                            options={additions}
+                                                            placeholder="Addition 2"
+                                                            allowCustom={true}
+                                                        />
+                                                        <CustomSelect
+                                                            value={medicine.addition3 || ''}
+                                                            onChange={(val) => updateMedicine(medicineIndex, 'addition3', val.toUpperCase())}
+                                                            options={additions}
+                                                            placeholder="Addition 3"
+                                                            allowCustom={true}
+                                                        />
                                                     </div>
                                                 </div>
                                             </div>
@@ -742,7 +760,7 @@ function EditTreatmentPage() {
                                                 </button>
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                             )}
                         </div>

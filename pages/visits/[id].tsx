@@ -18,9 +18,9 @@ export default function VisitDetail() {
 
     useEffect(() => {
         if (!id) return
-        fetch('/api/visits').then(r => r.json()).then(list => {
-            const found = list.find((v: any) => String(v.id) === String(id))
-            setVisit(found)
+        // Fetch the specific visit by ID instead of all visits
+        fetch(`/api/visits?id=${id}`).then(r => r.json()).then(visitData => {
+            setVisit(visitData)
         })
 
         // Fetch products for medicine names
@@ -356,28 +356,24 @@ export default function VisitDetail() {
 
                     yPos += 6
 
-                    // Prepare table data with new column structure
+                    // Prepare table data with new SPY/Addition structure
                     const tableData = prescriptions.map((pr: any, index: number) => {
                         const product = products.find((p: any) => String(p.id) === String(pr.productId))
                         const row = [
                             String(index + 1),  // #
                             product?.name?.toUpperCase() || pr.treatment?.treatmentPlan?.toUpperCase() || '',  // Medicine name
-                            '',  // comp1 - hardcoded blank
-                            '',  // comp2 - hardcoded blank
-                            '',  // comp3 - hardcoded blank
+                            '',  // spy1 - blank for handwriting
+                            '',  // spy2 - blank for handwriting
+                            '',  // spy3 - blank for handwriting
+                            '',  // spy4 - blank for handwriting
+                            '',  // spy5 - blank for handwriting
+                            '',  // spy6 - blank for handwriting
                         ]
-
-                        // Only add comp4 and comp5 if they exist in any prescription
-                        const hasComp4 = prescriptions.some((p: any) => p.comp4)
-                        const hasComp5 = prescriptions.some((p: any) => p.comp5)
-
-                        if (hasComp4) row.push('')  // comp4 - hardcoded blank
-                        if (hasComp5) row.push('')  // comp5 - hardcoded blank
 
                         row.push(
                             (pr.timing || '').toUpperCase(),  // timing
                             (pr.dosage || '').toUpperCase(),  // dose
-                            (pr.additions || '').toUpperCase(),  // additions
+                            (pr.additions || '').toUpperCase(),  // additions (general)
                             (pr.procedure || '').toUpperCase(),  // procedure
                             (pr.presentation || '').toUpperCase(),  // presentation
                             (pr.droppersToday?.toString() || '').toUpperCase(),  // droppers today
@@ -387,42 +383,28 @@ export default function VisitDetail() {
                         return row
                     })
 
-                    // Check if comp4 and comp5 columns are needed
-                    const hasComp4 = prescriptions.some((p: any) => p.comp4)
-                    const hasComp5 = prescriptions.some((p: any) => p.comp5)
-
-                    // Build header dynamically
-                    const tableHead = ['', '', '', '', '']  // #, Medicine, comp1, comp2, comp3
-                    if (hasComp4) tableHead.push('')
-                    if (hasComp5) tableHead.push('')
+                    // Build header for SPY 1-6
+                    const tableHead = ['', '', '', '', '', '', '', '']  // #, Medicine, spy1-6
                     tableHead.push('', '', '', '', '', '', '')  // timing, dose, additions, procedure, presentation, droppers, qty
 
-                    // Build column styles dynamically - more compact
+                    // Build column styles - SPY 1-6 in green
                     const columnStyles: any = {
                         0: { cellWidth: 8, halign: 'center', textColor: [0, 0, 0] },   // #
-                        1: { cellWidth: 35, halign: 'left', textColor: [0, 0, 255], fontStyle: 'bold' },    // Medicine name (blue, bold)
-                        2: { cellWidth: 12, halign: 'center', textColor: [0, 128, 0] },  // comp1 (green)
-                        3: { cellWidth: 12, halign: 'center', textColor: [0, 128, 0] },  // comp2 (green)
-                        4: { cellWidth: 12, halign: 'center', textColor: [0, 128, 0] },  // comp3 (green)
+                        1: { cellWidth: 30, halign: 'left', textColor: [0, 0, 255], fontStyle: 'bold' },    // Medicine name (blue, bold)
+                        2: { cellWidth: 10, halign: 'center', textColor: [0, 128, 0] },  // spy1 (green)
+                        3: { cellWidth: 10, halign: 'center', textColor: [0, 128, 0] },  // spy2 (green)
+                        4: { cellWidth: 10, halign: 'center', textColor: [0, 128, 0] },  // spy3 (green)
+                        5: { cellWidth: 10, halign: 'center', textColor: [0, 128, 0] },  // spy4 (green)
+                        6: { cellWidth: 10, halign: 'center', textColor: [0, 128, 0] },  // spy5 (green)
+                        7: { cellWidth: 10, halign: 'center', textColor: [0, 128, 0] },  // spy6 (green)
+                        8: { cellWidth: 15, halign: 'center', textColor: [200, 0, 0], fontStyle: 'bold' },  // timing (red, bold)
+                        9: { cellWidth: 12, halign: 'center', textColor: [128, 0, 128] },  // dose (purple)
+                        10: { cellWidth: 12, halign: 'center', textColor: [0, 0, 0] },  // additions (black)
+                        11: { cellWidth: 12, halign: 'center', textColor: [0, 0, 0] },  // procedure (black)
+                        12: { cellWidth: 14, halign: 'center', textColor: [0, 0, 0] },  // presentation (black)
+                        13: { cellWidth: 12, halign: 'center', textColor: [255, 140, 0] },  // droppers today (orange)
+                        14: { cellWidth: 10, halign: 'center', textColor: [0, 0, 0], fontStyle: 'bold' }  // quantity (black, bold)
                     }
-
-                    let colIndex = 5
-                    if (hasComp4) {
-                        columnStyles[colIndex] = { cellWidth: 12, halign: 'center', textColor: [0, 128, 0] }  // comp4 (green)
-                        colIndex++
-                    }
-                    if (hasComp5) {
-                        columnStyles[colIndex] = { cellWidth: 12, halign: 'center', textColor: [0, 128, 0] }  // comp5 (green)
-                        colIndex++
-                    }
-
-                    columnStyles[colIndex] = { cellWidth: 15, halign: 'center', textColor: [200, 0, 0], fontStyle: 'bold' }  // timing (red, bold)
-                    columnStyles[colIndex + 1] = { cellWidth: 12, halign: 'center', textColor: [128, 0, 128] }  // dose (purple)
-                    columnStyles[colIndex + 2] = { cellWidth: 12, halign: 'center', textColor: [0, 0, 0] }  // additions (black)
-                    columnStyles[colIndex + 3] = { cellWidth: 12, halign: 'center', textColor: [0, 0, 0] }  // procedure (black)
-                    columnStyles[colIndex + 4] = { cellWidth: 14, halign: 'center', textColor: [0, 0, 0] }  // presentation (black)
-                    columnStyles[colIndex + 5] = { cellWidth: 12, halign: 'center', textColor: [255, 140, 0] }  // droppers today (orange)
-                    columnStyles[colIndex + 6] = { cellWidth: 10, halign: 'center', textColor: [0, 0, 0], fontStyle: 'bold' }  // quantity (black, bold)
 
                     autoTable(doc, {
                         startY: yPos,
@@ -719,9 +701,7 @@ export default function VisitDetail() {
 
                     // ===== SECOND MEDICINE TABLE (WITH UNITS COLUMN) =====
                     const table2Headers = ['UNITS']
-                    table2Headers.push('#', 'MEDICINE NAME', 'COMP1', 'COMP2', 'COMP3')
-                    if (hasComp4) table2Headers.push('COMP4')
-                    if (hasComp5) table2Headers.push('COMP5')
+                    table2Headers.push('#', 'MEDICINE NAME', 'SPY1', 'SPY2', 'SPY3', 'SPY4', 'SPY5', 'SPY6')
                     table2Headers.push('TIMING', 'DOSE', 'ADDITIONS', 'PROCEDURE', 'PRESENTATION', 'DROPPERS TODAY', 'QUANTITY')
 
                     const table2Body = prescriptions.map((prescription: any, index: number) => {
@@ -734,12 +714,13 @@ export default function VisitDetail() {
                             remainingUnits.toString(),
                             (index + 1).toString(),
                             (product?.name || '').toUpperCase(),
-                            (prescription.comp1 || '').toUpperCase(),
-                            (prescription.comp2 || '').toUpperCase(),
-                            (prescription.comp3 || '').toUpperCase()
+                            (prescription.spy1 || '').toUpperCase(),
+                            (prescription.spy2 || '').toUpperCase(),
+                            (prescription.spy3 || '').toUpperCase(),
+                            (prescription.spy4 || '').toUpperCase(),
+                            (prescription.spy5 || '').toUpperCase(),
+                            (prescription.spy6 || '').toUpperCase()
                         ]
-                        if (hasComp4) row.push((prescription.comp4 || '').toUpperCase())
-                        if (hasComp5) row.push((prescription.comp5 || '').toUpperCase())
                         row.push(
                             (prescription.timing || '').toUpperCase(),
                             (prescription.dosage || '').toUpperCase(),
@@ -753,21 +734,22 @@ export default function VisitDetail() {
                     })
 
                     const table2ColumnStyles: any = {
-                        0: { cellWidth: 12, halign: 'center', textColor: [0, 0, 0] },
-                        1: { cellWidth: 8, halign: 'center' },
-                        2: { cellWidth: 28 }
-                    }
-
-                    let table2ColIndex = 3
-                    for (let i = 0; i < 3; i++) {
-                        table2ColumnStyles[table2ColIndex++] = { cellWidth: 12 }
-                    }
-                    if (hasComp4) table2ColumnStyles[table2ColIndex++] = { cellWidth: 12 }
-                    if (hasComp5) table2ColumnStyles[table2ColIndex++] = { cellWidth: 12 }
-
-                    const remainingCols = 6
-                    for (let i = 0; i < remainingCols; i++) {
-                        table2ColumnStyles[table2ColIndex++] = { cellWidth: 12 }
+                        0: { cellWidth: 12, halign: 'center', textColor: [0, 0, 0] },  // UNITS
+                        1: { cellWidth: 8, halign: 'center' },  // #
+                        2: { cellWidth: 25 },  // MEDICINE NAME
+                        3: { cellWidth: 10 },  // SPY1
+                        4: { cellWidth: 10 },  // SPY2
+                        5: { cellWidth: 10 },  // SPY3
+                        6: { cellWidth: 10 },  // SPY4
+                        7: { cellWidth: 10 },  // SPY5
+                        8: { cellWidth: 10 },  // SPY6
+                        9: { cellWidth: 12 },  // TIMING
+                        10: { cellWidth: 12 },  // DOSE
+                        11: { cellWidth: 12 },  // ADDITIONS
+                        12: { cellWidth: 12 },  // PROCEDURE
+                        13: { cellWidth: 12 },  // PRESENTATION
+                        14: { cellWidth: 12 },  // DROPPERS TODAY
+                        15: { cellWidth: 10 }   // QUANTITY
                     }
 
                     autoTable(doc, {

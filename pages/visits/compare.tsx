@@ -14,10 +14,10 @@ function CompareVisitsPage() {
 
     useEffect(() => {
         if (patientId) {
-            // Fetch patient info and visits
+            // Fetch patient info and visits with prescriptions
             Promise.all([
                 fetch(`/api/patients?id=${patientId}`).then(r => r.json()),
-                fetch(`/api/visits?patientId=${patientId}`).then(r => r.json())
+                fetch(`/api/visits?patientId=${patientId}&includePrescriptions=true`).then(r => r.json())
             ]).then(([patientData, visitsData]) => {
                 setPatient(patientData)
                 const visitsList = Array.isArray(visitsData) ? visitsData : []
@@ -57,12 +57,48 @@ function CompareVisitsPage() {
         return <LoadingModal isOpen={true} message="Loading visits..." />
     }
 
-    if (!patient || visits.length === 0) {
+    if (!patient) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="text-center">
-                    <p className="text-lg text-muted mb-4">No visits found for this patient</p>
-                    <button onClick={() => router.back()} className="btn btn-secondary">
+            <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+                <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md">
+                    <div className="mb-4">
+                        <svg className="w-16 h-16 mx-auto text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Patient Not Found</h2>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">Unable to load patient information.</p>
+                    <button 
+                        onClick={() => router.back()} 
+                        className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold transition-all"
+                    >
+                        Go Back
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+    if (visits.length === 0) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+                <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg max-w-md">
+                    <div className="mb-4">
+                        <svg className="w-16 h-16 mx-auto text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Visits Found</h2>
+                    <p className="text-gray-600 dark:text-gray-400 mb-2">
+                        <strong>{patient.firstName} {patient.lastName}</strong> has no visit records to compare.
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+                        At least 1 visit is required for comparison.
+                    </p>
+                    <button 
+                        onClick={() => router.back()} 
+                        className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold transition-all"
+                    >
                         Go Back
                     </button>
                 </div>
@@ -116,7 +152,7 @@ function CompareVisitsPage() {
             </div>
 
             {/* Comparison Grid */}
-            <div className={`grid gap-4 ${
+            <div className={`grid gap-6 ${
                 compareCount === 2 ? 'grid-cols-2' :
                 compareCount === 3 ? 'grid-cols-3' :
                 'grid-cols-4'
@@ -125,24 +161,31 @@ function CompareVisitsPage() {
                     <div key={visit.id} className="relative">
                         {/* Divider (except for last item) */}
                         {index < selectedVisits.length - 1 && (
-                            <div className="absolute right-0 top-0 bottom-0 w-px bg-gray-300 dark:bg-gray-700 z-10"></div>
+                            <div className="absolute -right-3 top-0 bottom-0 w-px bg-gradient-to-b from-emerald-200 via-emerald-300 to-emerald-200 dark:from-emerald-800 dark:via-emerald-700 dark:to-emerald-800 z-10"></div>
                         )}
 
                         {/* Visit Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 h-full overflow-y-auto max-h-[calc(100vh-200px)]">
+                        <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6 h-full overflow-y-auto max-h-[calc(100vh-200px)] transition-all hover:shadow-xl hover:shadow-emerald-500/20">
                             {/* Visit Header */}
-                            <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="mb-4 pb-4 border-b-2 border-emerald-200/50 dark:border-emerald-700/50">
                                 <div className="flex items-center justify-between mb-2">
-                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                                        Visit #{visit.visitNumber || index + 1}
-                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                            Visit #{visits.length - index}
+                                        </h3>
+                                        {index === 0 && (
+                                            <span className="px-2 py-0.5 bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-700 dark:text-green-300 text-xs font-semibold rounded-full border border-green-400/30 dark:border-green-600/30">
+                                                Most Recent
+                                            </span>
+                                        )}
+                                    </div>
                                     <span className="text-xs text-gray-500 dark:text-gray-400">
                                         {new Date(visit.date).toLocaleDateString()}
                                     </span>
                                 </div>
                                 <button
                                     onClick={() => handleUseVisitData(visit)}
-                                    className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                                    className="w-full px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -153,62 +196,170 @@ function CompareVisitsPage() {
 
                             {/* Visit Details */}
                             <div className="space-y-4 text-sm">
+                                {/* Basic Info */}
+                                {visit.opdNo && (
+                                    <div>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">OPD Number</h4>
+                                        <p className="text-gray-600 dark:text-gray-400 font-mono">{visit.opdNo}</p>
+                                    </div>
+                                )}
+
+                                {visit.visitType && (
+                                    <div>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Visit Type</h4>
+                                        <p className="text-gray-600 dark:text-gray-400">{visit.visitType}</p>
+                                    </div>
+                                )}
+
+                                {visit.complaint && (
+                                    <div>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Complaint</h4>
+                                        <p className="text-gray-600 dark:text-gray-400">{visit.complaint}</p>
+                                    </div>
+                                )}
+
                                 {visit.diagnoses && (
                                     <div>
-                                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Diagnoses</h4>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Diagnoses</h4>
                                         <p className="text-gray-600 dark:text-gray-400">{visit.diagnoses}</p>
                                     </div>
                                 )}
 
                                 {visit.temperament && (
                                     <div>
-                                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Temperament</h4>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Temperament</h4>
                                         <p className="text-gray-600 dark:text-gray-400">{visit.temperament}</p>
                                     </div>
                                 )}
 
                                 {visit.pulseDiagnosis && (
                                     <div>
-                                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Pulse Diagnosis</h4>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Pulse Diagnosis</h4>
                                         <p className="text-gray-600 dark:text-gray-400">{visit.pulseDiagnosis}</p>
+                                    </div>
+                                )}
+
+                                {visit.pulseDiagnosis2 && (
+                                    <div>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Pulse Diagnosis 2</h4>
+                                        <p className="text-gray-600 dark:text-gray-400">{visit.pulseDiagnosis2}</p>
                                     </div>
                                 )}
 
                                 {visit.majorComplaints && (
                                     <div>
-                                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Major Complaints</h4>
-                                        <p className="text-gray-600 dark:text-gray-400">{visit.majorComplaints}</p>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Major Complaints</h4>
+                                        <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{visit.majorComplaints}</p>
+                                    </div>
+                                )}
+
+                                {visit.historyReports && (
+                                    <div>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">History & Reports</h4>
+                                        <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{visit.historyReports}</p>
+                                    </div>
+                                )}
+
+                                {visit.investigations && (
+                                    <div>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Investigations</h4>
+                                        <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{visit.investigations}</p>
                                     </div>
                                 )}
 
                                 {visit.provisionalDiagnosis && (
                                     <div>
-                                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Provisional Diagnosis</h4>
-                                        <p className="text-gray-600 dark:text-gray-400">{visit.provisionalDiagnosis}</p>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Provisional Diagnosis</h4>
+                                        <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{visit.provisionalDiagnosis}</p>
                                     </div>
                                 )}
 
                                 {/* Prescriptions */}
                                 {visit.prescriptions && visit.prescriptions.length > 0 && (
                                     <div>
-                                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Prescriptions ({visit.prescriptions.length})</h4>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-2">Prescriptions ({visit.prescriptions.length})</h4>
                                         <div className="space-y-2">
-                                            {visit.prescriptions.map((prescription: any) => (
-                                                <div key={prescription.id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
-                                                    <p className="font-medium text-gray-900 dark:text-white mb-2">
-                                                        {prescription.product?.name || 'Custom Medicine'}
-                                                    </p>
+                                            {visit.prescriptions.map((prescription: any, idx: number) => (
+                                                <div key={prescription.id} className="p-3 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg border border-emerald-300/40 dark:border-emerald-700/40 shadow-sm">
+                                                    <div className="flex items-start justify-between mb-2">
+                                                        <p className="font-medium text-gray-900 dark:text-white">
+                                                            {idx + 1}. {prescription.product?.name || prescription.customMedicine || 'Medicine'}
+                                                        </p>
+                                                        {prescription.product?.category && (
+                                                            <span className="text-xs px-2 py-0.5 bg-emerald-500/20 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-full border border-emerald-400/30 dark:border-emerald-600/30 font-semibold">
+                                                                {prescription.product.category}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     
                                                     {/* Compositions */}
-                                                    {(prescription.comp1 || prescription.comp2 || prescription.comp3 || prescription.comp4 || prescription.comp5) && (
-                                                        <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
-                                                            <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Compositions:</p>
-                                                            <div className="text-xs text-gray-700 dark:text-gray-300 space-y-0.5">
-                                                                {prescription.comp1 && <div>• {prescription.comp1}</div>}
-                                                                {prescription.comp2 && <div>• {prescription.comp2}</div>}
-                                                                {prescription.comp3 && <div>• {prescription.comp3}</div>}
-                                                                {prescription.comp4 && <div>• {prescription.comp4}</div>}
-                                                                {prescription.comp5 && <div>• {prescription.comp5}</div>}
+                                                    {(prescription.spy1 || prescription.spy2 || prescription.spy3 || prescription.spy4 || prescription.spy5 || prescription.spy6) && (
+                                                        <div className="mb-2 p-2 bg-emerald-500/10 dark:bg-emerald-500/5 rounded border border-emerald-300/30 dark:border-emerald-700/30">
+                                                            <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 mb-1">SPY Components:</p>
+                                                            <div className="grid grid-cols-3 gap-2 text-xs">
+                                                                {prescription.spy1 && (
+                                                                    <div className="p-1.5 bg-white/50 dark:bg-gray-800/50 rounded border border-emerald-200/40 dark:border-emerald-700/40">
+                                                                        <span className="font-medium text-emerald-600 dark:text-emerald-400">SPY 1:</span>
+                                                                        <div className="text-gray-700 dark:text-gray-300 mt-0.5">{prescription.spy1}</div>
+                                                                    </div>
+                                                                )}
+                                                                {prescription.spy2 && (
+                                                                    <div className="p-1.5 bg-white/50 dark:bg-gray-800/50 rounded border border-emerald-200/40 dark:border-emerald-700/40">
+                                                                        <span className="font-medium text-emerald-600 dark:text-emerald-400">SPY 2:</span>
+                                                                        <div className="text-gray-700 dark:text-gray-300 mt-0.5">{prescription.spy2}</div>
+                                                                    </div>
+                                                                )}
+                                                                {prescription.spy3 && (
+                                                                    <div className="p-1.5 bg-white/50 dark:bg-gray-800/50 rounded border border-emerald-200/40 dark:border-emerald-700/40">
+                                                                        <span className="font-medium text-emerald-600 dark:text-emerald-400">SPY 3:</span>
+                                                                        <div className="text-gray-700 dark:text-gray-300 mt-0.5">{prescription.spy3}</div>
+                                                                    </div>
+                                                                )}
+                                                                {prescription.spy4 && (
+                                                                    <div className="p-1.5 bg-white/50 dark:bg-gray-800/50 rounded border border-emerald-200/40 dark:border-emerald-700/40">
+                                                                        <span className="font-medium text-emerald-600 dark:text-emerald-400">SPY 4:</span>
+                                                                        <div className="text-gray-700 dark:text-gray-300 mt-0.5">{prescription.spy4}</div>
+                                                                    </div>
+                                                                )}
+                                                                {prescription.spy5 && (
+                                                                    <div className="p-1.5 bg-white/50 dark:bg-gray-800/50 rounded border border-emerald-200/40 dark:border-emerald-700/40">
+                                                                        <span className="font-medium text-emerald-600 dark:text-emerald-400">SPY 5:</span>
+                                                                        <div className="text-gray-700 dark:text-gray-300 mt-0.5">{prescription.spy5}</div>
+                                                                    </div>
+                                                                )}
+                                                                {prescription.spy6 && (
+                                                                    <div className="p-1.5 bg-white/50 dark:bg-gray-800/50 rounded border border-emerald-200/40 dark:border-emerald-700/40">
+                                                                        <span className="font-medium text-emerald-600 dark:text-emerald-400">SPY 6:</span>
+                                                                        <div className="text-gray-700 dark:text-gray-300 mt-0.5">{prescription.spy6}</div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Addition Components */}
+                                                    {(prescription.addition1 || prescription.addition2 || prescription.addition3) && (
+                                                        <div className="mb-2 p-2 bg-blue-500/10 dark:bg-blue-500/5 rounded border border-blue-300/30 dark:border-blue-700/30">
+                                                            <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Addition Components:</p>
+                                                            <div className="grid grid-cols-3 gap-2 text-xs">
+                                                                {prescription.addition1 && (
+                                                                    <div className="p-1.5 bg-white/50 dark:bg-gray-800/50 rounded border border-blue-200/40 dark:border-blue-700/40">
+                                                                        <span className="font-medium text-blue-600 dark:text-blue-400">Addition 1:</span>
+                                                                        <div className="text-gray-700 dark:text-gray-300 mt-0.5">{prescription.addition1}</div>
+                                                                    </div>
+                                                                )}
+                                                                {prescription.addition2 && (
+                                                                    <div className="p-1.5 bg-white/50 dark:bg-gray-800/50 rounded border border-blue-200/40 dark:border-blue-700/40">
+                                                                        <span className="font-medium text-blue-600 dark:text-blue-400">Addition 2:</span>
+                                                                        <div className="text-gray-700 dark:text-gray-300 mt-0.5">{prescription.addition2}</div>
+                                                                    </div>
+                                                                )}
+                                                                {prescription.addition3 && (
+                                                                    <div className="p-1.5 bg-white/50 dark:bg-gray-800/50 rounded border border-blue-200/40 dark:border-blue-700/40">
+                                                                        <span className="font-medium text-blue-600 dark:text-blue-400">Addition 3:</span>
+                                                                        <div className="text-gray-700 dark:text-gray-300 mt-0.5">{prescription.addition3}</div>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     )}
@@ -233,16 +384,28 @@ function CompareVisitsPage() {
                                                                 <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.quantity}</span>
                                                             </div>
                                                         )}
+                                                        {prescription.dilution && (
+                                                            <div>
+                                                                <span className="text-gray-500 dark:text-gray-400">Dilution:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.dilution}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.doseQuantity && (
+                                                            <div>
+                                                                <span className="text-gray-500 dark:text-gray-400">Dose Qty:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.doseQuantity}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.doseTiming && (
+                                                            <div>
+                                                                <span className="text-gray-500 dark:text-gray-400">Dose Timing:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.doseTiming}</span>
+                                                            </div>
+                                                        )}
                                                         {prescription.administration && (
                                                             <div>
                                                                 <span className="text-gray-500 dark:text-gray-400">Administration:</span>
                                                                 <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.administration}</span>
-                                                            </div>
-                                                        )}
-                                                        {prescription.additions && (
-                                                            <div className="col-span-2">
-                                                                <span className="text-gray-500 dark:text-gray-400">Additions:</span>
-                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.additions}</span>
                                                             </div>
                                                         )}
                                                         {prescription.procedure && (
@@ -269,6 +432,18 @@ function CompareVisitsPage() {
                                                                 <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.medicineQuantity}</span>
                                                             </div>
                                                         )}
+                                                        {prescription.days && (
+                                                            <div>
+                                                                <span className="text-gray-500 dark:text-gray-400">Days:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.days}</span>
+                                                            </div>
+                                                        )}
+                                                        {prescription.remarks && (
+                                                            <div className="col-span-2">
+                                                                <span className="text-gray-500 dark:text-gray-400">Remarks:</span>
+                                                                <span className="ml-1 text-gray-900 dark:text-white font-medium">{prescription.remarks}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
@@ -278,15 +453,15 @@ function CompareVisitsPage() {
 
                                 {visit.specialNote && (
                                     <div>
-                                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Special Note</h4>
-                                        <p className="text-gray-600 dark:text-gray-400">{visit.specialNote}</p>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Special Note</h4>
+                                        <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{visit.specialNote}</p>
                                     </div>
                                 )}
 
                                 {visit.improvements && (
                                     <div>
-                                        <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-1">Improvements</h4>
-                                        <p className="text-gray-600 dark:text-gray-400">{visit.improvements}</p>
+                                        <h4 className="font-semibold text-green-700 dark:text-green-400 mb-1">Improvements</h4>
+                                        <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{visit.improvements}</p>
                                     </div>
                                 )}
                             </div>

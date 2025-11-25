@@ -111,16 +111,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         try {
             if (ids && Array.isArray(ids)) {
                 // Bulk delete
+                const productIds = ids.map((id: any) => Number(id))
+                
+                // Delete related stock transactions first
+                await prisma.stockTransaction.deleteMany({
+                    where: {
+                        productId: { in: productIds }
+                    }
+                })
+                
+                // Then delete the products
                 await prisma.product.deleteMany({
                     where: {
-                        id: { in: ids.map((id: any) => Number(id)) }
+                        id: { in: productIds }
                     }
                 })
                 return res.status(200).json({ success: true, count: ids.length })
             } else if (id) {
                 // Single delete
+                const productId = Number(id)
+                
+                // Delete related stock transactions first
+                await prisma.stockTransaction.deleteMany({
+                    where: {
+                        productId: productId
+                    }
+                })
+                
+                // Then delete the product
                 await prisma.product.delete({
-                    where: { id: Number(id) }
+                    where: { id: productId }
                 })
                 return res.status(200).json({ success: true })
             } else {

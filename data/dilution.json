@@ -4,27 +4,35 @@
         "label": "Dilution"
     },
     {
-        "value": "WTR",
-        "label": "WTR (in Water)"
+        "value": "WATER",
+        "label": "WATER"
+    },
+    {
+        "value": "LW WATER",
+        "label": "LW WATER"
     },
     {
         "value": "DOT",
-        "label": "DOT (Direct on Tongue)"
+        "label": "DOT"
     },
     {
-        "value": "LW WTR",
-        "label": "LW WTR (Luke Warm Water)"
+        "value": "HOT WATER",
+        "label": "HOT WATER"
     },
     {
-        "value": "MILK",
-        "label": "MILK"
+        "value": "COLD WATER",
+        "label": "COLD WATER"
     },
     {
-        "value": "HONEY",
-        "label": "HONEY"
+        "value": "LITTLE WATER",
+        "label": "LITTLE WATER"
     },
     {
-        "value": "JUICE",
-        "label": "JUICE"
+        "value": "HOT MILK",
+        "label": "HOT MILK"
+    },
+    {
+        "value": "HOT BEV",
+        "label": "HOT BEV"
     }
 ]

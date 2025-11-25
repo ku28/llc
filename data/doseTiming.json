@@ -4,43 +4,27 @@
         "label": "Timing"
     },
     {
-        "value": "OD",
-        "label": "OD (Once Daily)"
+        "value": "TDS",
+        "label": "TDS"
     },
     {
         "value": "BD",
-        "label": "BD (Twice Daily)"
+        "label": "BD"
     },
     {
-        "value": "TDS",
-        "label": "TDS (3 Times a Day)"
-    },
-    {
-        "value": "QDS",
-        "label": "QDS (4 Times a Day)"
+        "value": "OD",
+        "label": "OD"
     },
     {
         "value": "QID",
-        "label": "QID (4 Times a Day)"
+        "label": "QID"
     },
     {
-        "value": "BM",
-        "label": "BM (Before Meal)"
+        "value": "REP",
+        "label": "REP"
     },
     {
-        "value": "AM",
-        "label": "AM (After Meal)"
-    },
-    {
-        "value": "MOR",
-        "label": "MOR (Morning)"
-    },
-    {
-        "value": "EVE",
-        "label": "EVE (Evening)"
-    },
-    {
-        "value": "NIGHT",
-        "label": "NIGHT"
+        "value": "SOS",
+        "label": "SOS"
     }
 ]

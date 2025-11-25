@@ -180,11 +180,16 @@ model TreatmentProduct {
   id               Int       @id @default(autoincrement())
   treatmentId      Int
   productId        Int
-  comp1            String?
-  comp2            String?
-  comp3            String?
+  spy1             String?
+  spy2             String?
+  spy3             String?
+  spy4             String?
+  spy5             String?
+  spy6             String?
   createdAt        DateTime  @default(now())
-  additions        String?
+  addition1        String?
+  addition2        String?
+  addition3        String?
   dosage           String?
   presentation     String?
   procedure        String?
@@ -247,10 +252,15 @@ model Prescription {
   taken            Boolean    @default(false)
   dispensed        Boolean    @default(false)
   createdAt        DateTime   @default(now())
-  additions        String?
-  comp1            String?
-  comp2            String?
-  comp3            String?
+  spy1             String?
+  spy2             String?
+  spy3             String?
+  spy4             String?
+  spy5             String?
+  spy6             String?
+  addition1        String?
+  addition2        String?
+  addition3        String?
   droppersToday    Int?
   medicineQuantity Int?
   presentation     String?

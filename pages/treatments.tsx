@@ -1068,11 +1068,19 @@ function TreatmentsPage() {
                                                                                 </div>
                                                                                 
                                                                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-1 text-[10px]">
-                                                                                    {(tp.comp1 || tp.comp2 || tp.comp3 || tp.comp4 || tp.comp5) && (
+                                                                                    {(tp.spy1 || tp.spy2 || tp.spy3 || tp.spy4 || tp.spy5 || tp.spy6) && (
                                                                                         <div className="col-span-2 md:col-span-3">
-                                                                                            <span className="text-muted">Compositions: </span>
+                                                                                            <span className="text-muted">SPY: </span>
                                                                                             <span className="font-medium">
-                                                                                                {[tp.comp1, tp.comp2, tp.comp3, tp.comp4, tp.comp5].filter(Boolean).join(', ')}
+                                                                                                {[tp.spy1, tp.spy2, tp.spy3, tp.spy4, tp.spy5, tp.spy6].filter(Boolean).join(', ')}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {(tp.addition1 || tp.addition2 || tp.addition3) && (
+                                                                                        <div className="col-span-2 md:col-span-3">
+                                                                                            <span className="text-muted">Additions: </span>
+                                                                                            <span className="font-medium">
+                                                                                                {[tp.addition1, tp.addition2, tp.addition3].filter(Boolean).join(', ')}
                                                                                             </span>
                                                                                         </div>
                                                                                     )}

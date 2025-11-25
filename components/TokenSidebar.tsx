@@ -476,7 +476,7 @@ export default function TokenSidebar({ isOpen, onClose }: TokenSidebarProps) {
                                             value={form.patientId}
                                             onChange={(val) => setForm({ ...form, patientId: val })}
                                             options={[
-                                                { value: '', label: '-- Select patient --' },
+                                                { value: '', label: 'Select patient' },
                                                 ...(() => {
                                                     // Helper to check if patient is from today
                                                     const isFromToday = (patient: any) => {
@@ -508,7 +508,7 @@ export default function TokenSidebar({ isOpen, onClose }: TokenSidebarProps) {
                                                     })
                                                 })()
                                             ]}
-                                            placeholder="-- Select patient --"
+                                            placeholder="Select patient"
                                         />
                                     </div>
 

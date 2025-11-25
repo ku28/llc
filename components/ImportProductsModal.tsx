@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import * as XLSX from 'xlsx'
 import { useImportContext } from '../contexts/ImportContext'
 
@@ -159,8 +160,14 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
                 }
             }
 
-            const rawUnit = getRaw('UINT', 'UNIT')
-            const unit = rawUnit === undefined || rawUnit === null || String(rawUnit).trim() === '' ? undefined : String(rawUnit).trim()
+            const rawUnit = getRaw('UINT', 'UNIT', 'UNITQUANTITY', 'UNIT QUANTITY')
+            const unitQuantity = rawUnit === undefined || rawUnit === null || String(rawUnit).trim() === '' ? undefined : String(rawUnit).trim()
+            
+            const rawUnitType = getRaw('UNITTYPE', 'UNIT TYPE', 'UNIT_TYPE', 'TYPE')
+            const unitType = rawUnitType === undefined || rawUnitType === null || String(rawUnitType).trim() === '' ? undefined : String(rawUnitType).trim().toUpperCase()
+            
+            // Combine unit quantity and type if both exist
+            const unit = unitQuantity && unitType ? `${unitQuantity} ${unitType}` : unitQuantity || undefined
 
             // Category field
             const rawCategory = getRaw('CATEGORY', 'CAT', 'CATEGORYNAME', 'CATEGORY NAME')
@@ -415,8 +422,10 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
     // If minimized, show nothing (task is tracked in notification dropdown)
     if (isMinimized) return null
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    if (!isOpen) return null
+
+    return createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999] p-4">
             <div className="rounded-lg border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-xl shadow-emerald-500/10 backdrop-blur-sm max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-lg"></div>
                 <div className="relative">
@@ -480,7 +489,8 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
                                     <li className="ml-4">• <strong>price</strong> - Selling price (₹ or paise, auto-converts)</li>
                                     <li className="ml-4">• <strong>purchasePrice</strong> - Cost price for inventory</li>
                                     <li className="ml-4">• <strong>quantity</strong> - Stock quantity (default: 0)</li>
-                                    <li className="ml-4">• <strong>unit</strong> - Unit of measurement (e.g., "tablets", "ml", "box")</li>
+                                    <li className="ml-4">• <strong>unit</strong> or <strong>unitQuantity</strong> - Unit quantity (e.g., "30", "100")</li>
+                                    <li className="ml-4">• <strong>unitType</strong> - Unit type (ML, GM, SPOONS, TABS, CAPS, PUFFS)</li>
                                     
                                     <li className="mt-2"><strong>💰 Price Format:</strong></li>
                                     <li className="ml-4">• Enter in rupees: <strong>50</strong> or <strong>50.00</strong> (auto-converts to paise)</li>
@@ -595,7 +605,7 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
                                     onClick={() => handleImport(false)}
                                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                 >
-                                    Import All {parsedData.length}
+                                    Import All {parsedData.length} (Update Duplicates)
                                 </button>
                             </div>
                         </div>
@@ -702,6 +712,7 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
                     </div>
                 </div>
             )}
-        </div>
+        </div>,
+        document.body
     )
 }
