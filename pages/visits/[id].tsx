@@ -14,6 +14,10 @@ export default function VisitDetail() {
     const [showDownloadDropdown, setShowDownloadDropdown] = useState(false)
     const [showPrintDropdown, setShowPrintDropdown] = useState(false)
     const [showPrintSubmenu, setShowPrintSubmenu] = useState<'PATIENT' | 'OFFICE' | 'BOTH' | null>(null)
+    const [showReportsDropdown, setShowReportsDropdown] = useState(false)
+    const [reportsAttachments, setReportsAttachments] = useState<Array<{ url: string, name: string, type: string }>>([])
+    const [selectedReportUrl, setSelectedReportUrl] = useState<string | null>(null)
+    const [selectedReportName, setSelectedReportName] = useState<string>('')
     const prescriptionRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -21,6 +25,18 @@ export default function VisitDetail() {
         // Fetch the specific visit by ID instead of all visits
         fetch(`/api/visits?id=${id}`).then(r => r.json()).then(visitData => {
             setVisit(visitData)
+            // Parse reportsAttachments if it exists (stored as JSON string)
+            if (visitData.reportsAttachments) {
+                try {
+                    const parsed = JSON.parse(visitData.reportsAttachments)
+                    if (Array.isArray(parsed)) {
+                        setReportsAttachments(parsed)
+                    }
+                } catch (e) {
+                    console.error('Failed to parse reportsAttachments:', e)
+                    setReportsAttachments([])
+                }
+            }
         })
 
         // Fetch products for medicine names
@@ -373,7 +389,7 @@ export default function VisitDetail() {
                         row.push(
                             (pr.timing || '').toUpperCase(),  // timing
                             (pr.dosage || '').toUpperCase(),  // dose
-                            (pr.additions || '').toUpperCase(),  // additions (general)
+                            (pr.addition1 || '').toUpperCase(),  // addition1 (general)
                             (pr.procedure || '').toUpperCase(),  // procedure
                             (pr.presentation || '').toUpperCase(),  // presentation
                             (pr.droppersToday?.toString() || '').toUpperCase(),  // droppers today
@@ -486,9 +502,9 @@ export default function VisitDetail() {
                     doc.setTextColor(0, 0, 0)
                     doc.setFont('helvetica', 'bold')
 
-                    // Check if comp4 and comp5 columns are needed
-                    const hasComp4 = prescriptions.some((p: any) => p.comp4)
-                    const hasComp5 = prescriptions.some((p: any) => p.comp5)
+                    // Check if spy4 and spy6 columns are needed
+                    const hasSpy4 = prescriptions.some((p: any) => p.spy4)
+                    const hasSpy6 = prescriptions.some((p: any) => p.spy6)
 
                     const imgStartY = currentY
 
@@ -724,7 +740,7 @@ export default function VisitDetail() {
                         row.push(
                             (prescription.timing || '').toUpperCase(),
                             (prescription.dosage || '').toUpperCase(),
-                            (prescription.additions || '').toUpperCase(),
+                            (prescription.addition1 || '').toUpperCase(),
                             (prescription.procedure || '').toUpperCase(),
                             (prescription.presentation || '').toUpperCase(),
                             (prescription.droppersToday?.toString() || '').toUpperCase(),
@@ -1396,22 +1412,22 @@ export default function VisitDetail() {
                                 )}
                             </button>
                             {showDownloadDropdown && (
-                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
+                                <div className="absolute right-0 mt-1 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg z-50">
                                     <button
                                         onMouseDown={(e) => { e.preventDefault(); downloadPatientCopy(); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all"
                                     >
                                         Download Patient Copy
                                     </button>
                                     <button
                                         onMouseDown={(e) => { e.preventDefault(); downloadOfficeCopy(); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all"
                                     >
                                         Download Office Copy
                                     </button>
                                     <button
                                         onMouseDown={(e) => { e.preventDefault(); downloadBothCopies(); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all rounded-b-md"
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
                                     >
                                         Download Both
                                     </button>
@@ -1427,34 +1443,34 @@ export default function VisitDetail() {
                                     setShowPrintDropdown(false)
                                     setShowPrintSubmenu(null)
                                 }, 200)}
-                                className="px-3 py-1.5 bg-blue-600 dark:bg-blue-700 text-white text-sm rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-all shadow-sm flex items-center gap-1.5"
+                                className="px-3 py-1.5 bg-emerald-600/90 dark:bg-emerald-700/90 text-white text-sm rounded-md hover:bg-emerald-700 dark:hover:bg-emerald-600 transition-all shadow-sm flex items-center gap-1.5 backdrop-blur-sm"
                             >
                                 <span>🖨️</span>
                                 <span>Print</span>
                                 <span>▼</span>
                             </button>
                             {showPrintDropdown && (
-                                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
+                                <div className="absolute right-0 mt-1 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg z-50">
                                     {/* Patient Copy with Submenu */}
                                     <div className="relative">
                                         <button
                                             onMouseEnter={() => setShowPrintSubmenu('PATIENT')}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex items-center justify-between"
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
                                         >
                                             <span>Print Patient Copy</span>
                                             <span>▶</span>
                                         </button>
                                         {showPrintSubmenu === 'PATIENT' && (
-                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
                                                 <button
                                                     onMouseDown={(e) => { e.preventDefault(); handlePrintLetterhead('PATIENT'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all rounded-t-md"
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
                                                 >
                                                     Letterhead Paper
                                                 </button>
                                                 <button
                                                     onMouseDown={(e) => { e.preventDefault(); handlePrintPlain('PATIENT'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all rounded-b-md"
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
                                                 >
                                                     Plain Paper
                                                 </button>
@@ -1466,22 +1482,22 @@ export default function VisitDetail() {
                                     <div className="relative">
                                         <button
                                             onMouseEnter={() => setShowPrintSubmenu('OFFICE')}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex items-center justify-between"
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
                                         >
                                             <span>Print Office Copy</span>
                                             <span>▶</span>
                                         </button>
                                         {showPrintSubmenu === 'OFFICE' && (
-                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
                                                 <button
                                                     onMouseDown={(e) => { e.preventDefault(); handlePrintLetterhead('OFFICE'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all rounded-t-md"
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
                                                 >
                                                     Letterhead Paper
                                                 </button>
                                                 <button
                                                     onMouseDown={(e) => { e.preventDefault(); handlePrintPlain('OFFICE'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all rounded-b-md"
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
                                                 >
                                                     Plain Paper
                                                 </button>
@@ -1493,22 +1509,22 @@ export default function VisitDetail() {
                                     <div className="relative">
                                         <button
                                             onMouseEnter={() => setShowPrintSubmenu('BOTH')}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex items-center justify-between rounded-b-md"
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between rounded-b-md"
                                         >
                                             <span>Print Both</span>
                                             <span>▶</span>
                                         </button>
                                         {showPrintSubmenu === 'BOTH' && (
-                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
                                                 <button
                                                     onMouseDown={(e) => { e.preventDefault(); handlePrintBoth('letterhead'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all rounded-t-md"
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
                                                 >
                                                     Letterhead Paper
                                                 </button>
                                                 <button
                                                     onMouseDown={(e) => { e.preventDefault(); handlePrintBoth('plain'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all rounded-b-md"
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
                                                 >
                                                     Plain Paper
                                                 </button>
@@ -1518,11 +1534,15 @@ export default function VisitDetail() {
                                 </div>
                             )}
                         </div>
+
                     </div>
                 </div>
 
-                {/* Prescription Sheet */}
-                <div ref={prescriptionRef} className="prescription-container" style={{ background: 'white', color: 'black', padding: '0', position: 'relative', width: '210mm', minHeight: '297mm', margin: '0 auto', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                {/* Main Content Area with PDF Preview and Reports Sidebar */}
+                <div className="flex gap-6">
+                    {/* Prescription Sheet - Left Side */}
+                    <div className="flex-1">
+                        <div ref={prescriptionRef} className="prescription-container" style={{ background: 'white', color: 'black', padding: '0', position: 'relative', width: '210mm', minHeight: '297mm', margin: '0 auto', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                     {/* Watermark - Only show in PATIENT copy */}
                     {copyType === 'PATIENT' && (
                         <div className="watermark-container" style={{ position: 'absolute', top: 'calc(50% - 30px)', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.5, zIndex: 0, pointerEvents: 'none' }}>
@@ -1701,8 +1721,8 @@ export default function VisitDetail() {
                                 {/* Prescription Table */}
                                 <div className="mb-3">
                                     {(() => {
-                                        const hasComp4 = visit.prescriptions?.some((p: any) => p.comp4) || false
-                                        const hasComp5 = visit.prescriptions?.some((p: any) => p.comp5) || false
+                                        const hasSpy4 = visit.prescriptions?.some((p: any) => p.spy4) || false
+                                        const hasSpy6 = visit.prescriptions?.some((p: any) => p.spy6) || false
 
                                         return (
                                             <table className="w-full" style={{ fontSize: '0.7rem', borderCollapse: 'collapse' }}>
@@ -1723,8 +1743,8 @@ export default function VisitDetail() {
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
-                                                                    {hasComp4 && <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>}
-                                                                    {hasComp5 && <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>}
+                                                                    {hasSpy4 && <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>}
+                                                                    {hasSpy6 && <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>}
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', color: '#C80000', textTransform: 'uppercase', width: '8%', fontWeight: 'bold' }}>{p.timing || ''}</td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#800080', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.dosage || ''}</td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.additions || ''}</td>
@@ -1888,8 +1908,8 @@ export default function VisitDetail() {
                                 {/* Second Medicine Table with UNITS column */}
                                 <div style={{ marginBottom: '1rem' }}>
                                     {(() => {
-                                        const hasComp4 = visit.prescriptions?.some((p: any) => p.comp4)
-                                        const hasComp5 = visit.prescriptions?.some((p: any) => p.comp5)
+                                        const hasSpy4 = visit.prescriptions?.some((p: any) => p.spy4)
+                                        const hasSpy6 = visit.prescriptions?.some((p: any) => p.spy6)
 
                                         return (
                                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem' }}>
@@ -1903,11 +1923,11 @@ export default function VisitDetail() {
                                                                 <td style={{ padding: '0.25rem', textAlign: 'center', width: '50px', fontWeight: 'bold', color: isLowStock ? '#FF0000' : '#000' }}>{availableUnits}</td>
                                                                 <td style={{ padding: '0.25rem', textAlign: 'center', width: '30px', fontWeight: 'bold' }}>{index + 1}</td>
                                                                 <td style={{ padding: '0.25rem', width: '120px', color: '#0000FF', fontWeight: 'bold' }}>{product?.name?.toUpperCase() || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.comp1 || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.comp2 || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.comp3 || ''}</td>
-                                                                {hasComp4 && <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.comp4 || ''}</td>}
-                                                                {hasComp5 && <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.comp5 || ''}</td>}
+                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy1 || ''}</td>
+                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy2 || ''}</td>
+                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy3 || ''}</td>
+                                                                {hasSpy4 && <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy4 || ''}</td>}
+                                                                {hasSpy6 && <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy6 || ''}</td>}
                                                                 <td style={{ padding: '0.25rem', width: '60px', color: '#C80000', textTransform: 'uppercase', fontWeight: 'bold' }}>{prescription.timing || ''}</td>
                                                                 <td style={{ padding: '0.25rem', width: '60px', color: '#800080', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.dosage || ''}</td>
                                                                 <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.additions || ''}</td>
@@ -1968,6 +1988,138 @@ export default function VisitDetail() {
                         )}
                     </div>
                 </div>
+            </div>
+
+                    {/* Reports Sidebar - Right Side */}
+                    <div className="w-80 flex-shrink-0">
+                        <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-md p-4 sticky top-4 border border-emerald-200 dark:border-emerald-700">
+                            <h2 className="text-lg font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Reports
+                            </h2>
+                            
+                            {/* Reports Description */}
+                            {visit.reports && (
+                                <div className="mb-4 p-3 bg-emerald-50/50 dark:bg-emerald-900/20 backdrop-blur-sm rounded-md border border-emerald-200 dark:border-emerald-700">
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                                        {visit.reports}
+                                    </p>
+                                </div>
+                            )}
+                            
+                            {/* Reports List */}
+                            {reportsAttachments.length > 0 ? (
+                                <div className="space-y-3">
+                                    {reportsAttachments.map((attachment, index) => (
+                                        <div 
+                                            key={index}
+                                            onClick={() => {
+                                                setSelectedReportUrl(attachment.url)
+                                                setSelectedReportName(attachment.name)
+                                            }}
+                                            className="p-3 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-700 dark:to-gray-600 border border-emerald-200 dark:border-emerald-600 rounded-lg cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex-shrink-0">
+                                                    <svg className="w-8 h-8 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                                    </svg>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                                                        {attachment.name}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                        {attachment.type || 'PDF Document'}
+                                                    </p>
+                                                </div>
+                                                <div className="flex-shrink-0">
+                                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <svg className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    <p className="text-gray-500 dark:text-gray-400 text-sm">No reports found</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* PDF Viewer Modal */}
+                {selectedReportUrl && (
+                    <div 
+                        className="fixed inset-0 bg-emerald-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                        onClick={() => {
+                            setSelectedReportUrl(null)
+                            setSelectedReportName('')
+                        }}
+                    >
+                        <div 
+                            className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col border border-emerald-200 dark:border-emerald-700"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between p-4 border-b border-emerald-200 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/20">
+                                <h3 className="text-lg font-semibold text-emerald-800 dark:text-emerald-200 truncate">
+                                    {selectedReportName}
+                                </h3>
+                                <div className="flex items-center gap-2">
+                                    <a
+                                        href={selectedReportUrl}
+                                        download={selectedReportName}
+                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all flex items-center gap-2 text-sm font-medium"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        Download
+                                    </a>
+                                    <button
+                                        onClick={() => window.open(selectedReportUrl, '_blank')}
+                                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all flex items-center gap-2 text-sm font-medium"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                        Open in New Tab
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedReportUrl(null)
+                                            setSelectedReportName('')
+                                        }}
+                                        className="p-2 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded-lg transition-all"
+                                    >
+                                        <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* PDF Viewer */}
+                            <div className="flex-1 overflow-hidden">
+                                <iframe
+                                    src={selectedReportUrl}
+                                    className="w-full h-full"
+                                    title={selectedReportName}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Print and Animation Styles */}

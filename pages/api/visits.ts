@@ -131,6 +131,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             balance,
             visitNumber,
             followUpCount,
+            reportsAttachments, // JSON string of report attachments
             prescriptions, // optional array of { treatmentId, dosage, administration, quantity, taken, productId }
             autoGenerateInvoice // flag to automatically create customer invoice
         } = req.body
@@ -224,7 +225,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     payment: payment ? Number(payment) : undefined,
                     balance: balance ? Number(balance) : undefined,
                     visitNumber: visitNumber ? Number(visitNumber) : undefined,
-                    followUpCount: followUpCount ? Number(followUpCount) : undefined
+                    followUpCount: followUpCount ? Number(followUpCount) : undefined,
+                    reportsAttachments: reportsAttachments !== undefined ? reportsAttachments : undefined
                 }
                 
                 let visit
@@ -269,17 +271,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                 // 2. Process prescriptions if provided
                 if (Array.isArray(prescriptions) && prescriptions.length > 0) {
-                    for (const pr of prescriptions) {
+                    // Process prescriptions in parallel for better performance
+                    const prescriptionPromises = prescriptions.map(async (pr) => {
                         const prescriptionData: any = {
                             visitId: visit.id,
                             productId: pr.productId ? Number(pr.productId) : undefined,
-                            comp1: pr.comp1 || null,
-                            comp2: pr.comp2 || null,
-                            comp3: pr.comp3 || null,
                             quantity: Number(pr.quantity || 1),
                             timing: pr.timing || null,
                             dosage: pr.dosage || null,
-                            additions: pr.additions || null,
                             procedure: pr.procedure || null,
                             presentation: pr.presentation || null,
                             droppersToday: pr.droppersToday ? Number(pr.droppersToday) : null,
@@ -296,8 +295,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                         // Create prescription
                         const prescription = await tx.prescription.create({ data: prescriptionData })
-                        createdPrescriptions.push(prescription)
-
+                        
                         // 3. Handle inventory deduction if productId is provided
                         if (pr.productId) {
                             const pid = Number(pr.productId)
@@ -348,7 +346,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                     if (!existingOrder) {
                                         // Create auto-reorder with smart quantity (2x reorder level or minimum 10)
                                         const orderQty = Math.max(reorderLevel * 2, 10)
-                                        await tx.productOrder.create({ 
+                                        await tx.productOrder.create({
                                             data: { 
                                                 productId: pid, 
                                                 quantity: orderQty, 
@@ -373,7 +371,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                 }
                             }
                         }
-                    }
+                        
+                        return prescription
+                    })
+                    
+                    // Wait for all prescriptions to be processed
+                    createdPrescriptions = await Promise.all(prescriptionPromises)
                 }
 
                 // 6. Auto-generate customer invoice if requested and there are items

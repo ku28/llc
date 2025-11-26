@@ -472,7 +472,7 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                 data-active={router.pathname === '/purchase-orders'}
                 className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm ${router.pathname === '/purchase-orders' ? 'text-green-600 dark:text-green-400' : ''}`}
               >
-                Purchase Orders
+                PO & Billing
               </Link>
             )}
             {canAccess('/invoices') && (
@@ -610,7 +610,7 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                     className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Purchase Orders
+                    PO & Billing
                   </Link>
                 )}
                 {canAccess('/stock-transactions') && (

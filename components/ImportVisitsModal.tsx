@@ -44,11 +44,11 @@ interface VisitRow {
     prescriptions?: Array<{
         quantity?: number
         productName?: string
-        comp1?: string // CR - Spagyric 1 (SPY1)
-        comp2?: string // SY - Spagyric 2 (SPY2)
-        comp3?: string // EF - Spagyric 3 (SPY3)
-        comp4?: string // CP4 - Component 4 (optional)
-        comp5?: string // CP5 - Component 5 (optional)
+        spy1?: string // CR - Spagyric 1 (SPY1)
+        spy2?: string // SY - Spagyric 2 (SPY2)
+        spy3?: string // EF - Spagyric 3 (SPY3)
+        spy4?: string // CP4 - Spagyric 4 (optional)
+        spy5?: string // CP5 - Spagyric 5 (optional)
         timing?: string // TM - Timing
         dosage?: string
         additions?: string
@@ -193,11 +193,11 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                     prescriptions.push({
                         quantity: qty ? Number(qty) : 1,
                         productName: String(productName).trim(),
-                        comp1: row[`CR-${num}`] || '', // CR = Spagyric 1 (SPY1)
-                        comp2: row[`SY-${num}`] || '', // SY = Spagyric 2 (SPY2)
-                        comp3: row[`EF-${num}`] || '', // EF = Spagyric 3 (SPY3)
-                        comp4: row[`CP4-${num}`] || '', // CP4 = Component 4 (optional)
-                        comp5: row[`CP5-${num}`] || '', // CP5 = Component 5 (optional)
+                        spy1: row[`CR-${num}`] || '', // CR = Spagyric 1 (SPY1)
+                        spy2: row[`SY-${num}`] || '', // SY = Spagyric 2 (SPY2)
+                        spy3: row[`EF-${num}`] || '', // EF = Spagyric 3 (SPY3)
+                        spy4: row[`CP4-${num}`] || '', // CP4 = Spagyric 4 (optional)
+                        spy5: row[`CP5-${num}`] || '', // CP5 = Spagyric 5 (optional)
                         timing: row[`TM-${num}`] || '',
                         dosage: row[`DOSE-${num}`] || '',
                         additions: row[`AD-${num}`] || '',
@@ -597,9 +597,9 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                                     
                                     <li className="mt-2"><strong>💊 Medicines (supports up to 12 per visit):</strong></li>
                                     <li className="ml-4">• <strong>DL-01 to DL-12:</strong> Medicine/Drug names (auto-creates if not found)</li>
-                                    <li className="ml-4">• <strong>CR-01 to CR-12:</strong> Spagyric 1 (SPY1/Comp1)</li>
-                                    <li className="ml-4">• <strong>SY-01 to SY-12:</strong> Spagyric 2 (SPY2/Comp2)</li>
-                                    <li className="ml-4">• <strong>EF-01 to EF-12:</strong> Spagyric 3 (SPY3/Comp3)</li>
+                                    <li className="ml-4">• <strong>CR-01 to CR-12:</strong> Spagyric 1 (SPY1)</li>
+                                    <li className="ml-4">• <strong>SY-01 to SY-12:</strong> Spagyric 2 (SPY2)</li>
+                                    <li className="ml-4">• <strong>EF-01 to EF-12:</strong> Spagyric 3 (SPY3)</li>
                                     <li className="ml-4">• <strong>CP4-01 to CP4-12:</strong> Component 4 (optional)</li>
                                     <li className="ml-4">• <strong>CP5-01 to CP5-12:</strong> Component 5 (optional)</li>
                                     <li className="ml-4">• <strong>TM-01 to TM-12:</strong> Timing</li>

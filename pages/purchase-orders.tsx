@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import LoadingModal from '../components/LoadingModal'
 import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
+import ReceiveGoodsBillUploadModal from '../components/ReceiveGoodsBillUploadModal'
+import AddDemandItemsModal from '../components/AddDemandItemsModal'
+import RefreshButton from '../components/RefreshButton'
 import { useToast } from '../hooks/useToast'
 import { useDataCache } from '../contexts/DataCacheContext'
 import * as XLSX from 'xlsx'
@@ -16,8 +19,9 @@ export default function PurchaseOrdersPage() {
     const [selectedSupplier, setSelectedSupplier] = useState('')
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [deleteId, setDeleteId] = useState<number | null>(null)
-    const [activeTab, setActiveTab] = useState<'pending' | 'received'>('pending')
+    const [activeTab, setActiveTab] = useState<'pending' | 'received' | 'deleted'>('pending')
     const [searchQuery, setSearchQuery] = useState('')
+    const [isDirectBillUploadModalOpen, setIsDirectBillUploadModalOpen] = useState(false)
     const [filterSupplier, setFilterSupplier] = useState('')
     const [loading, setLoading] = useState(false)
     const [sendingEmail, setSendingEmail] = useState(false)
@@ -29,6 +33,8 @@ export default function PurchaseOrdersPage() {
     const [showSuccessModal, setShowSuccessModal] = useState(false)
     const [successModalAnimating, setSuccessModalAnimating] = useState(false)
     const [receivedPODetails, setReceivedPODetails] = useState<any>(null)
+    const [isBillUploadModalOpen, setIsBillUploadModalOpen] = useState(false)
+    const [isAddItemsModalOpen, setIsAddItemsModalOpen] = useState(false)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const { getCache, setCache } = useDataCache()
     const [user, setUser] = useState<any>(null)
@@ -36,6 +42,12 @@ export default function PurchaseOrdersPage() {
     // Bulk operations and sorting
     const [selectedPOIds, setSelectedPOIds] = useState<Set<number>>(new Set())
     const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
+    const [expandedPORows, setExpandedPORows] = useState<Set<number>>(new Set())
+    const [editingPOIds, setEditingPOIds] = useState<Set<number>>(new Set())
+    const [editedPOData, setEditedPOData] = useState<{[key: number]: any}>({})
+    const [uploadingBillForPO, setUploadingBillForPO] = useState<number | null>(null)
+    const [restoringPOId, setRestoringPOId] = useState<number | null>(null)
+    const [deletingPOId, setDeletingPOId] = useState<number | null>(null)
     const [sortField, setSortField] = useState<string>('createdAt')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
     const [showSortDropdown, setShowSortDropdown] = useState(false)
@@ -43,7 +55,7 @@ export default function PurchaseOrdersPage() {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false)
     const [deleteProgress, setDeleteProgress] = useState({ current: 0, total: 0 })
     const [isDeleteMinimized, setIsDeleteMinimized] = useState(false)
-    const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; deleteMultiple?: boolean; message?: string }>({ open: false })
+    const [confirmModal, setConfirmModal] = useState<{ open: boolean; id?: number; deleteMultiple?: boolean; message?: string; onConfirm?: () => void }>({ open: false })
     const [confirmModalAnimating, setConfirmModalAnimating] = useState(false)
     const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false)
     const [isFilterSupplierOpen, setIsFilterSupplierOpen] = useState(false)
@@ -125,7 +137,8 @@ export default function PurchaseOrdersPage() {
                 currentStock: Number(p.actualInventory || p.quantity || 0),
                 requestedQuantity: Math.max(50, Number(p.minStockLevel || 10) * 5), // Order 5x min stock or 50, whichever is higher
                 unit: p.unit || 'pcs',
-                unitPrice: Number(p.purchasePriceRupees || p.priceRupees || 0), // Already in rupees
+                unitPrice: Number(p.purchasePriceRupees || 0), // Use purchase price
+                source: 'Auto',
                 autoAdded: true
             }))
             setDemandList(prev => {
@@ -138,16 +151,15 @@ export default function PurchaseOrdersPage() {
     }
 
     const addManualItem = () => {
-        const newItem = {
-            productId: '',
-            productName: '',
-            currentStock: 0,
-            requestedQuantity: 0,
-            unit: 0,
-            unitPrice: 0,
-            autoAdded: false
-        }
-        setDemandList([...demandList, newItem])
+        setIsAddItemsModalOpen(true)
+    }
+
+    const handleAddItemsFromModal = (items: any[]) => {
+        // Merge with existing demand list, avoiding duplicates
+        const existingIds = new Set(demandList.map(item => item.productId))
+        const newItems = items.filter(item => !existingIds.has(item.productId))
+        setDemandList([...demandList, ...newItems])
+        showSuccess(`Added ${newItems.length} items to demand list`)
     }
 
     const removeItem = (index: number) => {
@@ -165,7 +177,8 @@ export default function PurchaseOrdersPage() {
                 newList[index].productName = product.name
                 newList[index].currentStock = Number(product.actualInventory || product.quantity || 0)
                 newList[index].unit = product.unit || 'pcs'
-                newList[index].unitPrice = Number(product.purchasePriceRupees || product.priceRupees || 0) // Already in rupees
+                newList[index].unitPrice = Number(product.purchasePriceRupees || 0) // Use purchase price
+                newList[index].source = 'Manual'
                 // Suggest order quantity
                 if (!newList[index].requestedQuantity) {
                     newList[index].requestedQuantity = Math.max(50, Number(product.minStockLevel || 10) * 5)
@@ -297,6 +310,238 @@ export default function PurchaseOrdersPage() {
         setTimeout(() => setReceivingModalAnimating(true), 10)
     }
 
+    const handleBillDataExtracted = (extractedData: any[], billUrl?: string) => {
+        if (!receivingPO) return
+        
+        // Map extracted data to receiving quantities
+        const updatedItems = receivingPO.items.map((item: any) => {
+            const extracted = extractedData.find((e: any) => 
+                e.productId === item.productId || 
+                e.productName?.toLowerCase() === item.product?.name?.toLowerCase()
+            )
+            
+            if (extracted && extracted.quantity) {
+                return { ...item, receivingQuantity: extracted.quantity }
+            }
+            return item
+        })
+        
+        setReceivingPO({ ...receivingPO, items: updatedItems, billUrl: billUrl || receivingPO.billUrl })
+        showSuccess('Bill data extracted successfully!')
+    }
+    
+    const toggleEditMode = (poId: number) => {
+        const newEditing = new Set(editingPOIds)
+        if (newEditing.has(poId)) {
+            newEditing.delete(poId)
+            // Remove edited data
+            const newData = { ...editedPOData }
+            delete newData[poId]
+            setEditedPOData(newData)
+        } else {
+            newEditing.add(poId)
+            // Initialize edited data with current PO data
+            const po = sentDemands.find(p => p.id === poId)
+            if (po) {
+                setEditedPOData({
+                    ...editedPOData,
+                    [poId]: {
+                        supplierName: po.supplier?.name || '',
+                        orderDate: po.orderDate || '',
+                        receivedDate: po.receivedDate || '',
+                        status: po.status || 'pending',
+                        items: po.items || []
+                    }
+                })
+            }
+        }
+        setEditingPOIds(newEditing)
+    }
+    
+    const handleDirectBillAttachment = async (poId: number, file: File) => {
+        try {
+            setUploadingBillForPO(poId)
+            const formData = new FormData()
+            formData.append('file', file)
+            
+            const response = await fetch('/api/upload-bill-only', {
+                method: 'POST',
+                body: formData
+            })
+            
+            if (!response.ok) throw new Error('Failed to upload bill')
+            
+            const data = await response.json()
+            console.log('Bill uploaded, URL:', data.billUrl)
+            
+            // Update PO with bill URL
+            const updateResponse = await fetch('/api/purchase-orders', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: poId,
+                    billUrl: data.billUrl
+                })
+            })
+            
+            if (!updateResponse.ok) throw new Error('Failed to update PO')
+            
+            const updatedPO = await updateResponse.json()
+            console.log('PO updated with billUrl:', updatedPO)
+            
+            showSuccess('Bill uploaded successfully!')
+            await fetchSentDemands()
+        } catch (error) {
+            console.error('Error uploading bill:', error)
+            showError('Failed to upload bill')
+        } finally {
+            setUploadingBillForPO(null)
+        }
+    }
+    
+    const saveEditedPO = async (poId: number) => {
+        try {
+            const editedData = editedPOData[poId]
+            if (!editedData) return
+            
+            const response = await fetch('/api/purchase-orders', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: poId,
+                    status: editedData.status,
+                    receivedDate: editedData.receivedDate,
+                    items: editedData.items.map((item: any) => ({
+                        id: item.id,
+                        productId: item.productId,
+                        quantity: item.quantity,
+                        receivedQuantity: item.receivedQuantity,
+                        unitPrice: item.unitPrice
+                    }))
+                })
+            })
+            
+            if (!response.ok) throw new Error('Failed to save changes')
+            
+            showSuccess('Changes saved successfully!')
+            toggleEditMode(poId)
+            await fetchSentDemands()
+        } catch (error) {
+            console.error('Error saving PO:', error)
+            showError('Failed to save changes')
+        }
+    }
+    
+    const restorePO = async (poId: number) => {
+        try {
+            setRestoringPOId(poId)
+            const response = await fetch('/api/purchase-orders', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: poId,
+                    status: 'pending'
+                })
+            })
+            
+            if (!response.ok) throw new Error('Failed to restore purchase order')
+            
+            showSuccess('Purchase order restored successfully!')
+            await fetchSentDemands()
+        } catch (error) {
+            console.error('Error restoring PO:', error)
+            showError('Failed to restore purchase order')
+        } finally {
+            setRestoringPOId(null)
+        }
+    }
+    
+    const removeBillAttachment = async (poId: number) => {
+        try {
+            const response = await fetch('/api/purchase-orders', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: poId,
+                    billUrl: null
+                })
+            })
+            
+            if (!response.ok) throw new Error('Failed to remove bill')
+            
+            showSuccess('Bill removed successfully!')
+            await fetchSentDemands()
+        } catch (error) {
+            console.error('Error removing bill:', error)
+            showError('Failed to remove bill')
+        }
+    }
+    
+    const handleDirectBillUpload = async (extractedData: any[], billUrl?: string) => {
+        console.log('Direct bill upload:', extractedData, 'Bill URL:', billUrl)
+        
+        try {
+            // Get the most recently used supplier
+            const sortedDemands = [...sentDemands].sort((a, b) => b.id - a.id)
+            const lastUsedSupplierId = sortedDemands[0]?.supplierId || (suppliers[0]?.id || 0)
+            
+            if (!lastUsedSupplierId) {
+                showError('No supplier found. Please create a supplier first.')
+                return
+            }
+            
+            // Create items array with receivedQuantity = quantity
+            const items = extractedData.map((item: any) => ({
+                productId: item.productId,
+                quantity: item.quantity || 0,
+                receivedQuantity: item.quantity || 0,
+                unitPrice: item.unitPrice || 0
+            }))
+            
+            if (items.length === 0) {
+                showError('No items extracted from bill. Please try again.')
+                return
+            }
+            
+            const today = new Date().toISOString().split('T')[0]
+            
+            // Create new purchase order
+            const newPO = {
+                supplierId: lastUsedSupplierId,
+                status: 'received',
+                demandDate: today,
+                receivedDate: today,
+                billUrl: billUrl || '',
+                items: items
+            }
+            
+            const res = await fetch('/api/purchase-orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newPO)
+            })
+            
+            if (!res.ok) throw new Error('Failed to create purchase order')
+            
+            showSuccess('Purchase order created successfully from uploaded bill!')
+            setIsDirectBillUploadModalOpen(false)
+            
+            // Refresh the purchase orders list
+            const updatedRes = await fetch('/api/purchase-orders')
+            if (updatedRes.ok) {
+                const data = await updatedRes.json()
+                setSentDemands(data)
+            }
+            
+            // Switch to received tab to show the newly created PO
+            setActiveTab('received')
+            
+        } catch (error) {
+            console.error('Error handling direct bill upload:', error)
+            showError('Failed to process bill upload')
+        }
+    }
+
     const closeReceivingModal = () => {
         setReceivingModalAnimating(false)
         document.body.style.overflow = 'unset'
@@ -323,10 +568,23 @@ export default function PurchaseOrdersPage() {
                 unitPrice: item.unitPrice
             }))
 
+            // Check if there are any items with partial receiving
+            const remainingItems = receivingPO.items.filter((item: any) => {
+                const ordered = Number(item.quantity)
+                const previouslyReceived = Number(item.receivedQuantity) || 0
+                const receivingNow = Number(item.receivingQuantity) || 0
+                const totalReceived = previouslyReceived + receivingNow
+                return totalReceived < ordered
+            }).map((item: any) => ({
+                ...item,
+                remainingQty: item.quantity - ((Number(item.receivedQuantity) || 0) + (Number(item.receivingQuantity) || 0))
+            }))
+
             console.log('Sending receive goods request:', {
                 id: receivingPO.id,
-                status: 'received',
+                status: 'received', // Always mark original as received
                 receivedDate: new Date().toISOString().split('T')[0],
+                billUrl: receivingPO.billUrl || null,
                 items
             })
 
@@ -335,8 +593,9 @@ export default function PurchaseOrdersPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id: receivingPO.id,
-                    status: 'received',
+                    status: 'received', // Mark as received
                     receivedDate: new Date().toISOString().split('T')[0],
+                    billUrl: receivingPO.billUrl || null,
                     items
                 })
             })
@@ -346,6 +605,64 @@ export default function PurchaseOrdersPage() {
             if (response.ok) {
                 const updatedPO = await response.json()
                 console.log('Updated PO:', updatedPO)
+                
+                // If there are remaining items, create a NEW purchase order for them
+                if (remainingItems.length > 0) {
+                    try {
+                        const today = new Date().toISOString().split('T')[0]
+                        
+                        // Create new PO with remaining items
+                        const newPOResponse = await fetch('/api/purchase-orders', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                supplierId: receivingPO.supplierId,
+                                status: 'pending',
+                                demandDate: today,
+                                items: remainingItems.map((item: any) => ({
+                                    productId: item.productId,
+                                    quantity: item.remainingQty,
+                                    receivedQuantity: 0,
+                                    unitPrice: item.unitPrice
+                                }))
+                            })
+                        })
+                        
+                        if (newPOResponse.ok) {
+                            const newPO = await newPOResponse.json()
+                            console.log('Created new PO for remaining items:', newPO)
+                            
+                            // Send email to supplier about remaining items
+                            const emailResponse = await fetch('/api/purchase-orders/send-remaining-email', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    purchaseOrderId: newPO.id,
+                                    remainingItems: remainingItems.map((item: any) => ({
+                                        productName: item.product?.name,
+                                        ordered: item.remainingQty,
+                                        received: 0,
+                                        remaining: item.remainingQty
+                                    }))
+                                })
+                            })
+                            
+                            if (emailResponse.ok) {
+                                showSuccess(`Goods received! New PO ${newPO.poNumber} created for ${remainingItems.length} remaining items. Email sent to supplier.`)
+                            } else {
+                                showInfo(`Goods received! New PO ${newPO.poNumber} created for remaining items. Failed to send email.`)
+                            }
+                        } else {
+                            showInfo('Goods received! Failed to create new PO for remaining items.')
+                        }
+                    } catch (error) {
+                        console.error('Error creating new PO for remaining items:', error)
+                        showInfo('Goods received! Failed to create new PO for remaining items.')
+                    }
+                } else {
+                    showSuccess('All goods received successfully!')
+                }
+                
                 await fetchSentDemands()
                 closeReceivingModal()
                 
@@ -422,7 +739,9 @@ export default function PurchaseOrdersPage() {
         let filtered = sentDemands.filter(demand => {
             const matchesTab = activeTab === 'pending' ?
                 demand.status === 'pending' :
-                demand.status === 'received'
+                activeTab === 'received' ?
+                demand.status === 'received' :
+                demand.status === 'deleted'
             
             const matchesSearch = searchQuery ?
                 demand.poNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -459,8 +778,12 @@ export default function PurchaseOrdersPage() {
     }
 
     // Delete functions
-    async function deleteDemand(id: number) {
-        setConfirmModal({ open: true, id, message: 'Are you sure you want to delete this purchase order?' })
+    async function deleteDemand(id: number, isPermanent: boolean = false) {
+        const demand = sentDemands.find(d => d.id === id)
+        const message = isPermanent || demand?.status === 'deleted' 
+            ? 'Are you sure you want to PERMANENTLY delete this purchase order? This cannot be undone.' 
+            : 'Are you sure you want to move this purchase order to deleted?'
+        setConfirmModal({ open: true, id, message })
         document.body.style.overflow = 'hidden'
         setTimeout(() => setConfirmModalAnimating(true), 10)
     }
@@ -481,7 +804,7 @@ export default function PurchaseOrdersPage() {
         setTimeout(() => setConfirmModal({ open: false }), 300)
     }
 
-    async function handleConfirmDelete(id?: number) {
+    async function handleConfirmDelete(id?: number, isPermanent: boolean = false) {
         if (!id && !confirmModal.deleteMultiple) {
             closeConfirmModal()
             return
@@ -489,6 +812,7 @@ export default function PurchaseOrdersPage() {
         
         closeConfirmModal()
         setDeleting(true)
+        if (id) setDeletingPOId(id)
         
         try {
             if (confirmModal.deleteMultiple) {
@@ -503,9 +827,18 @@ export default function PurchaseOrdersPage() {
                 
                 for (let i = 0; i < idsArray.length; i += CHUNK_SIZE) {
                     const chunk = idsArray.slice(i, i + CHUNK_SIZE)
-                    const deletePromises = chunk.map(poId =>
-                        fetch(`/api/purchase-demands/${poId}`, { method: 'DELETE' })
-                    )
+                    const deletePromises = chunk.map(poId => {
+                        const demand = sentDemands.find(d => d.id === poId)
+                        if (isPermanent || demand?.status === 'deleted') {
+                            return fetch(`/api/purchase-orders?id=${poId}`, { method: 'DELETE' })
+                        } else {
+                            return fetch('/api/purchase-orders', {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: poId, status: 'deleted' })
+                            })
+                        }
+                    })
                     await Promise.all(deletePromises)
                     
                     completed += chunk.length
@@ -514,20 +847,34 @@ export default function PurchaseOrdersPage() {
                 
                 await fetchSentDemands()
                 setSelectedPOIds(new Set())
-                showSuccess(`Successfully deleted ${completed} purchase order(s)`)
+                showSuccess(`Successfully ${isPermanent ? 'permanently deleted' : 'moved to deleted'} ${completed} purchase order(s)`)
                 setDeleteProgress({ current: 0, total: 0 })
             } else {
                 // Single delete
-                const res = await fetch(`/api/purchase-demands/${id}`, { method: 'DELETE' })
-                if (!res.ok) throw new Error('Delete failed')
+                const demand = sentDemands.find(d => d.id === id)
+                if (isPermanent || demand?.status === 'deleted') {
+                    // Permanent delete
+                    const res = await fetch(`/api/purchase-orders?id=${id}`, { method: 'DELETE' })
+                    if (!res.ok) throw new Error('Delete failed')
+                    showSuccess('Purchase order permanently deleted')
+                } else {
+                    // Soft delete - move to deleted tab
+                    const res = await fetch('/api/purchase-orders', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id, status: 'deleted' })
+                    })
+                    if (!res.ok) throw new Error('Update failed')
+                    showSuccess('Purchase order moved to deleted')
+                }
                 await fetchSentDemands()
-                showSuccess('Purchase order deleted successfully')
             }
         } catch (error: any) {
             console.error('Delete error:', error)
             showError(error.message || 'Failed to delete purchase order(s)')
         } finally {
             setDeleting(false)
+            setDeletingPOId(null)
         }
     }
 
@@ -679,317 +1026,765 @@ export default function PurchaseOrdersPage() {
                     )}
                 </div>
 
-                {/* Demand List Builder */}
-                <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                    <div className="relative flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
-                            Current Demand List ({demandList.length} items)
-                        </h2>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={addManualItem}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                            >
-                                + Add Item
-                            </button>
-                            <button
-                                onClick={openSupplierModal}
-                                disabled={demandList.length === 0}
-                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
-                            >
-                                Send Demand
-                            </button>
+                {/* Main Grid: Demand List and Purchase Orders Side by Side */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Demand List Builder */}
+                    <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                                Current Demand List ({demandList.length})
+                            </h2>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={addManualItem}
+                                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                    Add Item
+                                </button>
+                                <button
+                                    onClick={openSupplierModal}
+                                    disabled={demandList.length === 0}
+                                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                    Send Demand
+                                </button>
+                            </div>
                         </div>
-                    </div>
 
-                    {demandList.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                            <p className="text-lg">No items in demand list</p>
-                            <p className="text-sm mt-2">Add items manually or they will be auto-added from low stock products</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 dark:bg-gray-800">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Product</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Current Stock</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Requested Qty</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Unit</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Unit Price</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Source</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                    {demandList.map((item, index) => {
-                                        const stockStatus = getStockStatus(item.currentStock)
-                                        const total = item.requestedQuantity * item.unitPrice
-                                        
-                                        return (
-                                            <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                                                <td className="px-4 py-3">
-                                                    {item.productId ? (
-                                                        <div>
-                                                            <div className="font-medium text-gray-900 dark:text-white">{item.productName}</div>
-                                                            <div className="text-xs text-gray-500">ID: {item.productId}</div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className={isProductDropdownOpen ? 'relative z-[10000]' : 'relative z-0'}>
-                                                        <CustomSelect
-                                                            value={item.productId?.toString() || ''}
-                                                            onChange={(value) => updateItem(index, 'productId', value)}
-                                                            options={products.map(p => ({ value: p.id.toString(), label: p.name }))}
-                                                            placeholder="Select Product"
-                                                            className="min-w-[200px]"
-                                                            onOpenChange={setIsProductDropdownOpen}
-                                                        />
+                        {demandList.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                </svg>
+                                <p className="text-lg font-medium">No items in demand list</p>
+                                <p className="text-sm mt-2">Add items manually or they will be auto-added from low stock products</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {demandList.map((item, index) => {
+                                    const stockStatus = getStockStatus(item.currentStock)
+                                    const total = item.requestedQuantity * item.unitPrice
+                                    const isExpanded = expandedRows.has(index)
+                                    
+                                    return (
+                                        <div key={index} className="relative group">
+                                            {/* Main Row */}
+                                            <div className={`relative rounded-lg border border-emerald-200/40 dark:border-emerald-700/40 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm transition-all hover:shadow-md ${
+                                                item.currentStock === 0 ? 'border-l-4 border-l-red-500' :
+                                                item.currentStock < 50 ? 'border-l-4 border-l-orange-500' :
+                                                'border-l-4 border-l-emerald-500'
+                                            }`}>
+                                                <div className="p-3 flex items-center gap-3">
+                                                    {/* Status Dot */}
+                                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                                        item.currentStock === 0 ? 'bg-red-500 shadow-lg shadow-red-500/50' :
+                                                        item.currentStock < 50 ? 'bg-orange-500 shadow-lg shadow-orange-500/50' :
+                                                        'bg-emerald-500 shadow-lg shadow-emerald-500/50'
+                                                    }`}></div>
+
+                                                    {/* Product Name */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="font-medium text-gray-900 dark:text-white truncate">{item.productName || 'Select Product'}</div>
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400">Stock: {item.currentStock}</div>
+                                                    </div>
+
+                                                    {/* Requested Qty (Editable in collapsed view) */}
+                                                    {!isExpanded && (
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-xs text-gray-500 dark:text-gray-400">Qty:</span>
+                                                            <span className="font-medium text-gray-900 dark:text-white">{item.requestedQuantity}</span>
                                                         </div>
                                                     )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={`px-2 py-1 rounded text-xs font-medium ${stockStatus.color}`}>
-                                                            {stockStatus.label}
-                                                        </span>
-                                                        <span className="text-gray-900 dark:text-white">{item.currentStock}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <input
-                                                        type="number"
-                                                        value={item.requestedQuantity}
-                                                        onChange={(e) => updateItem(index, 'requestedQuantity', e.target.value)}
-                                                        className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                                        placeholder="Qty"
-                                                        min="1"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-900 dark:text-white">{item.unit}</td>
-                                                <td className="px-4 py-3">
-                                                    <input
-                                                        type="number"
-                                                        value={item.unitPrice}
-                                                        onChange={(e) => updateItem(index, 'unitPrice', e.target.value)}
-                                                        className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                                        placeholder="Price"
-                                                        min="0"
-                                                        step="0.01"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-900 dark:text-white font-medium">
-                                                    ₹{total.toFixed(2)}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${item.autoAdded ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'}`}>
-                                                        {item.autoAdded ? 'Auto' : 'Manual'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <button
-                                                        onClick={() => removeItem(index)}
-                                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
-                                                    >
-                                                        🗑️ Remove
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                                <tfoot className="bg-gray-50 dark:bg-gray-800">
-                                    <tr>
-                                        <td colSpan={5} className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">
-                                            Total:
-                                        </td>
-                                        <td className="px-4 py-3 font-bold text-lg text-green-600 dark:text-green-400">
-                                            ₹{demandList.reduce((sum, item) => sum + (item.requestedQuantity * item.unitPrice), 0).toFixed(2)}
-                                        </td>
-                                        <td colSpan={2}></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    )}
-                </div>
 
-                {/* Sent Demands History */}
-                <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                    <h2 className="relative text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
-                        <span className="font-bold">Purchase Order Records {selectedPOIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">({selectedPOIds.size} selected)</span>}</span>
-                    </h2>
-                    
-                    {/* Tabs */}
-                    <div className="relative flex gap-2 mb-6 border-b border-emerald-200 dark:border-emerald-700">
-                        <button
-                            onClick={() => setActiveTab('pending')}
-                            className={`px-6 py-3 font-medium transition-all ${
-                                activeTab === 'pending'
-                                    ? 'text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400'
-                            }`}
-                        >
-                            Pending Demands
-                            <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                                activeTab === 'pending'
-                                    ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                            }`}>
-                                {sentDemands.filter(d => d.status === 'pending').length}
-                            </span>
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('received')}
-                            className={`px-6 py-3 font-medium transition-all ${
-                                activeTab === 'received'
-                                    ? 'text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400'
-                            }`}
-                        >
-                            Received Orders
-                            <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                                activeTab === 'received'
-                                    ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                            }`}>
-                                {sentDemands.filter(d => d.status === 'received').length}
-                            </span>
-                        </button>
-                    </div>
-                    
-                    {/* Search and Filter */}
-                    <div className="relative flex gap-4 mb-4">
-                        <input
-                            type="text"
-                            placeholder="🔍 Search by PO Number or Supplier..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="flex-1 px-4 py-2 border border-emerald-200 dark:border-emerald-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        />
-                        <div className={isFilterSupplierOpen ? 'relative z-[10000]' : 'relative z-0'}>
-                        <CustomSelect
-                            value={filterSupplier}
-                            onChange={(value) => setFilterSupplier(value)}
-                            options={suppliers.map(s => ({ value: s.id.toString(), label: s.name }))}
-                            placeholder="All Suppliers"
-                            className="w-64"
-                            onOpenChange={setIsFilterSupplierOpen}
-                        />
-                        </div>
-                    </div>
-
-                    {loading ? (
-                        <div className="flex flex-col items-center justify-center py-12">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
-                            <p className="text-muted">Loading purchase orders...</p>
-                        </div>
-                    ) : filteredDemands.length === 0 ? (
-                        <div className="relative text-center py-12 text-gray-500 dark:text-gray-400">
-                            <p className="text-lg">No demands sent yet</p>
-                        </div>
-                    ) : (
-                        <div className="relative overflow-x-auto rounded-lg border border-emerald-100 dark:border-emerald-800">
-                            <table className="w-full text-sm">
-                                <thead className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/50 dark:to-green-950/50 border-b border-emerald-200 dark:border-emerald-700">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left">
-                                            <label className="relative group/checkbox cursor-pointer flex-shrink-0">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedPOIds.size === filteredDemands.length && filteredDemands.length > 0}
-                                                    onChange={toggleSelectAll}
-                                                    className="peer sr-only"
-                                                />
-                                                <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
-                                                    <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                </div>
-                                                <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
-                                            </label>
-                                        </th>
-                                        <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('poNumber')}>
-                                            PO Number {sortField === 'poNumber' && (sortOrder === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('supplier')}>
-                                            Supplier {sortField === 'supplier' && (sortOrder === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-4 py-3 text-left font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('createdAt')}>
-                                            Date {sortField === 'createdAt' && (sortOrder === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-4 py-3 text-left font-semibold">Items</th>
-                                        <th className="px-4 py-3 text-left font-semibold">Total Amount</th>
-                                        <th className="px-4 py-3 text-center font-semibold cursor-pointer hover:text-emerald-600" onClick={() => setSortField('status')}>
-                                            Status {sortField === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
-                                        </th>
-                                        <th className="px-4 py-3 text-center font-semibold">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-emerald-100 dark:divide-emerald-900/30">
-                                    {filteredDemands.map((demand) => (
-                                        <tr key={demand.id} className={`hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors ${selectedPOIds.has(demand.id) ? 'ring-2 ring-green-500 bg-green-50/30 dark:bg-green-950/30' : ''}`}>
-                                            <td className="px-4 py-3">
-                                                <label className="relative group/checkbox cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedPOIds.has(demand.id)}
-                                                        onChange={() => toggleSelectPO(demand.id)}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="peer sr-only"
-                                                    />
-                                                    <div className="w-6 h-6 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-green-500/50 group-hover/checkbox:border-green-500 group-hover/checkbox:scale-110">
-                                                        <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
-                                                        </svg>
+                                                    {/* Total */}
+                                                    <div className="font-semibold text-green-600 dark:text-green-400">
+                                                        ₹{total.toFixed(2)}
                                                     </div>
-                                                    <div className="absolute inset-0 rounded-md bg-green-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
-                                                </label>
-                                            </td>
-                                            <td className="px-4 py-3 font-medium font-mono">{demand.poNumber}</td>
-                                            <td className="px-4 py-3">{demand.supplier?.name}</td>
-                                            <td className="px-4 py-3 text-xs">
-                                                {demand.orderDate ? new Date(demand.orderDate).toLocaleDateString() : '-'}
-                                            </td>
-                                            <td className="px-4 py-3">{demand.items?.length || 0}</td>
-                                            <td className="px-4 py-3 font-semibold">
-                                                ₹{(demand.totalAmount || 0).toFixed(2)}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                                    demand.status === 'received' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
-                                                    demand.status === 'pending' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                                                    'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                                                }`}>
-                                                    {demand.status || 'pending'}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex gap-2">
-                                                    {demand.status === 'pending' && (
+
+                                                    {/* Actions */}
+                                                    <div className="flex items-center gap-1">
+                                                        {/* Edit Button */}
                                                         <button
-                                                            onClick={() => openReceivingModal(demand)}
-                                                            className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 font-medium"
+                                                            onClick={() => {
+                                                                const newExpanded = new Set(expandedRows)
+                                                                if (isExpanded) {
+                                                                    newExpanded.delete(index)
+                                                                } else {
+                                                                    newExpanded.add(index)
+                                                                }
+                                                                setExpandedRows(newExpanded)
+                                                            }}
+                                                            className="p-1.5 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-600 dark:text-purple-400 rounded transition-colors"
+                                                            title="Edit"
                                                         >
-                                                            📦 Receive
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                            </svg>
                                                         </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => deleteDemand(demand.id)}
-                                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
-                                                    >
-                                                        🗑️ Delete
-                                                    </button>
+
+                                                        {/* Expand/Collapse Button */}
+                                                        <button
+                                                            onClick={() => {
+                                                                const newExpanded = new Set(expandedRows)
+                                                                if (isExpanded) {
+                                                                    newExpanded.delete(index)
+                                                                } else {
+                                                                    newExpanded.add(index)
+                                                                }
+                                                                setExpandedRows(newExpanded)
+                                                            }}
+                                                            className="p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 rounded transition-colors"
+                                                            title={isExpanded ? "Collapse" : "Expand"}
+                                                        >
+                                                            <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </button>
+
+                                                        {/* Delete Button */}
+                                                        <button
+                                                            onClick={() => removeItem(index)}
+                                                            className="p-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 rounded transition-colors"
+                                                            title="Delete"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+
+                                                {/* Expanded Details */}
+                                                {isExpanded && (
+                                                    <div className="px-3 pb-3 pt-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
+                                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Requested Qty</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={item.requestedQuantity}
+                                                                    onChange={(e) => updateItem(index, 'requestedQuantity', e.target.value)}
+                                                                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                                                    min="1"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit Price</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={item.unitPrice}
+                                                                    onChange={(e) => updateItem(index, 'unitPrice', e.target.value)}
+                                                                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit</label>
+                                                                <div className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-300">
+                                                                    {item.unit || 'N/A'}
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Source</label>
+                                                                <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                                                                    item.source === 'Out of Stock' || item.source === 'Low Stock' 
+                                                                        ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' 
+                                                                        : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                                                                }`}>
+                                                                    {item.source || 'Manual'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                                
+                                {/* Total Footer */}
+                                <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-emerald-100 to-green-100 dark:from-emerald-900/30 dark:to-green-900/30 border border-emerald-200 dark:border-emerald-700">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-gray-900 dark:text-white">Total Amount:</span>
+                                        <span className="text-xl font-bold text-green-600 dark:text-green-400">
+                                            ₹{demandList.reduce((sum, item) => sum + (item.requestedQuantity * item.unitPrice), 0).toFixed(2)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Purchase Order Records */}
+                    <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                        <div className="relative flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                                Purchase Order Records {selectedPOIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">({selectedPOIds.size} selected)</span>}
+                            </h2>
                         </div>
-                    )}
+                    
+                        {/* Tabs and Upload Bill Button */}
+                        <div className="relative flex justify-between items-center mb-4">
+                            <div className="flex gap-2 border-b border-emerald-200 dark:border-emerald-700">
+                                <button
+                                    onClick={() => setActiveTab('pending')}
+                                    className={`px-4 py-2 font-medium transition-all text-sm ${
+                                        activeTab === 'pending'
+                                            ? 'text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400'
+                                            : 'text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400'
+                                    }`}
+                                >
+                                    Pending
+                                    <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                                        activeTab === 'pending'
+                                            ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                                    }`}>
+                                        {sentDemands.filter(d => d.status === 'pending').length}
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('received')}
+                                    className={`px-4 py-2 font-medium transition-all text-sm ${
+                                        activeTab === 'received'
+                                            ? 'text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400'
+                                            : 'text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400'
+                                    }`}
+                                >
+                                    Received
+                                    <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                                        activeTab === 'received'
+                                            ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                                    }`}>
+                                        {sentDemands.filter(d => d.status === 'received').length}
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('deleted')}
+                                    className={`px-4 py-2 font-medium transition-all text-sm ${
+                                        activeTab === 'deleted'
+                                            ? 'text-red-600 dark:text-red-400 border-b-2 border-red-600 dark:border-red-400'
+                                            : 'text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400'
+                                    }`}
+                                >
+                                    Deleted
+                                    <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                                        activeTab === 'deleted'
+                                            ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                                    }`}>
+                                        {sentDemands.filter(d => d.status === 'deleted').length}
+                                    </span>
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <RefreshButton onRefresh={fetchSentDemands} />
+                                <button
+                                    onClick={() => setIsDirectBillUploadModalOpen(true)}
+                                    className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium transition-all shadow-md text-sm flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                    Upload Bill
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Search and Filter */}
+                        <div className="relative flex gap-2 mb-4">
+                            <input
+                                type="text"
+                                placeholder="🔍 Search PO or Supplier..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="flex-1 px-3 py-1.5 text-sm border border-emerald-200 dark:border-emerald-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                            <div className={isFilterSupplierOpen ? 'relative z-[10000]' : 'relative z-0'}>
+                                <CustomSelect
+                                    value={filterSupplier}
+                                    onChange={(value) => setFilterSupplier(value)}
+                                    options={suppliers.map(s => ({ value: s.id.toString(), label: s.name }))}
+                                    placeholder="All Suppliers"
+                                    className="w-40"
+                                    onOpenChange={setIsFilterSupplierOpen}
+                                />
+                            </div>
+                        </div>
+
+                        {loading ? (
+                            <div className="flex flex-col items-center justify-center py-12">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+                                <p className="text-gray-500 dark:text-gray-400">Loading purchase orders...</p>
+                            </div>
+                        ) : filteredDemands.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                <svg className="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <p className="text-lg font-medium">No purchase orders yet</p>
+                                <p className="text-sm mt-2">Send demands to suppliers to create purchase orders</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {filteredDemands.map((demand) => {
+                                    const isPOExpanded = expandedPORows.has(demand.id)
+                                    
+                                    return (
+                                        <div key={demand.id} className="relative group">
+                                            {/* Main Row */}
+                                            <div className={`relative rounded-lg border border-emerald-200/40 dark:border-emerald-700/40 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm transition-all hover:shadow-md ${
+                                                selectedPOIds.has(demand.id) ? 'ring-2 ring-green-500 bg-green-50/30 dark:bg-green-950/30' : ''
+                                            } ${
+                                                demand.status === 'pending' ? 'border-l-4 border-l-yellow-500' :
+                                                demand.status === 'received' ? 'border-l-4 border-l-green-500' :
+                                                'border-l-4 border-l-gray-400'
+                                            }`}>
+                                                <div className="p-3 flex items-center gap-3">
+                                                                    {/* Status Dot */}
+                                                                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                                                        demand.status === 'pending' ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50' :
+                                                                        demand.status === 'received' ? 'bg-green-500 shadow-lg shadow-green-500/50' :
+                                                                        demand.status === 'deleted' ? 'bg-red-500 shadow-lg shadow-red-500/50' :
+                                                                        'bg-gray-400 shadow-lg shadow-gray-400/50'
+                                                                    }`}></div>                                                    {/* Checkbox */}
+                                                    <label className="relative group/checkbox cursor-pointer flex-shrink-0">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedPOIds.has(demand.id)}
+                                                            onChange={() => toggleSelectPO(demand.id)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="peer sr-only"
+                                                        />
+                                                        <div className="w-5 h-5 border-2 border-green-400 dark:border-green-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-green-500 peer-checked:to-emerald-600 peer-checked:border-green-500 transition-all duration-200 flex items-center justify-center shadow-sm">
+                                                            <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        </div>
+                                                    </label>
+
+                                                    {/* PO Number */}
+                                                    <div className="font-medium text-gray-900 dark:text-white font-mono text-sm min-w-[100px]">
+                                                        PON. {demand.poNumber}
+                                                    </div>
+
+                                                    {/* Items Count */}
+                                                    <div className="flex items-center gap-1 text-sm">
+                                                        <span className="text-gray-500 dark:text-gray-400">Items:</span>
+                                                        <span className="font-medium text-gray-900 dark:text-white">{demand.items?.length || 0}</span>
+                                                    </div>
+
+                                                    {/* Amount */}
+                                                    <div className="flex-1 text-right">
+                                                        <div className="font-semibold text-green-600 dark:text-green-400">
+                                                            ₹{(demand.totalAmount || 0).toFixed(2)}
+                                                        </div>
+                                                    </div>
+
+                                                                    {/* Actions */}
+                                                                    <div className="flex items-center gap-1">
+                                                                        {/* Receive Button (only for pending) */}
+                                                                        {demand.status === 'pending' && (
+                                                                            <button
+                                                                                onClick={() => openReceivingModal(demand)}
+                                                                                className="p-1.5 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-600 dark:text-green-400 rounded transition-colors"
+                                                                                title="Receive Goods"
+                                                                            >
+                                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                                                                </svg>
+                                                                            </button>
+                                                                        )}
+                                                                        
+                                                                        {/* Bill Actions - Only in Received Tab */}
+                                                                        {demand.status === 'received' && (() => {
+                                                                            console.log('Demand ID:', demand.id, 'Status:', demand.status, 'BillUrl:', demand.billUrl)
+                                                                            return true
+                                                                        })() && (
+                                                                            <>
+                                                                                {demand.billUrl ? (
+                                                                                    <>
+                                                                                        <button
+                                                                                            onClick={() => {
+                                                                                                const printWindow = window.open(demand.billUrl, '_blank')
+                                                                                                if (printWindow) {
+                                                                                                    printWindow.onload = () => {
+                                                                                                        printWindow.print()
+                                                                                                    }
+                                                                                                }
+                                                                                            }}
+                                                                                            className="p-1.5 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded transition-colors"
+                                                                                            title="Print Bill"
+                                                                                        >
+                                                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                                                            </svg>
+                                                                                        </button>
+                                                                                        
+                                                                                        {/* Download Button */}
+                                                                                        <a
+                                                                                            href={demand.billUrl}
+                                                                                            download
+                                                                                            className="p-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded transition-colors inline-flex items-center justify-center"
+                                                                                            title="Download Bill"
+                                                                                        >
+                                                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                                                            </svg>
+                                                                                        </a>
+                                                                                    </>
+                                                                                ) : uploadingBillForPO === demand.id ? (
+                                                                                    <div className="p-1.5 bg-gray-100 dark:bg-gray-700 text-gray-400 rounded inline-flex items-center justify-center" title="Uploading...">
+                                                                                        <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                                        </svg>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <label className="p-1.5 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-600 dark:text-green-400 rounded transition-colors cursor-pointer inline-flex items-center justify-center" title="Upload Bill">
+                                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                                                        </svg>
+                                                                                        <input
+                                                                                            type="file"
+                                                                                            accept=".pdf,image/*"
+                                                                                            className="hidden"
+                                                                                            onChange={(e) => {
+                                                                                                const file = e.target.files?.[0]
+                                                                                                if (file) handleDirectBillAttachment(demand.id, file)
+                                                                                            }}
+                                                                                        />
+                                                                                    </label>
+                                                                                )}
+                                                                            </>
+                                                                        )}
+
+                                                                        {/* Expand/Collapse Button */}
+                                                        <button
+                                                            onClick={() => {
+                                                                const newExpanded = new Set(expandedPORows)
+                                                                if (isPOExpanded) {
+                                                                    newExpanded.delete(demand.id)
+                                                                } else {
+                                                                    newExpanded.add(demand.id)
+                                                                }
+                                                                setExpandedPORows(newExpanded)
+                                                            }}
+                                                            className="p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 rounded transition-colors"
+                                                            title={isPOExpanded ? "Collapse" : "Expand"}
+                                                        >
+                                                            <svg className={`w-4 h-4 transition-transform ${isPOExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </button>
+
+                                                        {/* Edit Button */}
+                                                        {!editingPOIds.has(demand.id) ? (
+                                                            <button
+                                                                onClick={() => toggleEditMode(demand.id)}
+                                                                className="p-1.5 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded transition-colors"
+                                                                title="Edit"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                </svg>
+                                                            </button>
+                                                        ) : (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => saveEditedPO(demand.id)}
+                                                                    className="p-1.5 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-600 dark:text-green-400 rounded transition-colors"
+                                                                    title="Save"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => toggleEditMode(demand.id)}
+                                                                    className="p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400 rounded transition-colors"
+                                                                    title="Cancel"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                    </svg>
+                                                                </button>
+                                                            </>
+                                                        )}
+
+                                                        {/* Delete or Restore Button */}
+                                                        {activeTab === 'deleted' ? (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => restorePO(demand.id)}
+                                                                    disabled={restoringPOId === demand.id}
+                                                                    className="p-1.5 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-600 dark:text-green-400 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    title="Restore"
+                                                                >
+                                                                    {restoringPOId === demand.id ? (
+                                                                        <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                        </svg>
+                                                                    ) : (
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                        </svg>
+                                                                    )}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setConfirmModal({
+                                                                            open: true,
+                                                                            message: 'Are you sure you want to permanently delete this purchase order? This action cannot be undone.',
+                                                                            onConfirm: () => handleConfirmDelete(demand.id, true),
+                                                                            deleteMultiple: false
+                                                                        })
+                                                                    }}
+                                                                    disabled={deletingPOId === demand.id}
+                                                                    className="p-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    title="Permanently Delete"
+                                                                >
+                                                                    {deletingPOId === demand.id ? (
+                                                                        <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                        </svg>
+                                                                    ) : (
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                        </svg>
+                                                                    )}
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => deleteDemand(demand.id)}
+                                                                disabled={deletingPOId === demand.id}
+                                                                className="p-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                title="Delete"
+                                                            >
+                                                                {deletingPOId === demand.id ? (
+                                                                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                    </svg>
+                                                                ) : (
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                    </svg>
+                                                                )}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Expanded Details */}
+                                                {isPOExpanded && (
+                                                    <div className="px-3 pb-3 pt-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
+                                                        {editingPOIds.has(demand.id) && demand.status === 'received' && (
+                                                            <div className="mb-3">
+                                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Bill Attachment</label>
+                                                                {demand.billUrl ? (
+                                                                    <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
+                                                                        <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                        </svg>
+                                                                        <span className="text-sm text-green-700 dark:text-green-300 flex-1 truncate">
+                                                                            {demand.billUrl.split('/').pop() || 'Bill attached'}
+                                                                        </span>
+                                                                        <button
+                                                                            onClick={() => removeBillAttachment(demand.id)}
+                                                                            className="p-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 rounded transition-colors flex-shrink-0"
+                                                                            title="Remove Bill"
+                                                                        >
+                                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                            </svg>
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <label className="flex items-center gap-2 p-2 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-600 dark:text-green-400 rounded transition-colors cursor-pointer">
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                                        </svg>
+                                                                        <span className="text-sm font-medium">Upload Bill PDF</span>
+                                                                        <input
+                                                                            type="file"
+                                                                            accept=".pdf,image/*"
+                                                                            className="hidden"
+                                                                            onChange={(e) => {
+                                                                                const file = e.target.files?.[0]
+                                                                                if (file) handleDirectBillAttachment(demand.id, file)
+                                                                            }}
+                                                                        />
+                                                                    </label>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Supplier</label>
+                                                                {editingPOIds.has(demand.id) ? (
+                                                                    <input
+                                                                        type="text"
+                                                                        value={editedPOData[demand.id]?.supplierName || ''}
+                                                                        onChange={(e) => setEditedPOData({
+                                                                            ...editedPOData,
+                                                                            [demand.id]: { ...editedPOData[demand.id], supplierName: e.target.value }
+                                                                        })}
+                                                                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                                                                        disabled
+                                                                    />
+                                                                ) : (
+                                                                    <div className="text-gray-900 dark:text-white font-medium">{demand.supplier?.name || 'N/A'}</div>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Date</label>
+                                                                {editingPOIds.has(demand.id) ? (
+                                                                    <input
+                                                                        type="date"
+                                                                        value={editedPOData[demand.id]?.orderDate?.split('T')[0] || ''}
+                                                                        onChange={(e) => setEditedPOData({
+                                                                            ...editedPOData,
+                                                                            [demand.id]: { ...editedPOData[demand.id], orderDate: e.target.value }
+                                                                        })}
+                                                                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                                                                        disabled
+                                                                    />
+                                                                ) : (
+                                                                    <div className="text-gray-900 dark:text-white">
+                                                                        {demand.orderDate ? new Date(demand.orderDate).toLocaleDateString() : '-'}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Status</label>
+                                                                {editingPOIds.has(demand.id) ? (
+                                                                    <select
+                                                                        value={editedPOData[demand.id]?.status || 'pending'}
+                                                                        onChange={(e) => setEditedPOData({
+                                                                            ...editedPOData,
+                                                                            [demand.id]: { ...editedPOData[demand.id], status: e.target.value }
+                                                                        })}
+                                                                        className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                                                                    >
+                                                                        <option value="pending">Pending</option>
+                                                                        <option value="received">Received</option>
+                                                                    </select>
+                                                                ) : (
+                                                                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                                                                        demand.status === 'received' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
+                                                                        demand.status === 'pending' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                                                        demand.status === 'deleted' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                                                                        'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                                                                    }`}>
+                                                                        {demand.status || 'pending'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {demand.receivedDate && (
+                                                                <div>
+                                                                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Received Date</label>
+                                                                    {editingPOIds.has(demand.id) ? (
+                                                                        <input
+                                                                            type="date"
+                                                                            value={editedPOData[demand.id]?.receivedDate?.split('T')[0] || ''}
+                                                                            onChange={(e) => setEditedPOData({
+                                                                                ...editedPOData,
+                                                                                [demand.id]: { ...editedPOData[demand.id], receivedDate: e.target.value }
+                                                                            })}
+                                                                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="text-gray-900 dark:text-white">
+                                                                            {new Date(demand.receivedDate).toLocaleDateString()}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Items List */}
+                                                        {demand.items && demand.items.length > 0 && (
+                                                            <div>
+                                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Items:</label>
+                                                                <div className="space-y-1">
+                                                                    {(editingPOIds.has(demand.id) ? editedPOData[demand.id]?.items || demand.items : demand.items).map((item: any, idx: number) => (
+                                                                        <div key={idx} className="flex justify-between items-center text-xs bg-white dark:bg-gray-800 rounded px-2 py-1.5">
+                                                                            <div className="flex-1">
+                                                                                <div className="font-medium text-gray-900 dark:text-white">{item.product?.name || item.productName || 'Unknown Product'}</div>
+                                                                                <div className="text-gray-500 dark:text-gray-400 text-xs mt-0.5 flex items-center gap-2">
+                                                                                    {editingPOIds.has(demand.id) ? (
+                                                                                        <>
+                                                                                            <span>Qty:</span>
+                                                                                            <input
+                                                                                                type="number"
+                                                                                                value={item.quantity || 0}
+                                                                                                onChange={(e) => {
+                                                                                                    const newItems = [...(editedPOData[demand.id]?.items || [])]
+                                                                                                    newItems[idx] = { ...newItems[idx], quantity: Number(e.target.value) }
+                                                                                                    setEditedPOData({
+                                                                                                        ...editedPOData,
+                                                                                                        [demand.id]: { ...editedPOData[demand.id], items: newItems }
+                                                                                                    })
+                                                                                                }}
+                                                                                                className="w-16 px-1 py-0.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                                                                            />
+                                                                                            <span>{item.product?.unit || ''}</span>
+                                                                                        </>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            Qty: {item.quantity || item.requestedQuantity} {item.product?.unit || ''}
+                                                                                        </>
+                                                                                    )}
+                                                                                    {item.receivedQuantity > 0 && !editingPOIds.has(demand.id) && (
+                                                                                        <span className="ml-2 text-green-600 dark:text-green-400">(Received: {item.receivedQuantity})</span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="flex flex-col items-end gap-0.5">
+                                                                                {editingPOIds.has(demand.id) ? (
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        step="0.01"
+                                                                                        value={item.unitPrice || 0}
+                                                                                        onChange={(e) => {
+                                                                                            const newItems = [...(editedPOData[demand.id]?.items || [])]
+                                                                                            newItems[idx] = { ...newItems[idx], unitPrice: Number(e.target.value) }
+                                                                                            setEditedPOData({
+                                                                                                ...editedPOData,
+                                                                                                [demand.id]: { ...editedPOData[demand.id], items: newItems }
+                                                                                            })
+                                                                                        }}
+                                                                                        className="w-20 px-1 py-0.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-right"
+                                                                                    />
+                                                                                ) : (
+                                                                                    <span className="text-gray-600 dark:text-gray-400">₹{(item.unitPrice || 0).toFixed(2)}/unit</span>
+                                                                                )}
+                                                                                <span className="font-medium text-green-600 dark:text-green-400">₹{((item.quantity || item.requestedQuantity) * (item.unitPrice || 0)).toFixed(2)}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -997,9 +1792,9 @@ export default function PurchaseOrdersPage() {
             {/* Supplier Selection Modal */}
             {showSupplierModal && (
                 <div className={`fixed inset-0 bg-black flex items-center justify-center p-4 transition-opacity duration-300 ${supplierModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }}>
-                    <div className={`relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-md w-full transform transition-all duration-300 ${supplierModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                    <div className={`relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-lg w-full transform transition-all duration-300 ${supplierModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
-                        <div className="relative p-6">
+                        <div className="relative p-5">
                             <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 mb-4">Select Supplier</h2>
                             <p className="text-gray-600 dark:text-gray-400 mb-6">
                                 Choose a supplier to send this demand to. An email will be sent automatically.
@@ -1055,14 +1850,28 @@ export default function PurchaseOrdersPage() {
             {/* Receiving Goods Modal */}
             {isReceivingModalOpen && receivingPO && (
                 <div className={`fixed inset-0 bg-black flex items-center justify-center p-4 transition-opacity duration-300 ${receivingModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }}>
-                    <div className={`relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-4xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-300 ${receivingModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                    <div className={`relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-3xl w-full max-h-[85vh] overflow-y-auto transform transition-all duration-300 ${receivingModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
-                        <form onSubmit={handleReceiveGoods} className="relative p-6">
-                            <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 mb-4">Receive Goods - {receivingPO.poNumber}</h2>
-                            <p className="text-gray-600 dark:text-gray-400 mb-6">
-                                Supplier: <strong>{receivingPO.supplier?.name}</strong> | 
-                                Order Date: <strong>{receivingPO.orderDate ? new Date(receivingPO.orderDate).toLocaleDateString() : '-'}</strong>
-                            </p>
+                        <form onSubmit={handleReceiveGoods} className="relative p-5">
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Receive Goods - {receivingPO.poNumber}</h2>
+                                    <p className="text-gray-600 dark:text-gray-400 mt-2">
+                                        Supplier: <strong>{receivingPO.supplier?.name}</strong> | 
+                                        Order Date: <strong>{receivingPO.orderDate ? new Date(receivingPO.orderDate).toLocaleDateString() : '-'}</strong>
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsBillUploadModalOpen(true)}
+                                    className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium transition-all shadow-md text-sm flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                    Upload Bill
+                                </button>
+                            </div>
 
                             <div className="overflow-x-auto mb-6">
                                 <table className="w-full">
@@ -1255,7 +2064,7 @@ export default function PurchaseOrdersPage() {
                                         Cancel
                                     </button>
                                     <button 
-                                        onClick={() => handleConfirmDelete(confirmModal.id)} 
+                                        onClick={() => confirmModal.onConfirm ? confirmModal.onConfirm() : handleConfirmDelete(confirmModal.id)} 
                                         disabled={deleting} 
                                         className="flex-1 px-4 py-2.5 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors font-medium shadow-md"
                                     >
@@ -1409,6 +2218,28 @@ export default function PurchaseOrdersPage() {
                     message={sendingEmail ? 'Sending demand...' : 'Receiving goods...'}
                 />
             )}
+
+            {/* Bill Upload Modal */}
+            <ReceiveGoodsBillUploadModal
+                isOpen={isBillUploadModalOpen}
+                onClose={() => setIsBillUploadModalOpen(false)}
+                onDataExtracted={handleBillDataExtracted}
+            />
+            
+            {/* Direct Bill Upload Modal */}
+            <ReceiveGoodsBillUploadModal
+                isOpen={isDirectBillUploadModalOpen}
+                onClose={() => setIsDirectBillUploadModalOpen(false)}
+                onDataExtracted={handleDirectBillUpload}
+            />
+
+            {/* Add Items Modal */}
+            <AddDemandItemsModal
+                isOpen={isAddItemsModalOpen}
+                onClose={() => setIsAddItemsModalOpen(false)}
+                products={products}
+                onAddItems={handleAddItemsFromModal}
+            />
 
             <ToastNotification toasts={toasts} removeToast={removeToast} />
         </>

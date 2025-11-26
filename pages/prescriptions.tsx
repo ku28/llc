@@ -45,13 +45,13 @@ export default function PrescriptionsPage() {
     const videoRef = useRef<HTMLVideoElement>(null)
     const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
     const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({})
-    
+
     // Refs to track which field user is editing (prevent circular updates)
     const isUpdatingHeightFromFeet = useRef(false)
     const isUpdatingFeetFromHeight = useRef(false)
     const isUpdatingDateFromCount = useRef(false)
     const isUpdatingCountFromDate = useRef(false)
-    
+
     const [form, setForm] = useState<any>({
         patientId: '', opdNo: '', date: new Date().toISOString().split('T')[0], temperament: '', pulseDiagnosis: '', pulseDiagnosis2: '',
         majorComplaints: '', historyReports: '', investigations: '', reports: '', provisionalDiagnosis: '',
@@ -79,27 +79,27 @@ export default function PrescriptionsPage() {
             const visitsRes = await fetch(`/api/visits?patientId=${patientId}`)
             const visits = await visitsRes.json()
             const visitCount = visits.length + 1 // Next visit number
-            
+
             // Get token for today (or calculate next token)
             const today = new Date()
             const yy = today.getFullYear().toString().slice(-2)
             const mm = (today.getMonth() + 1).toString().padStart(2, '0')
             const dd = today.getDate().toString().padStart(2, '0')
-            
+
             // Get tokens for today to determine next token number
             const tokensRes = await fetch('/api/tokens')
             const tokens = await tokensRes.json()
-            
+
             const todayStart = new Date(today)
             todayStart.setHours(0, 0, 0, 0)
             const todayEnd = new Date(today)
             todayEnd.setHours(23, 59, 59, 999)
-            
+
             const todayTokens = tokens.filter((t: any) => {
                 const tokenDate = new Date(t.date)
                 return tokenDate >= todayStart && tokenDate <= todayEnd
             })
-            
+
             // Find token for this patient or estimate next token
             let tokenNumber = 1
             const patientToken = todayTokens.find((t: any) => t.patientId === Number(patientId))
@@ -107,14 +107,14 @@ export default function PrescriptionsPage() {
                 tokenNumber = patientToken.tokenNumber
             } else {
                 // Estimate next token number
-                const maxToken = todayTokens.reduce((max: number, t: any) => 
+                const maxToken = todayTokens.reduce((max: number, t: any) =>
                     Math.max(max, t.tokenNumber), 0)
                 tokenNumber = maxToken + 1
             }
-            
+
             const token = tokenNumber.toString().padStart(2, '0')
             const visit = visitCount.toString().padStart(2, '0')
-            
+
             return `${yy}${mm}${dd} ${token} ${visit}`
         } catch (error) {
             console.error('Error generating OPD preview:', error)
@@ -145,7 +145,7 @@ export default function PrescriptionsPage() {
     const [isPulseDiagnosis2Open, setIsPulseDiagnosis2Open] = useState(false)
     const [isTreatmentSelectOpen, setIsTreatmentSelectOpen] = useState(false)
     const [isMedicineSelectOpen, setIsMedicineSelectOpen] = useState(false)
-    const [isPrescriptionDropdownOpen, setIsPrescriptionDropdownOpen] = useState<{[key: number]: {[field: string]: boolean}}>({})
+    const [isPrescriptionDropdownOpen, setIsPrescriptionDropdownOpen] = useState<{ [key: number]: { [field: string]: boolean } }>({})
 
     // Step configuration
     const steps = [
@@ -158,9 +158,9 @@ export default function PrescriptionsPage() {
     ]
 
     useEffect(() => { fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user)) }, [])
-    
+
     // Fetch all required data eagerly on mount
-    useEffect(() => { 
+    useEffect(() => {
         const fetchData = async () => {
             setDataLoading(true)
             try {
@@ -169,11 +169,11 @@ export default function PrescriptionsPage() {
                     fetch('/api/treatments'),
                     fetch('/api/products')
                 ])
-                
+
                 const patientsData = await patientsRes.json()
                 const treatmentsData = await treatmentsRes.json()
                 const productsData = await productsRes.json()
-                
+
                 console.log('Patients fetched:', patientsData)
                 setPatients(Array.isArray(patientsData) ? patientsData : [])
                 setTreatments(treatmentsData)
@@ -199,16 +199,16 @@ export default function PrescriptionsPage() {
                     .then(r => r.json())
                     .then(async (patientVisits: any[]) => {
                         const latestVisit = patientVisits.length > 0 ? patientVisits[0] : null
-                        
+
                         // Generate preview for new visits
                         let previewOpdNo = ''
                         if (!latestVisit?.opdNo) {
                             previewOpdNo = await generateOpdNoPreview(String(patientId))
                             setGeneratedOpdNo(previewOpdNo)
                         }
-                        
-                        setForm((prev: any) => ({ 
-                            ...prev, 
+
+                        setForm((prev: any) => ({
+                            ...prev,
                             patientId: String(patientId),
                             opdNo: latestVisit?.opdNo || previewOpdNo,
                             visitNumber: visitNumber ? String(visitNumber) : prev.visitNumber,
@@ -235,8 +235,8 @@ export default function PrescriptionsPage() {
                     })
                     .catch(() => {
                         // If fetch fails, just set patient data without opdNo
-                        setForm((prev: any) => ({ 
-                            ...prev, 
+                        setForm((prev: any) => ({
+                            ...prev,
                             patientId: String(patientId),
                             opdNo: '',
                             visitNumber: visitNumber ? String(visitNumber) : prev.visitNumber,
@@ -262,8 +262,8 @@ export default function PrescriptionsPage() {
                         }))
                     })
             } else {
-                setForm((prev: any) => ({ 
-                    ...prev, 
+                setForm((prev: any) => ({
+                    ...prev,
                     patientId: String(patientId),
                     visitNumber: visitNumber ? String(visitNumber) : prev.visitNumber
                 }))
@@ -279,7 +279,7 @@ export default function PrescriptionsPage() {
                 .then(visits => {
                     if (visits && visits.length > 0) {
                         // Sort by date descending and get the most recent visit
-                        const sortedVisits = visits.sort((a: any, b: any) => 
+                        const sortedVisits = visits.sort((a: any, b: any) =>
                             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
                         )
                         const lastVisit = sortedVisits[0]
@@ -295,11 +295,11 @@ export default function PrescriptionsPage() {
     // Auto-calculate amount from prescriptions
     useEffect(() => {
         if (prescriptions.length === 0 || products.length === 0) return
-        
+
         let totalAmount = 0
         let spyBottleAdded = false
         let additionsBottleAdded = false
-        
+
         prescriptions.forEach(pr => {
             const product = products.find(p => String(p.id) === String(pr.productId))
             if (product && product.priceRupees !== undefined) {
@@ -307,7 +307,7 @@ export default function PrescriptionsPage() {
                 // priceRupees is in rupees per unit
                 totalAmount += (Number(product.priceRupees) * quantity)
             }
-            
+
             // Add spy bottle price only once if any spy4-spy6 are filled
             if (!spyBottleAdded && (pr.spy4 || pr.spy5 || pr.spy6) && pr.spyBottleSize) {
                 const bottlePrice = bottlePricing.find(b => b.value === pr.spyBottleSize)
@@ -316,7 +316,7 @@ export default function PrescriptionsPage() {
                     spyBottleAdded = true
                 }
             }
-            
+
             // Add additions bottle price only once if any addition1-addition3 are filled
             if (!additionsBottleAdded && (pr.addition1 || pr.addition2 || pr.addition3) && pr.additionsBottleSize) {
                 const bottlePrice = bottlePricing.find(b => b.value === pr.additionsBottleSize)
@@ -337,7 +337,7 @@ export default function PrescriptionsPage() {
         const discount = parseFloat(form.discount) || 0
         const payment = parseFloat(form.payment) || 0
         const balance = (amount - discount - payment).toFixed(2)
-        
+
         setForm((prev: any) => ({ ...prev, balance }))
     }, [form.amount, form.discount, form.payment])
 
@@ -347,7 +347,7 @@ export default function PrescriptionsPage() {
             isUpdatingHeightFromFeet.current = false
             return
         }
-        
+
         if (form.height && form.height !== '') {
             const cm = parseFloat(form.height)
             if (!isNaN(cm) && cm > 0) {
@@ -370,7 +370,7 @@ export default function PrescriptionsPage() {
             isUpdatingFeetFromHeight.current = false
             return
         }
-        
+
         if ((form.heightFeet !== '' || form.heightInches !== '') && form.heightFeet !== undefined && form.heightInches !== undefined) {
             const feet = parseFloat(form.heightFeet) || 0
             const inches = parseFloat(form.heightInches) || 0
@@ -461,7 +461,7 @@ export default function PrescriptionsPage() {
                 const birthYear = today.getFullYear() - age
                 const approxDob = new Date(birthYear, today.getMonth(), today.getDate())
                 const newDob = approxDob.toISOString().split('T')[0]
-                
+
                 // Only update if the calculated DOB would be different
                 if (form.dob !== newDob) {
                     setForm((prev: any) => ({ ...prev, dob: newDob }))
@@ -479,7 +479,7 @@ export default function PrescriptionsPage() {
                 .then(r => r.json())
                 .then(allTreatments => setTreatments(allTreatments))
                 .catch(err => console.error('Error loading treatments:', err))
-            
+
             fetch(`/api/visits?id=${visitId}`)
                 .then(r => r.json())
                 .then(visit => {
@@ -534,6 +534,19 @@ export default function PrescriptionsPage() {
                         followUpCount: visit.followUpCount ?? ''
                     })
 
+                    // Load reports attachments if they exist
+                    if (visit.reportsAttachments) {
+                        try {
+                            const parsed = JSON.parse(visit.reportsAttachments)
+                            if (Array.isArray(parsed)) {
+                                setReportsAttachments(parsed)
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse reportsAttachments:', e)
+                            setReportsAttachments([])
+                        }
+                    }
+
                     // Pre-fill prescriptions
                     if (visit.prescriptions && visit.prescriptions.length > 0) {
                         const loadedPrescriptions = visit.prescriptions.map((p: any) => ({
@@ -558,9 +571,9 @@ export default function PrescriptionsPage() {
                             administration: p.administration || '',
                             patientHasMedicine: p.patientHasMedicine || false
                         }))
-                        
+
                         setPrescriptions(loadedPrescriptions)
-                        
+
                         // Check if prescriptions have a treatment plan attached
                         const firstTreatmentId = visit.prescriptions[0]?.treatmentId
                         if (firstTreatmentId) {
@@ -644,9 +657,9 @@ export default function PrescriptionsPage() {
                             administration: p.administration || '',
                             patientHasMedicine: false // Reset for new visit
                         }))
-                        
+
                         setPrescriptions(copiedPrescriptions)
-                        
+
                         // Check if prescriptions have a treatment plan attached
                         const firstTreatmentId = visit.prescriptions[0]?.treatmentId
                         if (firstTreatmentId) {
@@ -662,7 +675,7 @@ export default function PrescriptionsPage() {
                                 .catch(err => console.error('Error fetching treatment plan:', err))
                         }
                     }
-                    
+
                     // Show success toast only once after all data is loaded
                     showSuccess('Previous visit data loaded successfully')
                     setLoading(false)
@@ -681,16 +694,16 @@ export default function PrescriptionsPage() {
             isUpdatingDateFromCount.current = false
             return
         }
-        
+
         if (form.nextVisitDate) {
             const today = new Date()
             today.setHours(0, 0, 0, 0)
             const nextVisit = new Date(form.nextVisitDate)
             nextVisit.setHours(0, 0, 0, 0)
-            
+
             const diffTime = nextVisit.getTime() - today.getTime()
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-            
+
             if (diffDays >= 0 && form.followUpCount !== diffDays.toString()) {
                 isUpdatingCountFromDate.current = true
                 setForm((prev: any) => ({ ...prev, followUpCount: diffDays.toString() }))
@@ -704,17 +717,17 @@ export default function PrescriptionsPage() {
             isUpdatingCountFromDate.current = false
             return
         }
-        
+
         if (form.followUpCount && form.followUpCount !== '' && !isNaN(Number(form.followUpCount))) {
             const today = new Date()
             const daysToAdd = parseInt(form.followUpCount, 10)
-            
+
             if (daysToAdd >= 0) {
                 const nextDate = new Date(today)
                 nextDate.setDate(today.getDate() + daysToAdd)
-                
+
                 const formattedDate = nextDate.toISOString().split('T')[0]
-                
+
                 if (form.nextVisitDate !== formattedDate) {
                     isUpdatingDateFromCount.current = true
                     setForm((prev: any) => ({ ...prev, nextVisitDate: formattedDate }))
@@ -801,6 +814,12 @@ export default function PrescriptionsPage() {
         const files = e.target.files
         if (!files || files.length === 0) return
 
+        if (!form.patientId) {
+            showError('Please select a patient first')
+            e.target.value = ''
+            return
+        }
+
         if (reportsAttachments.length + files.length > 10) {
             showError('You can upload a maximum of 10 files')
             return
@@ -861,6 +880,11 @@ export default function PrescriptionsPage() {
 
     // Handle captured image from camera modal
     async function handleCameraCapture(imageData: string) {
+        if (!form.patientId) {
+            showError('Please select a patient first')
+            return
+        }
+
         if (reportsAttachments.length >= 10) {
             showError('You can upload a maximum of 10 files')
             return
@@ -1012,10 +1036,10 @@ export default function PrescriptionsPage() {
         // Try to parse old format (e.g., "10/DRP/TDS/WTR")
         const oldParts = dosageValue.split('/')
         if (oldParts.length >= 3) {
-            return { 
-                quantity: oldParts[0] || '', 
-                timing: oldParts[2] || '', 
-                dilution: oldParts[3] || '' 
+            return {
+                quantity: oldParts[0] || '',
+                timing: oldParts[2] || '',
+                dilution: oldParts[3] || ''
             }
         }
         return { quantity: '', timing: '', dilution: '' }
@@ -1050,12 +1074,12 @@ export default function PrescriptionsPage() {
 
     function addToSelectedMedicines() {
         if (!selectedProductId) return showError('Select a medicine first')
-        
+
         // Check if already in the list
         if (selectedMedicines.includes(selectedProductId)) {
             return showInfo('This medicine is already in your selection')
         }
-        
+
         setSelectedMedicines([...selectedMedicines, selectedProductId])
         setSelectedProductId('') // Clear the dropdown
     }
@@ -1147,14 +1171,14 @@ export default function PrescriptionsPage() {
             .then(r => r.json())
             .then(async (patientVisits: any[]) => {
                 const latestVisit = patientVisits.length > 0 ? patientVisits[0] : null
-                
+
                 // Generate preview for new visits
                 let previewOpdNo = ''
                 if (!latestVisit?.opdNo) {
                     previewOpdNo = await generateOpdNoPreview(id)
                     setGeneratedOpdNo(previewOpdNo)
                 }
-                
+
                 setForm((prev: any) => ({
                     ...prev,
                     patientId: String(found.id),
@@ -1360,7 +1384,12 @@ export default function PrescriptionsPage() {
     async function performSubmit() {
         setLoading(true)
         try {
-            const payload = { ...form, prescriptions }
+            const payload = { ...form, prescriptions, autoGenerateInvoice: true }
+
+            // Always add reports attachments as JSON string (even if empty to clear old data)
+            payload.reportsAttachments = reportsAttachments.length > 0 
+                ? JSON.stringify(reportsAttachments)
+                : null
 
             // Combine date and time for nextVisit
             if (form.nextVisitDate && form.nextVisitTime) {
@@ -1386,64 +1415,9 @@ export default function PrescriptionsPage() {
             const data = await res.json()
             setLastCreatedVisitId(data.id)
             setLastCreatedVisit(data)
-            
-            // Auto-create or update invoice for this visit
-            try {
-                const selectedPatient = patients.find(p => String(p.id) === String(form.patientId))
-                const invoiceItems = prescriptions.map(p => {
-                    const product = products.find(prod => String(prod.id) === String(p.productId))
-                    return {
-                        productId: p.productId,
-                        description: product?.name || '',
-                        quantity: p.quantity || 1,
-                        unitPrice: product?.price || 0,
-                        taxRate: 0,
-                        discount: 0
-                    }
-                })
-                
-                // Check if invoice already exists for this visit
-                const existingInvoicesRes = await fetch('/api/customer-invoices')
-                const existingInvoices = await existingInvoicesRes.json()
-                const existingInvoice = Array.isArray(existingInvoices) 
-                    ? existingInvoices.find((inv: any) => inv.visitId === data.id)
-                    : null
-                
-                const invoicePayload = {
-                    visitId: data.id,
-                    patientId: form.patientId,
-                    customerName: `${selectedPatient?.firstName || ''} ${selectedPatient?.lastName || ''}`.trim(),
-                    customerPhone: form.phone || selectedPatient?.phone || '',
-                    customerAddress: form.address || selectedPatient?.address || '',
-                    invoiceDate: new Date().toISOString().split('T')[0],
-                    discount: parseFloat(form.discount || '0'),
-                    items: invoiceItems
-                }
-                
-                if (existingInvoice) {
-                    // Update existing invoice
-                    await fetch('/api/customer-invoices', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            id: existingInvoice.id,
-                            ...invoicePayload
-                        })
-                    })
-                } else {
-                    // Create new invoice
-                    await fetch('/api/customer-invoices', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(invoicePayload)
-                    })
-                }
-            } catch (err) {
-                console.error('Failed to create/update invoice:', err)
-            }
-            
-            showSuccess(`Visit ${isEditMode ? 'updated' : 'created'} successfully!`)
-            
+
+            showSuccess(`Visit ${isEditMode ? 'updated' : 'created'} successfully!${data.invoiceCreated ? ' Invoice generated.' : ''}`)
+
             // Clear the auto-saved draft after successful submission
             if (!isEditMode) {
                 try {
@@ -1454,7 +1428,7 @@ export default function PrescriptionsPage() {
                     console.error('Failed to clear draft:', err)
                 }
             }
-            
+
             // Redirect to visit details page
             setTimeout(() => {
                 router.push(`/visits/${data.id}`)
@@ -1483,9 +1457,9 @@ export default function PrescriptionsPage() {
             {/* Creating Treatment Modal */}
             <LoadingModal isOpen={creatingTreatment} message={treatmentModalMessage} />
             {/* Camera Modal for Reports */}
-            <CameraModal 
-                isOpen={showCamera} 
-                onClose={() => setShowCamera(false)} 
+            <CameraModal
+                isOpen={showCamera}
+                onClose={() => setShowCamera(false)}
                 onCapture={handleCameraCapture}
                 title="Capture Report Document"
             />
@@ -1500,7 +1474,7 @@ export default function PrescriptionsPage() {
                 cancelText="Discard"
                 variant="info"
             />
-            
+
             {isPatient ? (
                 // Patient view - Read-only prescription list
                 <UserPrescriptionsContent user={user} />
@@ -1554,13 +1528,12 @@ export default function PrescriptionsPage() {
                                             <button
                                                 type="button"
                                                 onClick={() => goToStep(step.number)}
-                                                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 ${
-                                                    currentStep === step.number
-                                                        ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-lg shadow-emerald-500/30 scale-110'
-                                                        : currentStep > step.number
+                                                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 ${currentStep === step.number
+                                                    ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-lg shadow-emerald-500/30 scale-110'
+                                                    : currentStep > step.number
                                                         ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-2 border-emerald-300 dark:border-emerald-700'
                                                         : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-2 border-gray-200 dark:border-gray-700'
-                                                } hover:scale-105 cursor-pointer`}
+                                                    } hover:scale-105 cursor-pointer`}
                                             >
                                                 {currentStep > step.number ? (
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1573,13 +1546,12 @@ export default function PrescriptionsPage() {
 
                                             {/* Step Info - Only on larger screens */}
                                             <div className="hidden lg:block ml-3 flex-shrink-0">
-                                                <div className={`text-sm font-semibold ${
-                                                    currentStep === step.number
-                                                        ? 'text-emerald-700 dark:text-emerald-300'
-                                                        : currentStep > step.number
+                                                <div className={`text-sm font-semibold ${currentStep === step.number
+                                                    ? 'text-emerald-700 dark:text-emerald-300'
+                                                    : currentStep > step.number
                                                         ? 'text-emerald-600 dark:text-emerald-400'
                                                         : 'text-gray-500 dark:text-gray-400'
-                                                }`}>
+                                                    }`}>
                                                     {step.title}
                                                 </div>
                                                 <div className="text-xs text-gray-500 dark:text-gray-400">{step.description}</div>
@@ -1589,9 +1561,8 @@ export default function PrescriptionsPage() {
                                             {index < steps.length - 1 && (
                                                 <div className="flex-1 h-0.5 mx-3 bg-gray-200 dark:bg-gray-700 relative">
                                                     <div
-                                                        className={`absolute inset-0 bg-gradient-to-r from-emerald-500 to-green-500 transition-all duration-500 ${
-                                                            currentStep > step.number ? 'w-full' : 'w-0'
-                                                        }`}
+                                                        className={`absolute inset-0 bg-gradient-to-r from-emerald-500 to-green-500 transition-all duration-500 ${currentStep > step.number ? 'w-full' : 'w-0'
+                                                            }`}
                                                     ></div>
                                                 </div>
                                             )}
@@ -1622,237 +1593,237 @@ export default function PrescriptionsPage() {
                                             Select Patient <span className="text-red-600">*</span>
                                         </label>
                                         <div className={fieldErrors.patientId ? 'border-2 border-red-600 rounded-lg' : ''}>
-                                        <CustomSelect
-                                            required
-                                            value={form.patientId}
-                                            onChange={(id) => {
-                                                setForm((prev: any) => ({ ...prev, patientId: id }))
-                                                setFieldErrors((prev) => ({ ...prev, patientId: '' }))
-                                                const found = patients.find(p => String(p.id) === String(id))
-                                                if (!found) return
+                                            <CustomSelect
+                                                required
+                                                value={form.patientId}
+                                                onChange={(id) => {
+                                                    setForm((prev: any) => ({ ...prev, patientId: id }))
+                                                    setFieldErrors((prev) => ({ ...prev, patientId: '' }))
+                                                    const found = patients.find(p => String(p.id) === String(id))
+                                                    if (!found) return
 
-                                                // Split nextVisit into date and time
-                                                let nextVisitDate = ''
-                                                let nextVisitTime = ''
-                                                if (found.nextVisit) {
-                                                    const dt = new Date(found.nextVisit).toISOString()
-                                                    nextVisitDate = dt.slice(0, 10)
-                                                    nextVisitTime = dt.slice(11, 16)
-                                                }
+                                                    // Split nextVisit into date and time
+                                                    let nextVisitDate = ''
+                                                    let nextVisitTime = ''
+                                                    if (found.nextVisit) {
+                                                        const dt = new Date(found.nextVisit).toISOString()
+                                                        nextVisitDate = dt.slice(0, 10)
+                                                        nextVisitTime = dt.slice(11, 16)
+                                                    }
 
-                                                // Fetch the most recent visit for this patient to get opdNo
-                                                fetch(`/api/visits?patientId=${id}`)
-                                                    .then(r => r.json())
-                                                    .then(async (patientVisits: any[]) => {
-                                                        const latestVisit = patientVisits.length > 0 ? patientVisits[0] : null
-                                                        
-                                                        // Generate preview for new visits
-                                                        let previewOpdNo = ''
-                                                        if (!latestVisit?.opdNo) {
-                                                            previewOpdNo = await generateOpdNoPreview(id)
-                                                            setGeneratedOpdNo(previewOpdNo)
-                                                        }
-                                                        
-                                                        setForm((prev: any) => ({
-                                                            ...prev,
-                                                            patientId: String(found.id),
-                                                            opdNo: latestVisit?.opdNo || previewOpdNo,
-                                                            dob: formatDateForInput(found.dob),
-                                                            age: found.age ?? '',
-                                                            address: found.address || '',
-                                                            gender: found.gender || '',
-                                                            phone: found.phone || '',
-                                                            nextVisitDate,
-                                                            nextVisitTime,
-                                                            occupation: found.occupation || '',
-                                                            pendingPaymentCents: found.pendingPaymentCents ?? '',
-                                                            height: found.height ?? '',
-                                                            weight: found.weight ?? '',
-                                                            imageUrl: found.imageUrl || ''
-                                                        }))
-                                                    })
-                                                    .catch(() => {
-                                                        setForm((prev: any) => ({
-                                                            ...prev,
-                                                            patientId: String(found.id),
-                                                            opdNo: '',
-                                                            dob: formatDateForInput(found.dob),
-                                                            age: found.age ?? '',
-                                                            address: found.address || '',
-                                                            gender: found.gender || '',
-                                                            phone: found.phone || '',
-                                                            nextVisitDate,
-                                                            nextVisitTime,
-                                                            occupation: found.occupation || '',
-                                                            pendingPaymentCents: found.pendingPaymentCents ?? '',
-                                                            height: found.height ?? '',
-                                                            weight: found.weight ?? '',
-                                                            imageUrl: found.imageUrl || ''
-                                                        }))
-                                                    })
-                                            }}
-                                            options={[
-                                                { value: '', label: 'Select patient' },
-                                                ...patients.map(p => ({
-                                                    value: String(p.id),
-                                                    label: `${p.firstName} ${p.lastName}${p.phone ? ' · ' + p.phone : ''}`
-                                                }))
-                                            ]}
-                                            placeholder="Select patient"
-                                            onOpenChange={setIsPatientSelectOpen}
-                                        />
+                                                    // Fetch the most recent visit for this patient to get opdNo
+                                                    fetch(`/api/visits?patientId=${id}`)
+                                                        .then(r => r.json())
+                                                        .then(async (patientVisits: any[]) => {
+                                                            const latestVisit = patientVisits.length > 0 ? patientVisits[0] : null
+
+                                                            // Generate preview for new visits
+                                                            let previewOpdNo = ''
+                                                            if (!latestVisit?.opdNo) {
+                                                                previewOpdNo = await generateOpdNoPreview(id)
+                                                                setGeneratedOpdNo(previewOpdNo)
+                                                            }
+
+                                                            setForm((prev: any) => ({
+                                                                ...prev,
+                                                                patientId: String(found.id),
+                                                                opdNo: latestVisit?.opdNo || previewOpdNo,
+                                                                dob: formatDateForInput(found.dob),
+                                                                age: found.age ?? '',
+                                                                address: found.address || '',
+                                                                gender: found.gender || '',
+                                                                phone: found.phone || '',
+                                                                nextVisitDate,
+                                                                nextVisitTime,
+                                                                occupation: found.occupation || '',
+                                                                pendingPaymentCents: found.pendingPaymentCents ?? '',
+                                                                height: found.height ?? '',
+                                                                weight: found.weight ?? '',
+                                                                imageUrl: found.imageUrl || ''
+                                                            }))
+                                                        })
+                                                        .catch(() => {
+                                                            setForm((prev: any) => ({
+                                                                ...prev,
+                                                                patientId: String(found.id),
+                                                                opdNo: '',
+                                                                dob: formatDateForInput(found.dob),
+                                                                age: found.age ?? '',
+                                                                address: found.address || '',
+                                                                gender: found.gender || '',
+                                                                phone: found.phone || '',
+                                                                nextVisitDate,
+                                                                nextVisitTime,
+                                                                occupation: found.occupation || '',
+                                                                pendingPaymentCents: found.pendingPaymentCents ?? '',
+                                                                height: found.height ?? '',
+                                                                weight: found.weight ?? '',
+                                                                imageUrl: found.imageUrl || ''
+                                                            }))
+                                                        })
+                                                }}
+                                                options={[
+                                                    { value: '', label: 'Select patient' },
+                                                    ...patients.map(p => ({
+                                                        value: String(p.id),
+                                                        label: `${p.firstName} ${p.lastName}${p.phone ? ' · ' + p.phone : ''}`
+                                                    }))
+                                                ]}
+                                                placeholder="Select patient"
+                                                onOpenChange={setIsPatientSelectOpen}
+                                            />
+                                        </div>
+                                        {fieldErrors.patientId && (
+                                            <p className="text-red-600 text-sm mt-1">{fieldErrors.patientId}</p>
+                                        )}
                                     </div>
-                                    {fieldErrors.patientId && (
-                                        <p className="text-red-600 text-sm mt-1">{fieldErrors.patientId}</p>
-                                    )}
-                                </div>
 
-                                {/* Patient Image Display - Improved Layout */}
-                                {form.patientId && (
-                                    <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-gray-800 dark:to-gray-700 rounded-lg p-6 my-4">
-                                        <div className="flex items-center gap-6">
-                                            {/* Patient Image */}
-                                            <div className="flex-shrink-0">
-                                                <img
-                                                    src={patients.find(p => String(p.id) === String(form.patientId))?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''}
-                                                    alt="Patient"
-                                                    className="w-24 h-24 object-cover rounded-lg border-3 border-white shadow-lg ring-2 ring-emerald-200"
-                                                />
-                                            </div>
-                                            {/* Patient Info */}
-                                            <div className="flex-grow">
-                                                <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-1">
-                                                    {patients.find(p => String(p.id) === String(form.patientId))?.firstName} {patients.find(p => String(p.id) === String(form.patientId))?.lastName}
-                                                </h3>
-                                                <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-300">
-                                                    {form.opdNo && (
-                                                        <span className="flex items-center gap-1">
-                                                            <span className="font-semibold">OPD:</span> <span className="text-green-600 dark:text-green-400">{form.opdNo}</span>
-                                                        </span>
-                                                    )}
-                                                    {form.date && (
-                                                        <span className="flex items-center gap-1">
-                                                            <span className="font-semibold">Visit Date:</span> {new Date(form.date).toLocaleDateString()}
-                                                        </span>
-                                                    )}
-                                                    {form.age && (
-                                                        <span className="flex items-center gap-1">
-                                                            <span className="font-semibold">Age:</span> {form.age}
-                                                        </span>
-                                                    )}
-                                                    {form.gender && (
-                                                        <span className="flex items-center gap-1">
-                                                            <span className="font-semibold">Gender:</span> {form.gender}
-                                                        </span>
-                                                    )}
+                                    {/* Patient Image Display - Improved Layout */}
+                                    {form.patientId && (
+                                        <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-gray-800 dark:to-gray-700 rounded-lg p-6 my-4">
+                                            <div className="flex items-center gap-6">
+                                                {/* Patient Image */}
+                                                <div className="flex-shrink-0">
+                                                    <img
+                                                        src={patients.find(p => String(p.id) === String(form.patientId))?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''}
+                                                        alt="Patient"
+                                                        className="w-24 h-24 object-cover rounded-lg border-3 border-white shadow-lg ring-2 ring-emerald-200"
+                                                    />
+                                                </div>
+                                                {/* Patient Info */}
+                                                <div className="flex-grow">
+                                                    <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-1">
+                                                        {patients.find(p => String(p.id) === String(form.patientId))?.firstName} {patients.find(p => String(p.id) === String(form.patientId))?.lastName}
+                                                    </h3>
+                                                    <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-300">
+                                                        {form.opdNo && (
+                                                            <span className="flex items-center gap-1">
+                                                                <span className="font-semibold">OPD:</span> <span className="text-green-600 dark:text-green-400">{form.opdNo}</span>
+                                                            </span>
+                                                        )}
+                                                        {form.date && (
+                                                            <span className="flex items-center gap-1">
+                                                                <span className="font-semibold">Visit Date:</span> {new Date(form.date).toLocaleDateString()}
+                                                            </span>
+                                                        )}
+                                                        {form.age && (
+                                                            <span className="flex items-center gap-1">
+                                                                <span className="font-semibold">Age:</span> {form.age}
+                                                            </span>
+                                                        )}
+                                                        {form.gender && (
+                                                            <span className="flex items-center gap-1">
+                                                                <span className="font-semibold">Gender:</span> {form.gender}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">OPD Number</label>
-                                        <div className="p-2 text-base font-medium text-gray-900 dark:text-gray-100">
-                                            {form.opdNo || <span className="text-muted italic">Select a patient first</span>}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">Current Visit Date <span className="text-red-600">*</span></label>
-                                        <DateInput type="date" placeholder="Select visit date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full p-2 border rounded" required />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">Date of Birth</label>
-                                        <DateInput type="date" placeholder="Select date of birth" value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} className="w-full p-2 border rounded" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">Age</label>
-                                        <input type="number" placeholder="35" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} className="w-full p-2 border rounded" />
-                                    </div>
-                                    <div className={isGenderOpen ? 'relative z-[10000]' : 'relative z-0'}>
-                                        <label className="block text-sm font-medium mb-1.5">Gender</label>
-                                        <CustomSelect
-                                            value={form.gender}
-                                            onChange={(val) => setForm({ ...form, gender: val })}
-                                            options={genderOptions}
-                                            placeholder="Select gender"
-                                            allowCustom={true}
-                                            onOpenChange={setIsGenderOpen}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">Phone</label>
-                                        <input placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">Occupation</label>
-                                        <input placeholder="Engineer" value={form.occupation} onChange={e => setForm({ ...form, occupation: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">Father/Husband/Guardian Name</label>
-                                        <input placeholder="Guardian name" value={form.fatherHusbandGuardianName} onChange={e => setForm({ ...form, fatherHusbandGuardianName: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">Address</label>
-                                        <input placeholder="123 Main St, City" value={form.address} onChange={e => setForm({ ...form, address: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">Height</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {/* CM Input */}
-                                            <div className="flex items-center rounded overflow-hidden bg-white dark:bg-gray-800 w-32">
-                                                <input 
-                                                    type="number" 
-                                                    placeholder="175" 
-                                                    value={form.height} 
-                                                    onChange={e => setForm({ ...form, height: e.target.value })} 
-                                                    className="w-20 p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                                />
-                                                <span className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 border-y border-r rounded-r">cm</span>
-                                            </div>
-                                            
-                                            {/* Feet/Inches Input */}
-                                            <div className="flex items-center gap-1 rounded overflow-hidden bg-white dark:bg-gray-800 w-40">
-                                                <input 
-                                                    type="number" 
-                                                    placeholder="5" 
-                                                    value={form.heightFeet} 
-                                                    onChange={e => setForm({ ...form, heightFeet: e.target.value })} 
-                                                    className="w-12 p-2 border rounded-l text-center focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                                    title="Feet"
-                                                />
-                                                <span className="px-1 text-sm font-medium text-gray-600 dark:text-gray-400">ft</span>
-                                                <div className="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
-                                                <input 
-                                                    type="number" 
-                                                    placeholder="9" 
-                                                    value={form.heightInches} 
-                                                    onChange={e => setForm({ ...form, heightInches: e.target.value })} 
-                                                    className="w-12 p-2 border text-center focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                                    title="Inches"
-                                                />
-                                                <span className="px-2 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 border-y border-r rounded-r">in</span>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">OPD Number</label>
+                                            <div className="p-2 text-base font-medium text-gray-900 dark:text-gray-100">
+                                                {form.opdNo || <span className="text-muted italic">Select a patient first</span>}
                                             </div>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">
-                                            Weight (kg)
-                                            {previousWeight && (
-                                                <span className="ml-2 text-xs text-gray-500 font-normal">
-                                                    (Previous: {previousWeight} kg)
-                                                </span>
-                                            )}
-                                        </label>
-                                        <input type="number" placeholder="70" value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} className="w-full p-2 border rounded" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1.5">Pending Payment (₹)</label>
-                                        <input type="number" step="0.01" placeholder="500.00" value={form.pendingPaymentCents} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} className="w-full p-2 border rounded" />
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">Current Visit Date <span className="text-red-600">*</span></label>
+                                            <DateInput type="date" placeholder="Select visit date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full p-2 border rounded" required />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">Date of Birth</label>
+                                            <DateInput type="date" placeholder="Select date of birth" value={form.dob} onChange={e => setForm({ ...form, dob: e.target.value })} className="w-full p-2 border rounded" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">Age</label>
+                                            <input type="number" placeholder="35" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} className="w-full p-2 border rounded" />
+                                        </div>
+                                        <div className={isGenderOpen ? 'relative z-[10000]' : 'relative z-0'}>
+                                            <label className="block text-sm font-medium mb-1.5">Gender</label>
+                                            <CustomSelect
+                                                value={form.gender}
+                                                onChange={(val) => setForm({ ...form, gender: val })}
+                                                options={genderOptions}
+                                                placeholder="Select gender"
+                                                allowCustom={true}
+                                                onOpenChange={setIsGenderOpen}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">Phone</label>
+                                            <input placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">Occupation</label>
+                                            <input placeholder="Engineer" value={form.occupation} onChange={e => setForm({ ...form, occupation: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">Father/Husband/Guardian Name</label>
+                                            <input placeholder="Guardian name" value={form.fatherHusbandGuardianName} onChange={e => setForm({ ...form, fatherHusbandGuardianName: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">Address</label>
+                                            <input placeholder="123 Main St, City" value={form.address} onChange={e => setForm({ ...form, address: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">Height</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {/* CM Input */}
+                                                <div className="flex items-center rounded overflow-hidden bg-white dark:bg-gray-800 w-32">
+                                                    <input
+                                                        type="number"
+                                                        placeholder="175"
+                                                        value={form.height}
+                                                        onChange={e => setForm({ ...form, height: e.target.value })}
+                                                        className="w-20 p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                    <span className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 border-y border-r rounded-r">cm</span>
+                                                </div>
+
+                                                {/* Feet/Inches Input */}
+                                                <div className="flex items-center gap-1 rounded overflow-hidden bg-white dark:bg-gray-800 w-40">
+                                                    <input
+                                                        type="number"
+                                                        placeholder="5"
+                                                        value={form.heightFeet}
+                                                        onChange={e => setForm({ ...form, heightFeet: e.target.value })}
+                                                        className="w-12 p-2 border rounded-l text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        title="Feet"
+                                                    />
+                                                    <span className="px-1 text-sm font-medium text-gray-600 dark:text-gray-400">ft</span>
+                                                    <div className="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="9"
+                                                        value={form.heightInches}
+                                                        onChange={e => setForm({ ...form, heightInches: e.target.value })}
+                                                        className="w-12 p-2 border text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        title="Inches"
+                                                    />
+                                                    <span className="px-2 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 border-y border-r rounded-r">in</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">
+                                                Weight (kg)
+                                                {previousWeight && (
+                                                    <span className="ml-2 text-xs text-gray-500 font-normal">
+                                                        (Previous: {previousWeight} kg)
+                                                    </span>
+                                                )}
+                                            </label>
+                                            <input type="number" placeholder="70" value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} className="w-full p-2 border rounded" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-1.5">Pending Payment (₹)</label>
+                                            <input type="number" step="0.01" placeholder="500.00" value={form.pendingPaymentCents} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} className="w-full p-2 border rounded" />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
                             </div>
                         </div>
 
@@ -1878,7 +1849,7 @@ export default function PrescriptionsPage() {
                         >
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
                             <h3 className="relative text-lg font-semibold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Clinical Information</h3>
-                            
+
                             {/* Temperament and Pulse Diagnoses in one line */}
                             <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
                                 <div>
@@ -1942,24 +1913,24 @@ export default function PrescriptionsPage() {
                                 {/* History / Reports - Split into two columns */}
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">History</label>
-                                    <textarea 
-                                        placeholder="Previous medical history" 
-                                        value={form.historyReports} 
-                                        onChange={e => setForm({ ...form, historyReports: e.target.value.toUpperCase() })} 
+                                    <textarea
+                                        placeholder="Previous medical history"
+                                        value={form.historyReports}
+                                        onChange={e => setForm({ ...form, historyReports: e.target.value.toUpperCase() })}
                                         rows={4}
                                         className="w-full p-2 border rounded resize-none mb-2"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Reports</label>
-                                    <textarea 
-                                        placeholder="Lab reports, test results" 
-                                        value={form.reports} 
-                                        onChange={e => setForm({ ...form, reports: e.target.value.toUpperCase() })} 
+                                    <textarea
+                                        placeholder="Lab reports, test results"
+                                        value={form.reports}
+                                        onChange={e => setForm({ ...form, reports: e.target.value.toUpperCase() })}
                                         rows={4}
                                         className="w-full p-2 border rounded resize-none mb-2"
                                     />
-                                    
+
                                     {/* Minimalistic Reports Attachments with Camera */}
                                     <div className="space-y-2">
                                         {/* File Upload & Camera Controls */}
@@ -1980,9 +1951,15 @@ export default function PrescriptionsPage() {
                                             </label>
                                             <button
                                                 type="button"
-                                                onClick={() => setShowCamera(true)}
-                                                disabled={uploadingReports}
-                                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors text-xs"
+                                                onClick={() => {
+                                                    if (!form.patientId) {
+                                                        showError('Please select a patient first')
+                                                        return
+                                                    }
+                                                    setShowCamera(true)
+                                                }}
+                                                disabled={uploadingReports || reportsAttachments.length >= 10}
+                                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -2154,12 +2131,12 @@ export default function PrescriptionsPage() {
                                                 .filter(t => !(t.provDiagnosis === 'IMPORTED' && t.planNumber === '00')) // Hide imported treatment plan
                                                 .map(t => {
                                                     // Count how many plans exist for this diagnosis
-                                                    const sameDignosisPlans = treatments.filter(plan => 
+                                                    const sameDignosisPlans = treatments.filter(plan =>
                                                         plan.provDiagnosis === t.provDiagnosis && !plan.deleted
                                                     )
                                                     // If only one plan exists for this diagnosis, show as Plan 1
                                                     const displayPlanNumber = sameDignosisPlans.length === 1 ? '1' : t.planNumber
-                                                    
+
                                                     return {
                                                         value: String(t.id),
                                                         label: `${displayPlanNumber ? `Plan ${displayPlanNumber} - ` : ''}${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`} (${t.treatmentProducts?.length || 0} medicines)`
@@ -2206,89 +2183,89 @@ export default function PrescriptionsPage() {
                                     No medicines in inventory. Add products on the <a href="/products" className="text-brand underline font-medium">Inventory page</a>.
                                 </div>
                             ) : (
-                <div>
-                    <label className="block text-sm font-medium mb-2">Or Add Individual Medicine</label>
-                    <div className="mb-3">
-                        <CustomSelect
-                            value={selectedProductId}
-                            onChange={(value) => {
-                                setSelectedProductId(value)
-                                if (value && value !== '') {
-                                    // Check if already in selected medicines
-                                    if (!selectedMedicines.includes(value)) {
-                                        setSelectedMedicines([...selectedMedicines, value])
-                                    }
-                                    // Clear selection after adding
-                                    setSelectedProductId('')
-                                }
-                            }}
-                            options={[
-                                { value: '', label: '-- select medicine from inventory --' },
-                                ...products.map(p => {
-                                    const rl = (p as any).reorderLevel ?? 0
-                                    const low = p.quantity <= rl
-                                    return {
-                                        value: String(p.id),
-                                        label: `${p.name} · Stock: ${p.quantity}${rl ? ' · Reorder: ' + rl : ''}${low ? ' · ⚠️ LOW' : ''}`
-                                    }
-                                })
-                            ]}
-                            placeholder="-- select medicine from inventory --"
-                            className="flex-1"
-                            onOpenChange={setIsMedicineSelectOpen}
-                        />
-                    </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Or Add Individual Medicine</label>
+                                    <div className="mb-3">
+                                        <CustomSelect
+                                            value={selectedProductId}
+                                            onChange={(value) => {
+                                                setSelectedProductId(value)
+                                                if (value && value !== '') {
+                                                    // Check if already in selected medicines
+                                                    if (!selectedMedicines.includes(value)) {
+                                                        setSelectedMedicines([...selectedMedicines, value])
+                                                    }
+                                                    // Clear selection after adding
+                                                    setSelectedProductId('')
+                                                }
+                                            }}
+                                            options={[
+                                                { value: '', label: '-- select medicine from inventory --' },
+                                                ...products.map(p => {
+                                                    const rl = (p as any).reorderLevel ?? 0
+                                                    const low = p.quantity <= rl
+                                                    return {
+                                                        value: String(p.id),
+                                                        label: `${p.name} · Stock: ${p.quantity}${rl ? ' · Reorder: ' + rl : ''}${low ? ' · ⚠️ LOW' : ''}`
+                                                    }
+                                                })
+                                            ]}
+                                            placeholder="-- select medicine from inventory --"
+                                            className="flex-1"
+                                            onOpenChange={setIsMedicineSelectOpen}
+                                        />
+                                    </div>
 
-                    {/* Selected Medicines List - Always visible */}
-                    <div className="bg-emerald-50/60 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 mb-3 backdrop-blur-sm">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                                Selected Medicines ({selectedMedicines.length})
-                            </span>
-                            {selectedMedicines.length > 0 && (
-                                <div className="flex gap-2">
-                                    <button 
-                                        type="button" 
-                                        onClick={removeAllSelectedMedicines}
-                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg transition-colors shadow-sm"
-                                    >
-                                        Remove All
-                                    </button>
-                                    <button 
-                                        type="button" 
-                                        onClick={addAllSelectedMedicinesToPrescription}
-                                        className="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 rounded-lg transition-all shadow-sm hover:shadow-md"
-                                    >
-                                        Add All to Prescription
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                        {selectedMedicines.length === 0 ? (
-                            <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
-                                No medicines selected yet. Select medicines from the dropdown above.
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {selectedMedicines.map((productId) => {
-                                    const product = products.find(p => String(p.id) === productId)
-                                    if (!product) return null
-                                    return (
-                                        <div key={productId} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded p-2 text-sm">
-                                            <span className="font-medium">{product.name}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => removeFromSelectedMedicines(productId)}
-                                                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-semibold px-2"
-                                            >
-                                                Remove
-                                            </button>
+                                    {/* Selected Medicines List - Always visible */}
+                                    <div className="bg-emerald-50/60 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 mb-3 backdrop-blur-sm">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                                                Selected Medicines ({selectedMedicines.length})
+                                            </span>
+                                            {selectedMedicines.length > 0 && (
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={removeAllSelectedMedicines}
+                                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg transition-colors shadow-sm"
+                                                    >
+                                                        Remove All
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={addAllSelectedMedicinesToPrescription}
+                                                        className="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 rounded-lg transition-all shadow-sm hover:shadow-md"
+                                                    >
+                                                        Add All to Prescription
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
-                                    )
-                                })}
-                            </div>
-                        )}
-                    </div>
+                                        {selectedMedicines.length === 0 ? (
+                                            <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
+                                                No medicines selected yet. Select medicines from the dropdown above.
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {selectedMedicines.map((productId) => {
+                                                    const product = products.find(p => String(p.id) === productId)
+                                                    if (!product) return null
+                                                    return (
+                                                        <div key={productId} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded p-2 text-sm">
+                                                            <span className="font-medium">{product.name}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeFromSelectedMedicines(productId)}
+                                                                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-semibold px-2"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -2337,446 +2314,264 @@ export default function PrescriptionsPage() {
                                     {prescriptions.map((pr, i) => {
                                         const prescriptionTreatment = pr.treatmentId && Array.isArray(treatments) ? treatments.find(t => String(t.id) === String(pr.treatmentId)) : null
                                         const isDeleted = prescriptionTreatment?.deleted === true
-                                        
+
                                         return (
-                                        <div key={i} className={`relative group transition-all duration-300 ${isDeleted ? 'border border-red-400/50 dark:border-red-600/50 bg-red-50/50 dark:bg-red-950/30 rounded-2xl' : 'border border-emerald-200/40 dark:border-emerald-700/40 bg-gradient-to-br from-white via-emerald-50/20 to-transparent dark:from-gray-900/80 dark:via-emerald-950/10 dark:to-gray-900/80 rounded-2xl hover:border-emerald-400/60 dark:hover:border-emerald-600/60 hover:shadow-xl hover:shadow-emerald-500/10'}`}>
-                                            {/* Futuristic glow effect on hover */}
-                                            {!isDeleted && (
-                                                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-400/0 via-green-400/0 to-emerald-500/0 group-hover:from-emerald-400/5 group-hover:via-green-400/5 group-hover:to-emerald-500/5 transition-all duration-500 pointer-events-none"></div>
-                                            )}
-                                            
-                                            {isDeleted && (
-                                                <div className="mb-3 p-2.5 bg-red-100/80 dark:bg-red-900/50 border border-red-300/50 dark:border-red-700/50 rounded-xl text-sm backdrop-blur-sm">
-                                                    <span className="text-red-700 dark:text-red-300 font-semibold">⚠ DELETED TREATMENT PLAN - Read Only</span>
-                                                </div>
-                                            )}
-                                            <div className="relative p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                                                {/* Remove Treatment Plan field from individual rows - it's selected globally above */}
-                                                
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1.5 text-gray-600 dark:text-gray-400">
-                                                        Medicine (from inventory)
-                                                    </label>
-                                                    {pr.productId ? (
-                                                        <div className="p-2 text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2 flex-wrap">
-                                                            {(() => {
-                                                                const product = products.find(p => String(p.id) === String(pr.productId))
-                                                                return (
-                                                                    <>
-                                                                        <span className="px-2 py-1 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-xs font-bold">{i + 1}</span>
-                                                                        <span>{product ? product.name : `Product #${pr.productId}`}</span>
-                                                                        {product?.category && (() => {
-                                                                            const categoryName = typeof product.category === 'string' ? product.category : product.category.name
-                                                                            if (product.unit) {
-                                                                                const unitParts = String(product.unit).trim().split(/\s+/)
-                                                                                const unitType = unitParts.length >= 2 ? unitParts[1] : ''
-                                                                                return (
-                                                                                    <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full text-xs font-semibold">
-                                                                                        {categoryName} {unitType ? `(${unitType})` : ''}
-                                                                                    </span>
-                                                                                )
-                                                                            }
-                                                                            return (
-                                                                                <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full text-xs font-semibold">
-                                                                                    {categoryName}
-                                                                                </span>
-                                                                            )
-                                                                        })()}
-                                                                        {product && <span className="text-gray-500">· Stock: {product.quantity}</span>}
-                                                                    </>
-                                                                )
-                                                            })()}
-                                                        </div>
-                                                    ) : (
-                                                    <CustomSelect
-                                                        value={pr.productId}
-                                                        onChange={(val) => !isDeleted && !pr.productId && updatePrescription(i, { productId: val })}
-                                                        options={[
-                                                            { value: '', label: '-- select medicine --' },
-                                                            ...products.map(p => ({
-                                                                value: String(p.id),
-                                                                label: `${p.name} · Stock: ${p.quantity}${p.reorderLevel ? ' · Reorder: ' + p.reorderLevel : ''}`
-                                                            }))
-                                                        ]}
-                                                        placeholder="-- select medicine --"
-                                                        className={`${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}
-                                                    />
-                                                    )}
-                                                </div>
+                                            <div key={i} className={`relative group transition-all duration-300 ${isDeleted ? 'border border-red-400/50 dark:border-red-600/50 bg-red-50/50 dark:bg-red-950/30 rounded-2xl' : 'border border-emerald-200/40 dark:border-emerald-700/40 bg-gradient-to-br from-white via-emerald-50/20 to-transparent dark:from-gray-900/80 dark:via-emerald-950/10 dark:to-gray-900/80 rounded-2xl hover:border-emerald-400/60 dark:hover:border-emerald-600/60 hover:shadow-xl hover:shadow-emerald-500/10'}`}>
+                                                {/* Futuristic glow effect on hover */}
+                                                {!isDeleted && (
+                                                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-400/0 via-green-400/0 to-emerald-500/0 group-hover:from-emerald-400/5 group-hover:via-green-400/5 group-hover:to-emerald-500/5 transition-all duration-500 pointer-events-none"></div>
+                                                )}
 
-                                                {/* SPY & Addition Components - Organized Grid Layout */}
-                                                <div className="sm:col-span-2 lg:col-span-3">
-                                                    <div className={`space-y-3 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
-                                                        {/* Spagyric Section */}
-                                                        <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
-                                                            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Spagyric Components</h4>
-                                                            {/* Row 1: SPY 1, 2, 3 */}
-                                                            <div className="grid grid-cols-3 gap-2 mb-2">
-                                                                <div>
-                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 1</label>
-                                                                    <div className="flex gap-1">
-                                                                        <CustomSelect
-                                                                            value={parseComponent(pr.spy1 || '').name}
-                                                                            onChange={(val) => {
-                                                                                const parsed = parseComponent(pr.spy1 || '')
-                                                                                updatePrescription(i, { spy1: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                            }}
-                                                                            options={components}
-                                                                            placeholder="Name"
-                                                                            allowCustom={true}
-                                                                            className="flex-1 text-xs h-8"
-                                                                        />
-                                                                        <input
-                                                                            type="text"
-                                                                            value={parseComponent(pr.spy1 || '').volume}
-                                                                            onChange={(e) => {
-                                                                                const parsed = parseComponent(pr.spy1 || '')
-                                                                                updatePrescription(i, { spy1: formatComponent(parsed.name, e.target.value) })
-                                                                            }}
-                                                                            placeholder="Vol"
-                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
-                                                                        />
-                                                                    </div>
+                                                {isDeleted && (
+                                                    <div className="mb-3 p-2.5 bg-red-100/80 dark:bg-red-900/50 border border-red-300/50 dark:border-red-700/50 rounded-xl text-sm backdrop-blur-sm">
+                                                        <span className="text-red-700 dark:text-red-300 font-semibold">⚠ DELETED TREATMENT PLAN - Read Only</span>
+                                                    </div>
+                                                )}
+                                                <div className="relative p-4">
+                                                    {/* Row 1: Medicine Name (Left) + 3x3 SPY Grid (Right) */}
+                                                    <div className="flex gap-4 mb-3">
+                                                        {/* LEFT: Medicine Info */}
+                                                        <div className="w-64 flex-shrink-0">
+                                                            <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Medicine</label>
+                                                            {pr.productId ? (
+                                                                <div className="p-3 text-xs text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg border border-gray-200 dark:border-gray-700">
+                                                                    {(() => {
+                                                                        const product = products.find(p => String(p.id) === String(pr.productId))
+                                                                        return (
+                                                                            <div className="space-y-2.5">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="px-2 py-1 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-[10px] font-bold">{i + 1}</span>
+                                                                                    <span className="font-semibold leading-tight">{product ? product.name : `Product #${pr.productId}`}</span>
+                                                                                </div>
+                                                                                {product?.category && (
+                                                                                    <div className="space-y-1.5">
+                                                                                        <div className="flex items-center gap-1 text-[10px]">
+                                                                                            {(() => {
+                                                                                                const categoryName = typeof product.category === 'string' ? product.category : product.category.name
+                                                                                                if (product.unit) {
+                                                                                                    const unitParts = String(product.unit).trim().split(/\s+/)
+                                                                                                    const unitType = unitParts.length >= 2 ? unitParts[1] : ''
+                                                                                                    return (
+                                                                                                        <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full">
+                                                                                                            {categoryName} {unitType ? `(${unitType})` : ''}
+                                                                                                        </span>
+                                                                                                    )
+                                                                                                }
+                                                                                                return (
+                                                                                                    <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full">
+                                                                                                        {categoryName}
+                                                                                                    </span>
+                                                                                                )
+                                                                                            })()}
+                                                                                        </div>
+                                                                                        {product && <div className="text-[10px] text-gray-500">Stock: {product.quantity}</div>}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        )
+                                                                    })()}
                                                                 </div>
-                                                                <div>
-                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 2</label>
-                                                                    <div className="flex gap-1">
-                                                                        <CustomSelect
-                                                                            value={parseComponent(pr.spy2 || '').name}
-                                                                            onChange={(val) => {
-                                                                                const parsed = parseComponent(pr.spy2 || '')
-                                                                                updatePrescription(i, { spy2: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                            }}
-                                                                            options={components}
-                                                                            placeholder="Name"
-                                                                            allowCustom={true}
-                                                                            className="flex-1 text-xs h-8"
-                                                                        />
-                                                                        <input
-                                                                            type="text"
-                                                                            value={parseComponent(pr.spy2 || '').volume}
-                                                                            onChange={(e) => {
-                                                                                const parsed = parseComponent(pr.spy2 || '')
-                                                                                updatePrescription(i, { spy2: formatComponent(parsed.name, e.target.value) })
-                                                                            }}
-                                                                            placeholder="Vol"
-                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 3</label>
-                                                                    <div className="flex gap-1">
-                                                                        <CustomSelect
-                                                                            value={parseComponent(pr.spy3 || '').name}
-                                                                            onChange={(val) => {
-                                                                                const parsed = parseComponent(pr.spy3 || '')
-                                                                                updatePrescription(i, { spy3: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                            }}
-                                                                            options={components}
-                                                                            placeholder="Name"
-                                                                            allowCustom={true}
-                                                                            className="flex-1 text-xs h-8"
-                                                                        />
-                                                                        <input
-                                                                            type="text"
-                                                                            value={parseComponent(pr.spy3 || '').volume}
-                                                                            onChange={(e) => {
-                                                                                const parsed = parseComponent(pr.spy3 || '')
-                                                                                updatePrescription(i, { spy3: formatComponent(parsed.name, e.target.value) })
-                                                                            }}
-                                                                            placeholder="Vol"
-                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            {/* Row 2: SPY 4, 5, 6 */}
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                <div>
-                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 4</label>
-                                                                    <div className="flex gap-1">
-                                                                        <CustomSelect
-                                                                            value={parseComponent(pr.spy4 || '').name}
-                                                                            onChange={(val) => {
-                                                                                const parsed = parseComponent(pr.spy4 || '')
-                                                                                updatePrescription(i, { spy4: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                            }}
-                                                                            options={components}
-                                                                            placeholder="Name"
-                                                                            allowCustom={true}
-                                                                            className="flex-1 text-xs h-8"
-                                                                        />
-                                                                        <input
-                                                                            type="text"
-                                                                            value={parseComponent(pr.spy4 || '').volume}
-                                                                            onChange={(e) => {
-                                                                                const parsed = parseComponent(pr.spy4 || '')
-                                                                                updatePrescription(i, { spy4: formatComponent(parsed.name, e.target.value) })
-                                                                            }}
-                                                                            placeholder="Vol"
-                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 5</label>
-                                                                    <div className="flex gap-1">
-                                                                        <CustomSelect
-                                                                            value={parseComponent(pr.spy5 || '').name}
-                                                                            onChange={(val) => {
-                                                                                const parsed = parseComponent(pr.spy5 || '')
-                                                                                updatePrescription(i, { spy5: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                            }}
-                                                                            options={components}
-                                                                            placeholder="Name"
-                                                                            allowCustom={true}
-                                                                            className="flex-1 text-xs h-8"
-                                                                        />
-                                                                        <input
-                                                                            type="text"
-                                                                            value={parseComponent(pr.spy5 || '').volume}
-                                                                            onChange={(e) => {
-                                                                                const parsed = parseComponent(pr.spy5 || '')
-                                                                                updatePrescription(i, { spy5: formatComponent(parsed.name, e.target.value) })
-                                                                            }}
-                                                                            placeholder="Vol"
-                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">SPY 6</label>
-                                                                    <div className="flex gap-1">
-                                                                        <CustomSelect
-                                                                            value={parseComponent(pr.spy6 || '').name}
-                                                                            onChange={(val) => {
-                                                                                const parsed = parseComponent(pr.spy6 || '')
-                                                                                updatePrescription(i, { spy6: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                            }}
-                                                                            options={components}
-                                                                            placeholder="Name"
-                                                                            allowCustom={true}
-                                                                            className="flex-1 text-xs h-8"
-                                                                        />
-                                                                        <input
-                                                                            type="text"
-                                                                            value={parseComponent(pr.spy6 || '').volume}
-                                                                            onChange={(e) => {
-                                                                                const parsed = parseComponent(pr.spy6 || '')
-                                                                                updatePrescription(i, { spy6: formatComponent(parsed.name, e.target.value) })
-                                                                            }}
-                                                                            placeholder="Vol"
-                                                                            className="w-12 p-1 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Bottle Size Row */}
-                                                        <div className="flex gap-2">
-                                                            <div className="flex-1">
-                                                                <label className="block text-[11px] font-semibold text-purple-600 dark:text-purple-400 mb-1">SPY Bottle Size</label>
+                                                            ) : (
                                                                 <CustomSelect
-                                                                    value={pr.spyBottleSize || ''}
-                                                                    onChange={(val) => updatePrescription(i, { spyBottleSize: val })}
-                                                                    options={bottlePricing}
-                                                                    placeholder="Select Size"
-                                                                    disabled={!pr.spy4 && !pr.spy5 && !pr.spy6}
-                                                                    className="text-xs h-8"
+                                                                    value={pr.productId}
+                                                                    onChange={(val) => !isDeleted && !pr.productId && updatePrescription(i, { productId: val })}
+                                                                    options={[
+                                                                        { value: '', label: '-- select medicine --' },
+                                                                        ...products.map(p => ({
+                                                                            value: String(p.id),
+                                                                            label: `${p.name} · Stock: ${p.quantity}${p.reorderLevel ? ' · Reorder: ' + p.reorderLevel : ''}`
+                                                                        }))
+                                                                    ]}
+                                                                    placeholder="-- select --"
+                                                                    className={`text-xs h-9 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}
                                                                 />
-                                                            </div>
+                                                            )}
                                                         </div>
 
-                                                        {/* Additions Section */}
-                                                        <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
-                                                            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Additions</h4>
-                                                            <div className="grid grid-cols-4 gap-2">
+                                                        {/* RIGHT: SPY Grid + Additions */}
+                                                        <div className={`flex-1 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
+                                                            <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Spagyric Components</label>
+                                                            {/* Row 1: SPY 1-3 */}
+                                                            <div className="grid grid-cols-3 gap-3 mb-3">
+                                                                {[1, 2, 3].map(num => {
+                                                                    const spyKey = `spy${num}` as keyof typeof pr
+                                                                    const spyValue = pr[spyKey] as string || ''
+                                                                    return (
+                                                                        <div key={num} className="flex gap-1">
+                                                                            <CustomSelect
+                                                                                value={parseComponent(spyValue).name}
+                                                                                onChange={(val) => {
+                                                                                    const parsed = parseComponent(spyValue)
+                                                                                    updatePrescription(i, { [spyKey]: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                                }}
+                                                                                options={components}
+                                                                                placeholder={`SPY${num}`}
+                                                                                allowCustom={true}
+                                                                                className="flex-1 text-xs h-8"
+                                                                            />
+                                                                            <input
+                                                                                type="text"
+                                                                                value={parseComponent(spyValue).volume}
+                                                                                onChange={(e) => {
+                                                                                    const parsed = parseComponent(spyValue)
+                                                                                    updatePrescription(i, { [spyKey]: formatComponent(parsed.name, e.target.value) })
+                                                                                }}
+                                                                                placeholder="Vol"
+                                                                                className="flex-1 min-w-[64px] p-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                            />
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                            <label className="block text-xs font-semibold mb-2 mt-2 text-gray-600 dark:text-gray-400">SPY 4-6 & Bottle Size</label>
+                                                            {/* Row 2: SPY 4-6 + SPY Bottle */}
+                                                            <div className="grid grid-cols-4 gap-3 mb-3">
+                                                                {[4, 5, 6].map(num => {
+                                                                    const spyKey = `spy${num}` as keyof typeof pr
+                                                                    const spyValue = pr[spyKey] as string || ''
+                                                                    return (
+                                                                        <div key={num} className="flex gap-1">
+                                                                            <CustomSelect
+                                                                                value={parseComponent(spyValue).name}
+                                                                                onChange={(val) => {
+                                                                                    const parsed = parseComponent(spyValue)
+                                                                                    updatePrescription(i, { [spyKey]: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                                }}
+                                                                                options={components}
+                                                                                placeholder={`SPY${num}`}
+                                                                                allowCustom={true}
+                                                                                className="flex-1 text-xs h-8"
+                                                                            />
+                                                                            <input
+                                                                                type="text"
+                                                                                value={parseComponent(spyValue).volume}
+                                                                                onChange={(e) => {
+                                                                                    const parsed = parseComponent(spyValue)
+                                                                                    updatePrescription(i, { [spyKey]: formatComponent(parsed.name, e.target.value) })
+                                                                                }}
+                                                                                placeholder="Vol"
+                                                                                className="flex-1 min-w-[64px] p-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                            />
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                                {/* SPY Bottle Size */}
                                                                 <div>
-                                                                    <label className="block text-[11px] font-semibold text-blue-600 dark:text-blue-400 mb-1">Addition 1</label>
                                                                     <CustomSelect
-                                                                        value={pr.addition1 || ''}
-                                                                        onChange={(val) => updatePrescription(i, { addition1: val.toUpperCase() })}
-                                                                        options={additions}
-                                                                        placeholder="Select"
-                                                                        allowCustom={true}
-                                                                        className="text-xs h-8"
+                                                                        value={pr.spyBottleSize || ''}
+                                                                        onChange={(val) => updatePrescription(i, { spyBottleSize: val })}
+                                                                        options={bottlePricing.map(opt => ({
+                                                                            ...opt,
+                                                                            label: `${opt.label} (+${opt.price})`
+                                                                        }))}
+                                                                        placeholder="SPY Btl"
+                                                                        disabled={!pr.spy4 && !pr.spy5 && !pr.spy6}
+                                                                        className="text-xs h-8 [&_option]:text-green-600 dark:[&_option]:text-green-400"
                                                                     />
                                                                 </div>
+                                                            </div>
+                                                            <label className="block text-xs font-semibold mb-2 mt-2 text-blue-600 dark:text-blue-400">Additions & Bottle Size</label>
+                                                            {/* Row 3: Add 1-3 + Add Bottle */}
+                                                            <div className="grid grid-cols-4 gap-3">
+                                                                {[1, 2, 3].map(num => (
+                                                                    <div key={num}>
+                                                                        <CustomSelect
+                                                                            value={pr[`addition${num}` as keyof typeof pr] as string || ''}
+                                                                            onChange={(val) => updatePrescription(i, { [`addition${num}`]: val.toUpperCase() })}
+                                                                            options={additions}
+                                                                            placeholder={`Add ${num}`}
+                                                                            allowCustom={true}
+                                                                            className="text-xs h-8"
+                                                                        />
+                                                                    </div>
+                                                                ))}
+                                                                {/* Add Bottle Size */}
                                                                 <div>
-                                                                    <label className="block text-[11px] font-semibold text-blue-600 dark:text-blue-400 mb-1">Addition 2</label>
-                                                                    <CustomSelect
-                                                                        value={pr.addition2 || ''}
-                                                                        onChange={(val) => updatePrescription(i, { addition2: val.toUpperCase() })}
-                                                                        options={additions}
-                                                                        placeholder="Select"
-                                                                        allowCustom={true}
-                                                                        className="text-xs h-8"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-[11px] font-semibold text-blue-600 dark:text-blue-400 mb-1">Addition 3</label>
-                                                                    <CustomSelect
-                                                                        value={pr.addition3 || ''}
-                                                                        onChange={(val) => updatePrescription(i, { addition3: val.toUpperCase() })}
-                                                                        options={additions}
-                                                                        placeholder="Select"
-                                                                        allowCustom={true}
-                                                                        className="text-xs h-8"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-[11px] font-semibold text-purple-600 dark:text-purple-400 mb-1">Bottle Size</label>
                                                                     <CustomSelect
                                                                         value={pr.additionsBottleSize || ''}
                                                                         onChange={(val) => updatePrescription(i, { additionsBottleSize: val })}
-                                                                        options={bottlePricing}
-                                                                        placeholder="Select"
+                                                                        options={bottlePricing.map(opt => ({
+                                                                            ...opt,
+                                                                            label: `${opt.label} (+${opt.price})`
+                                                                        }))}
+                                                                        placeholder="Add Btl"
                                                                         disabled={!pr.addition1 && !pr.addition2 && !pr.addition3}
-                                                                        className="text-xs h-8"
+                                                                        className="text-xs h-8 [&_option]:text-green-600 dark:[&_option]:text-green-400"
                                                                     />
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
 
-                                                {/* Qty, Timing, and Dosage Section */}
-                                                <div className="sm:col-span-2 lg:col-span-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
-                                                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Dosage Information</h4>
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        {/* Qty Section */}
-                                                        <div>
-                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Qty (Drops)</label>
-                                                            <input 
-                                                                type="number" 
-                                                                placeholder="0" 
-                                                                value={pr.quantity || ''} 
-                                                                onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} 
-                                                                className="w-full p-1.5 border border-slate-300 dark:border-slate-600 rounded text-xs h-8 dark:bg-slate-800" 
-                                                            />
-                                                        </div>
-                                                        
-                                                        {/* Timing Section */}
-                                                        <div>
-                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Timing</label>
-                                                            <CustomSelect
-                                                                value={pr.timing || ''}
-                                                                onChange={(val) => updatePrescription(i, { timing: val })}
-                                                                options={timing}
-                                                                placeholder="Select"
-                                                                allowCustom={true}
-                                                                className="text-xs h-8"
-                                                            />
-                                                        </div>
-                                                        
-                                                        {/* Dosage - Dose */}
-                                                        <div>
-                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Dose</label>
-                                                            <CustomSelect
-                                                                value={parseDosage(pr.dosage || '').quantity}
-                                                                onChange={(val) => {
-                                                                    const parsed = parseDosage(pr.dosage || '')
-                                                                    updatePrescription(i, { dosage: formatDosage(val, parsed.timing, parsed.dilution) })
-                                                                }}
-                                                                options={doseQuantity}
-                                                                placeholder="Dose"
-                                                                allowCustom={true}
-                                                                className="text-xs h-8"
-                                                            />
-                                                        </div>
-                                                        
-                                                        {/* Dosage - Dilution */}
-                                                        <div>
-                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Dilution</label>
-                                                            <CustomSelect
-                                                                value={parseDosage(pr.dosage || '').dilution}
-                                                                onChange={(val) => {
-                                                                    const parsed = parseDosage(pr.dosage || '')
-                                                                    updatePrescription(i, { dosage: formatDosage(parsed.quantity, parsed.timing, val) })
-                                                                }}
-                                                                options={dilution}
-                                                                placeholder="Dilution"
-                                                                allowCustom={true}
-                                                                className="text-xs h-8"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                                {/* Procedure, Presentation, Administration Section */}
-                                                <div className="sm:col-span-2 lg:col-span-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
-                                                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Administration Details</h4>
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        <div>
-                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Procedure</label>
-                                                            <CustomSelect
-                                                                value={pr.procedure || ''}
-                                                                onChange={(val) => updatePrescription(i, { procedure: val.toUpperCase() })}
-                                                                options={procedure}
-                                                                placeholder="Select procedure"
-                                                                allowCustom={true}
-                                                                className="text-xs h-8"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Presentation</label>
-                                                            <CustomSelect
-                                                                value={pr.presentation || ''}
-                                                                onChange={(val) => updatePrescription(i, { presentation: val.toUpperCase() })}
-                                                                options={presentation}
-                                                                placeholder="Select presentation"
-                                                                allowCustom={true}
-                                                                className="text-xs h-8"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">Administration</label>
-                                                            <CustomSelect
-                                                                value={pr.administration || ''}
-                                                                onChange={(val) => updatePrescription(i, { administration: val.toUpperCase() })}
-                                                                options={administration}
-                                                                placeholder="Select administration"
-                                                                allowCustom={true}
-                                                                className="text-xs h-8"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                                {/* Taken Checkbox - Modern minimal design with green theme */}
-                                                <div className="col-span-full flex items-center justify-between pt-2 border-t border-emerald-200/30 dark:border-emerald-700/30 mt-2">
-                                                    <label className="flex items-center gap-2.5 cursor-pointer group/check">
-                                                        <div className="relative">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={pr.patientHasMedicine || false}
-                                                                onChange={(e) => updatePrescription(i, { patientHasMedicine: e.target.checked })}
-                                                                className="peer sr-only" 
-                                                            />
-                                                            <div className="w-5 h-5 border-2 border-emerald-300 dark:border-emerald-600 rounded-md peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-500 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-emerald-500/30">
-                                                                <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                                </svg>
+                                                    {/* Row 2: Remaining Fields in ONE LINE */}
+                                                    <div className="mt-4">
+                                                        <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Dosage & Administration Details</label>
+                                                        <div className={`flex gap-3 items-end w-full ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
+                                                            {/* Qty, Timing, Dosage */}
+                                                            <div className="flex-1 min-w-[56px]">
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Qty</label>
+                                                                <input type="number" placeholder="0" value={pr.quantity || ''} onChange={e => updatePrescription(i, { quantity: Number(e.target.value) })} className="w-full p-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-[96px]">
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Timing</label>
+                                                                <CustomSelect value={pr.timing || ''} onChange={(val) => updatePrescription(i, { timing: val })} options={timing} placeholder="Time" allowCustom={true} className="text-xs h-8" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-[80px]">
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dose</label>
+                                                                <CustomSelect value={parseDosage(pr.dosage || '').quantity} onChange={(val) => { const parsed = parseDosage(pr.dosage || ''); updatePrescription(i, { dosage: formatDosage(val, parsed.timing, parsed.dilution) }) }} options={doseQuantity} placeholder="Dose" allowCustom={true} className="text-xs h-8" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-[80px]">
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dilution</label>
+                                                                <CustomSelect value={parseDosage(pr.dosage || '').dilution} onChange={(val) => { const parsed = parseDosage(pr.dosage || ''); updatePrescription(i, { dosage: formatDosage(parsed.quantity, parsed.timing, val) }) }} options={dilution} placeholder="Dil" allowCustom={true} className="text-xs h-8" />
+                                                            </div>
+
+                                                            {/* Procedure, Presentation, Administration */}
+                                                            <div className="flex-1 min-w-[112px]">
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Procedure</label>
+                                                                <CustomSelect value={pr.procedure || ''} onChange={(val) => updatePrescription(i, { procedure: val.toUpperCase() })} options={procedure} placeholder="Proc" allowCustom={true} className="text-xs h-8" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-[112px]">
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Presentation</label>
+                                                                <CustomSelect value={pr.presentation || ''} onChange={(val) => updatePrescription(i, { presentation: val.toUpperCase() })} options={presentation} placeholder="Pres" allowCustom={true} className="text-xs h-8" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-[128px]">
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Administration</label>
+                                                                <CustomSelect value={pr.administration || ''} onChange={(val) => updatePrescription(i, { administration: val.toUpperCase() })} options={administration} placeholder="Admin" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                         </div>
-                                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover/check:text-emerald-600 dark:group-hover/check:text-emerald-400 transition-colors">Taken</span>
-                                                    </label>
-                                                    
-                                                    {/* Remove Button - Bottom right */}
-                                                    {!isDeleted && (
-                                                        <button 
-                                                            type="button" 
-                                                            onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }} 
-                                                            className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-600 border border-red-300 dark:border-red-700 rounded-lg transition-all duration-200 hover:shadow-md"
-                                                        >
-                                                            Remove
-                                                        </button>
-                                                    )}
+
+                                                        {/* Taken Checkbox & Remove Button - Original Position */}
+                                                        <div className="flex items-center justify-between pt-3 border-t border-emerald-200/30 dark:border-emerald-700/30 mt-3">
+                                                            <label className="flex items-center gap-2.5 cursor-pointer group/check">
+                                                                <div className="relative">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={pr.patientHasMedicine || false}
+                                                                        onChange={(e) => updatePrescription(i, { patientHasMedicine: e.target.checked })}
+                                                                        className="peer sr-only"
+                                                                    />
+                                                                    <div className="w-5 h-5 border-2 border-emerald-300 dark:border-emerald-600 rounded-md peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-500 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-emerald-500/30">
+                                                                        <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                                        </svg>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover/check:text-emerald-600 dark:group-hover/check:text-emerald-400 transition-colors">Taken</span>
+                                                            </label>
+
+                                                            {!isDeleted && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }}
+                                                                    className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-600 border border-red-300 dark:border-red-700 rounded-lg transition-all duration-200 hover:shadow-md"
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
                                         )
                                     })}
                                 </div>
@@ -2808,7 +2603,7 @@ export default function PrescriptionsPage() {
                                 </button>
                             </div>
                         )}
-                        
+
                         {/* Financial Information Card */}
                         <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6"
                             style={{ display: currentStep !== 6 ? 'none' : 'block' }}
@@ -2890,22 +2685,22 @@ export default function PrescriptionsPage() {
                                     You've modified the treatment plan data. Would you like to save these changes as a new treatment plan, or use them just for this prescription?
                                 </p>
                                 <div className="space-y-3">
-                                {selectedTreatmentId && (
-                                    <button
-                                        onClick={async () => {
-                                            const modal = document.querySelector('.animate-fadeIn')
-                                            if (modal) {
-                                                modal.classList.add('animate-fadeOut')
-                                                await new Promise(resolve => setTimeout(resolve, 200))
-                                            }
-                                            setShowSaveModal(false)
-                                            
-                                            try {
-                                                // Show loading modal with update message
-                                                setTreatmentModalMessage('Updating Treatment Plan and Saving Prescription...')
-                                                setCreatingTreatment(true)                                                    // Get the current treatment plan data
+                                    {selectedTreatmentId && (
+                                        <button
+                                            onClick={async () => {
+                                                const modal = document.querySelector('.animate-fadeIn')
+                                                if (modal) {
+                                                    modal.classList.add('animate-fadeOut')
+                                                    await new Promise(resolve => setTimeout(resolve, 200))
+                                                }
+                                                setShowSaveModal(false)
+
+                                                try {
+                                                    // Show loading modal with update message
+                                                    setTreatmentModalMessage('Updating Treatment Plan and Saving Prescription...')
+                                                    setCreatingTreatment(true)                                                    // Get the current treatment plan data
                                                     const currentPlan = treatments.find(t => String(t.id) === String(selectedTreatmentId))
-                                                    
+
                                                     // Update the existing treatment plan with modified data
                                                     const updateData = {
                                                         id: selectedTreatmentId,
@@ -2931,31 +2726,31 @@ export default function PrescriptionsPage() {
                                                             presentation: pr.presentation || ''
                                                         }))
                                                     }
-                                                    
+
                                                     // Update the treatment plan
                                                     const res = await fetch('/api/treatments', {
                                                         method: 'PUT',
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify(updateData)
                                                     })
-                                                    
+
                                                     if (!res.ok) {
                                                         const error = await res.json().catch(() => ({ error: 'Failed to update treatment plan' }))
                                                         setCreatingTreatment(false)
                                                         showError(error.error || 'Failed to update treatment plan')
                                                         return
                                                     }
-                                                    
+
                                                     // Refresh treatments list
                                                     const updatedTreatments = await fetch('/api/treatments').then(r => r.json())
                                                     setTreatments(updatedTreatments)
-                                                    
+
                                                     setCreatingTreatment(false)
                                                     showSuccess('Treatment plan updated successfully!')
-                                                    
+
                                                     // Continue with the prescription submission
                                                     await performSubmit()
-                                                    
+
                                                 } catch (error: any) {
                                                     console.error('Error updating treatment plan:', error)
                                                     setCreatingTreatment(false)
@@ -2987,7 +2782,7 @@ export default function PrescriptionsPage() {
                                             try {
                                                 // Show loading modal instead of toasts
                                                 setCreatingTreatment(true)
-                                                
+
                                                 // First, save/update the prescription
                                                 const payload = { ...form, prescriptions }
 
@@ -3006,14 +2801,14 @@ export default function PrescriptionsPage() {
                                                     headers: { 'Content-Type': 'application/json' },
                                                     body: JSON.stringify(payload)
                                                 })
-                                                
+
                                                 if (!visitRes.ok) {
                                                     const error = await visitRes.json().catch(() => ({ error: visitRes.statusText }))
                                                     setCreatingTreatment(false)
                                                     showError(`${isEditMode ? 'Update' : 'Save'} failed: ` + (error?.error || visitRes.statusText))
                                                     return
                                                 }
-                                                
+
                                                 const visitData = await visitRes.json()
                                                 const savedVisitId = visitData.id
                                                 setLastCreatedVisitId(savedVisitId)
@@ -3022,13 +2817,13 @@ export default function PrescriptionsPage() {
                                                 // Fetch all existing treatments to determine the next plan number
                                                 const treatmentsRes = await fetch('/api/treatments')
                                                 const allTreatments = await treatmentsRes.json()
-                                                
+
                                                 // Calculate next plan number (e.g., if we have 02, next is 03)
                                                 const planNumbers = allTreatments
                                                     .map((t: any) => t.planNumber)
                                                     .filter((pn: string) => pn && /^\d+$/.test(pn))
                                                     .map((pn: string) => parseInt(pn, 10))
-                                                
+
                                                 const maxPlanNumber = planNumbers.length > 0 ? Math.max(...planNumbers) : 0
                                                 const nextPlanNumber = String(maxPlanNumber + 1).padStart(2, '0')
 
@@ -3045,14 +2840,14 @@ export default function PrescriptionsPage() {
                                                     notes: `Created from ${isEditMode ? 'updated' : ''} visit - Patient: ${form.patientId ? patients.find(p => String(p.id) === form.patientId)?.firstName + ' ' + patients.find(p => String(p.id) === form.patientId)?.lastName : ''} - Date: ${new Date().toLocaleDateString()}`,
                                                     products: prescriptions.map(pr => ({
                                                         productId: pr.productId,
-                                                        comp1: pr.comp1 || '',
-                                                        comp2: pr.comp2 || '',
-                                                        comp3: pr.comp3 || '',
-                                                        comp4: pr.comp4 || '',
-                                                        comp5: pr.comp5 || '',
+                                                        spy1: pr.spy1 || '',
+                                                        spy2: pr.spy2 || '',
+                                                        spy3: pr.spy3 || '',
+                                                        spy4: pr.spy4 || '',
+                                                        spy5: pr.spy5 || '',
                                                         timing: pr.timing || '',
                                                         dosage: pr.dosage || '',
-                                                        additions: pr.additions || '',
+                                                        addition1: pr.addition1 || '',
                                                         procedure: pr.procedure || '',
                                                         presentation: pr.presentation || ''
                                                     }))
@@ -3225,7 +3020,7 @@ export default function PrescriptionsPage() {
                     )}
 
                     {/* Prescription Preview Card */}
-                    
+
                 </>
             )}
         </div>
@@ -3286,86 +3081,86 @@ function UserPrescriptionsContent({ user }: { user: any }) {
                         <div key={visit.id} className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                             <div className="relative">
-                            {/* Visit Header */}
-                            <div className="border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="text-lg font-semibold mb-1">
-                                            Visit - {new Date(visit.date).toLocaleDateString('en-IN', {
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric'
-                                            })}
-                                        </h3>
-                                        <p className="text-sm text-muted">OPD No: <span className="text-green-600 dark:text-green-400">{visit.opdNo}</span></p>
-                                        {visit.diagnoses && (
-                                            <p className="text-sm mt-2">
-                                                <span className="font-medium">Diagnosis:</span> {visit.diagnoses}
-                                            </p>
-                                        )}
-                                        {visit.chiefComplaint && (
-                                            <p className="text-sm mt-1">
-                                                <span className="font-medium">Chief Complaint:</span> {visit.chiefComplaint}
-                                            </p>
-                                        )}
+                                {/* Visit Header */}
+                                <div className="border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="text-lg font-semibold mb-1">
+                                                Visit - {new Date(visit.date).toLocaleDateString('en-IN', {
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                })}
+                                            </h3>
+                                            <p className="text-sm text-muted">OPD No: <span className="text-green-600 dark:text-green-400">{visit.opdNo}</span></p>
+                                            {visit.diagnoses && (
+                                                <p className="text-sm mt-2">
+                                                    <span className="font-medium">Diagnosis:</span> {visit.diagnoses}
+                                                </p>
+                                            )}
+                                            {visit.chiefComplaint && (
+                                                <p className="text-sm mt-1">
+                                                    <span className="font-medium">Chief Complaint:</span> {visit.chiefComplaint}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <Link
+                                            href={`/visits/${visit.id}`}
+                                            className="btn btn-secondary text-sm"
+                                        >
+                                            View Full Report
+                                        </Link>
                                     </div>
-                                    <Link
-                                        href={`/visits/${visit.id}`}
-                                        className="btn btn-secondary text-sm"
-                                    >
-                                        View Full Report
-                                    </Link>
                                 </div>
-                            </div>
 
-                            {/* Prescriptions List */}
-                            <h4 className="font-semibold mb-3">Prescribed Medications:</h4>
-                            <div className="space-y-3">
-                                {visit.prescriptions.map((prescription: any, idx: number) => (
-                                    <div
-                                        key={idx}
-                                        className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
-                                    >
-                                        <div className="flex items-start gap-4">
-                                            <div className="flex-shrink-0 w-10 h-10 bg-brand text-white rounded-full flex items-center justify-center font-bold">
-                                                {idx + 1}
-                                            </div>
-                                            <div className="flex-1">
-                                                <h5 className="font-semibold text-base mb-2">
-                                                    {prescription.product?.name || 'Medicine'}
-                                                </h5>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                                    {prescription.dosage && (
-                                                        <div>
-                                                            <span className="font-medium">Dosage:</span> {prescription.dosage}
-                                                        </div>
-                                                    )}
-                                                    {prescription.timing && (
-                                                        <div>
-                                                            <span className="font-medium">Timing:</span> {prescription.timing}
-                                                        </div>
-                                                    )}
-                                                    {prescription.quantity && (
-                                                        <div>
-                                                            <span className="font-medium">Quantity:</span> {prescription.quantity}
-                                                        </div>
-                                                    )}
-                                                    {prescription.administration && (
-                                                        <div>
-                                                            <span className="font-medium">Administration:</span> {prescription.administration}
+                                {/* Prescriptions List */}
+                                <h4 className="font-semibold mb-3">Prescribed Medications:</h4>
+                                <div className="space-y-3">
+                                    {visit.prescriptions.map((prescription: any, idx: number) => (
+                                        <div
+                                            key={idx}
+                                            className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                                        >
+                                            <div className="flex items-start gap-4">
+                                                <div className="flex-shrink-0 w-10 h-10 bg-brand text-white rounded-full flex items-center justify-center font-bold">
+                                                    {idx + 1}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h5 className="font-semibold text-base mb-2">
+                                                        {prescription.product?.name || 'Medicine'}
+                                                    </h5>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                                        {prescription.dosage && (
+                                                            <div>
+                                                                <span className="font-medium">Dosage:</span> {prescription.dosage}
+                                                            </div>
+                                                        )}
+                                                        {prescription.timing && (
+                                                            <div>
+                                                                <span className="font-medium">Timing:</span> {prescription.timing}
+                                                            </div>
+                                                        )}
+                                                        {prescription.quantity && (
+                                                            <div>
+                                                                <span className="font-medium">Quantity:</span> {prescription.quantity}
+                                                            </div>
+                                                        )}
+                                                        {prescription.administration && (
+                                                            <div>
+                                                                <span className="font-medium">Administration:</span> {prescription.administration}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {prescription.additions && (
+                                                        <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-sm">
+                                                            <span className="font-medium">Special Instructions:</span> {prescription.additions}
                                                         </div>
                                                     )}
                                                 </div>
-                                                {prescription.additions && (
-                                                    <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-sm">
-                                                        <span className="font-medium">Special Instructions:</span> {prescription.additions}
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     ))}

@@ -237,9 +237,11 @@ model Visit {
   payment              Float?
   balance              Float?
   helper               String?
-  createdAt            DateTime       @default(now())
+  reportsAttachments   String?           @db.Text
+  createdAt            DateTime          @default(now())
   prescriptions        Prescription[]
-  patient              Patient        @relation(fields: [patientId], references: [id])
+  patient              Patient           @relation(fields: [patientId], references: [id])
+  invoice              CustomerInvoice?
 }
 
 model Prescription {
@@ -352,6 +354,7 @@ model PurchaseOrder {
   totalAmount  Int                 @default(0)
   paidAmount   Int                 @default(0)
   notes        String?
+  billUrl      String?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
   supplier     Supplier            @relation(fields: [supplierId], references: [id])
@@ -376,6 +379,7 @@ model PurchaseOrderItem {
 model CustomerInvoice {
   id                 Int                   @id @default(autoincrement())
   invoiceNumber      String                @unique
+  visitId            Int?                  @unique
   patientId          Int?
   customerName       String
   customerEmail      String?
@@ -396,6 +400,7 @@ model CustomerInvoice {
   termsAndConditions String?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
+  visit              Visit?                @relation(fields: [visitId], references: [id])
   patient            Patient?              @relation(fields: [patientId], references: [id])
   items              CustomerInvoiceItem[]
   payments           Payment[]

@@ -18,9 +18,9 @@ interface TreatmentRow {
     administration?: string
     notes?: string
     productName: string
-    comp1?: string
-    comp2?: string
-    comp3?: string
+    spy1?: string
+    spy2?: string
+    spy3?: string
     timing?: string
     dosage?: string
     additions?: string
@@ -122,9 +122,9 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
             administration: row.administration || undefined,
             notes: row.notes || undefined,
             productName: row.productName || row.ProductName || undefined,
-            comp1: row.comp1 || undefined,
-            comp2: row.comp2 || undefined,
-            comp3: row.comp3 || undefined,
+            spy1: row.spy1 || undefined,
+            spy2: row.spy2 || undefined,
+            spy3: row.spy3 || undefined,
             timing: row.timing || undefined,
             dosage: row.dosage || undefined,
             additions: row.additions || undefined,
@@ -205,9 +205,9 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                         if (!productMap.has(productKey)) {
                             productMap.set(productKey, {
                                 productName: row.productName!,
-                                comp1: row.comp1,
-                                comp2: row.comp2,
-                                comp3: row.comp3,
+                                spy1: row.spy1,
+                                spy2: row.spy2,
+                                spy3: row.spy3,
                                 timing: row.timing,
                                 dosage: row.dosage,
                                 additions: row.additions,
@@ -454,7 +454,7 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                                     <li className="ml-4">• <strong>quantity</strong> - Amount to prescribe</li>
                                     <li className="ml-4">• <strong>dosage</strong> - Dosage instructions</li>
                                     <li className="ml-4">• <strong>timing</strong> - When to take (e.g., "After meals")</li>
-                                    <li className="ml-4">• Spagyric: comp1-comp5 for medicine composition</li>
+                                    <li className="ml-4">• Spagyric: spy1-spy6 for medicine composition</li>
                                     
                                     <li className="mt-2"><strong>ℹ️ Important Notes:</strong></li>
                                     <li className="ml-4">• Plan numbers are <strong>per diagnosis</strong> (Fever Plan 1, Cold Plan 1, etc.)</li>

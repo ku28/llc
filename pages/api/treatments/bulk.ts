@@ -148,9 +148,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             
                             return {
                                 productId: productId,
-                                comp1: p.comp1 || null,
-                                comp2: p.comp2 || null,
-                                comp3: p.comp3 || null,
+                                spy1: p.spy1 || null,
+                                spy2: p.spy2 || null,
+                                spy3: p.spy3 || null,
                                 timing: p.timing || null,
                                 dosage: p.dosage || null,
                                 additions: p.additions || null,

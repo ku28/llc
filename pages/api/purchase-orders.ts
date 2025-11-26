@@ -104,7 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'PUT') {
         try {
-            const { id, status, receivedDate, items } = req.body
+            const { id, status, receivedDate, items, billUrl } = req.body
 
             // If receiving goods, update stock
             if (status === 'received' && items) {
@@ -150,12 +150,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 }
             }
 
+            const updateData: any = {}
+            if (status !== undefined) updateData.status = status
+            if (receivedDate !== undefined) updateData.receivedDate = receivedDate ? new Date(receivedDate) : null
+            if (billUrl !== undefined) updateData.billUrl = billUrl
+
             const purchaseOrder = await prisma.purchaseOrder.update({
                 where: { id: Number(id) },
-                data: {
-                    status,
-                    receivedDate: receivedDate ? new Date(receivedDate) : null
-                },
+                data: updateData,
                 include: {
                     supplier: true,
                     items: {

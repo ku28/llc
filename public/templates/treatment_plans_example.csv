@@ -1,4 +1,4 @@
-planNumber,provDiagnosis,speciality,organ,diseaseAction,treatmentPlan,administration,notes,productName,comp1,comp2,comp3,timing,dosage,additions,procedure,presentation
+planNumber,provDiagnosis,speciality,organ,diseaseAction,treatmentPlan,administration,notes,productName,spy1,spy2,spy3,timing,dosage,addition1,procedure,presentation
 1,ACUTE FEVER WITH INFLAMMATION,General Medicine,WHOLE BODY,ANTI-PYRETIC & ANTI-INFLAMMATORY,Fever Management Protocol,ORAL,Take with lukewarm water. Avoid cold drinks.,BELLADONNA 30C,F1,BELLADONNA,,BID,5 DROPS,,DILUTE IN WATER,DROPS
 1,ACUTE FEVER WITH INFLAMMATION,General Medicine,WHOLE BODY,ANTI-PYRETIC & ANTI-INFLAMMATORY,Fever Management Protocol,ORAL,Take 30 minutes before meals,BRYONIA 200C,F1,BRYONIA,,TID,10 DROPS,,DILUTE IN WATER,DROPS
 1,ACUTE FEVER WITH INFLAMMATION,General Medicine,WHOLE BODY,ANTI-PYRETIC & ANTI-INFLAMMATORY,Fever Management Protocol,ORAL,Take at bedtime for rest,NUX VOMICA 30C,F1,NUX VOMICA,,HS,5 DROPS,,DILUTE IN WATER,DROPS

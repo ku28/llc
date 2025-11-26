@@ -456,13 +456,13 @@ export default function VisitsPage() {
                     if (pr) {
                         const productName = pr.product?.name || ''
                         row[`DRN-${num}`] = i + 1 // Dropper number (sequential)
-                        row[`DL-${num}`] = pr.comp1 || ''
+                        row[`DL-${num}`] = pr.spy1 || ''
                         row[`CR-${num}`] = productName
-                        row[`SY-${num}`] = pr.comp2 || ''
-                        row[`EF-${num}`] = pr.comp3 || ''
+                        row[`SY-${num}`] = pr.spy2 || ''
+                        row[`EF-${num}`] = pr.spy3 || ''
                         row[`TM-${num}`] = pr.timing || ''
                         row[`DOSE-${num}`] = pr.dosage || ''
-                        row[`AD-${num}`] = pr.additions || ''
+                        row[`AD-${num}`] = pr.addition1 || ''
                         row[`PR-${num}`] = pr.procedure || ''
                         row[`PRE-${num}`] = pr.presentation || ''
                         row[`TDY-${num}`] = pr.droppersToday || ''
