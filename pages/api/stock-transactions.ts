@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             
             // Filter by doctor through product relationship
             if (doctorId || user.role === 'doctor') {
-                const selectedDoctorId = doctorId ? Number(doctorId) : undefined
+                const selectedDoctorId = doctorId ? Number(doctorId) : null
                 const doctorFilter = getDoctorFilter(user, selectedDoctorId)
                 where.product = doctorFilter
             }
