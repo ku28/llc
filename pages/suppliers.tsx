@@ -58,6 +58,29 @@ export default function SuppliersPage() {
     }
 
     const [form, setForm] = useState(emptyForm)
+    const [user, setUser] = useState<any>(null)
+
+    const fetchSuppliers = useCallback(async () => {
+        const params = new URLSearchParams()
+        if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+        const response = await fetch(`/api/suppliers${params.toString() ? `?${params}` : ''}`)
+        const data = await response.json()
+        const suppliersData = Array.isArray(data) ? data : []
+        setSuppliers(suppliersData)
+        setCache('suppliers', suppliersData)
+    }, [selectedDoctorId, setCache])
+
+    const fetchInitialData = useCallback(async () => {
+        setLoading(true)
+        try {
+            await Promise.all([
+                fetchSuppliers(),
+                fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user))
+            ])
+        } finally {
+            setLoading(false)
+        }
+    }, [fetchSuppliers])
 
     useEffect(() => {
         const cachedSuppliers = getCache<any[]>('suppliers')
@@ -74,7 +97,7 @@ export default function SuppliersPage() {
         return () => {
             setSuppliers([])
         }
-    }, [selectedDoctorId, fetchSuppliers, getCache])
+    }, [selectedDoctorId, fetchSuppliers, getCache, fetchInitialData])
     
     // Listen for doctor change events
     useEffect(() => {
@@ -85,30 +108,6 @@ export default function SuppliersPage() {
         window.addEventListener('doctor-changed', handleDoctorChange)
         return () => window.removeEventListener('doctor-changed', handleDoctorChange)
     }, [fetchSuppliers])
-
-    const fetchInitialData = async () => {
-        setLoading(true)
-        try {
-            await Promise.all([
-                fetchSuppliers(),
-                fetch('/api/auth/me').then(r => r.json()).then(d => setUser(d.user))
-            ])
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    const fetchSuppliers = useCallback(async () => {
-        const params = new URLSearchParams()
-        if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
-        const response = await fetch(`/api/suppliers${params.toString() ? `?${params}` : ''}`)
-        const data = await response.json()
-        const suppliersData = Array.isArray(data) ? data : []
-        setSuppliers(suppliersData)
-        setCache('suppliers', suppliersData)
-    }, [selectedDoctorId, setCache])
-
-    const [user, setUser] = useState<any>(null)
 
     async function handleSubmit(e: any) {
         e.preventDefault()
