@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 import { useRouter } from 'next/router'
 import { requireDoctorOrAdmin } from '../lib/withAuth'
@@ -6,6 +6,7 @@ import ConfirmationModal from '../components/ConfirmationModal'
 import LoadingModal from '../components/LoadingModal'
 import ImportTreatmentModal from '../components/ImportTreatmentModal'
 import { useDataCache } from '../contexts/DataCacheContext'
+import { useDoctor } from '../contexts/DoctorContext'
 import RefreshButton from '../components/RefreshButton'
 import { useToast } from '../hooks/useToast'
 
@@ -39,6 +40,7 @@ function TreatmentsPage() {
     })
     const [showSortDropdown, setShowSortDropdown] = useState(false)
     const { getCache, setCache } = useDataCache()
+    const { selectedDoctorId } = useDoctor()
     const { showSuccess, showError, showInfo } = useToast()
     
     useEffect(() => {
@@ -52,6 +54,23 @@ function TreatmentsPage() {
             })
         }
     }, [])
+    
+    const fetchTreatments = useCallback(async (newId?: number) => {
+        try {
+            setLoading(true)
+            const params = new URLSearchParams()
+            if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+            const res = await fetch(`/api/treatments${params.toString() ? `?${params}` : ''}`)
+            const treatmentsData = await res.json()
+            const data = Array.isArray(treatmentsData) ? treatmentsData : []
+            setItems(data)
+            setCache('treatments', data)
+        } catch (err) {
+            console.error('Failed to fetch treatments')
+        } finally {
+            setLoading(false)
+        }
+    }, [selectedDoctorId, setCache])
     
     useEffect(() => { 
         // Check if returning from creating new treatment
@@ -75,22 +94,17 @@ function TreatmentsPage() {
         return () => {
             setItems([])
         }
-    }, [router.query.newId])
-
-    async function fetchTreatments(newId?: number) {
-        try {
-            setLoading(true)
-            const res = await fetch('/api/treatments')
-            const treatmentsData = await res.json()
-            const data = Array.isArray(treatmentsData) ? treatmentsData : []
-            setItems(data)
-            setCache('treatments', data)
-        } catch (err) {
-            console.error('Failed to fetch treatments')
-        } finally {
-            setLoading(false)
+    }, [router.query.newId, selectedDoctorId, fetchTreatments, getCache])
+    
+    // Listen for doctor change events
+    useEffect(() => {
+        const handleDoctorChange = () => {
+            fetchTreatments()
         }
-    }
+        
+        window.addEventListener('doctor-changed', handleDoctorChange)
+        return () => window.removeEventListener('doctor-changed', handleDoctorChange)
+    }, [fetchTreatments])
 
     function handleImportSuccess() {
         fetchTreatments()
@@ -169,7 +183,9 @@ function TreatmentsPage() {
                 await new Promise(resolve => setTimeout(resolve, 700))
                 
                 // NOW update the list - item fades out first, then gets removed
-                const updatedItems = await (await fetch('/api/treatments')).json()
+                const params = new URLSearchParams()
+                if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+                const updatedItems = await (await fetch(`/api/treatments${params.toString() ? `?${params}` : ''}`)).json()
                 setItems(updatedItems)
                 setCache('treatments', updatedItems)
                 

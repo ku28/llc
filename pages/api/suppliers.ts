@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
 import { requireStaffOrAbove } from '../../lib/auth'
+import { getDoctorFilter, getDoctorIdForCreate } from '../../lib/doctorUtils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Suppliers restricted to staff and above
@@ -9,7 +10,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (req.method === 'GET') {
         try {
+            const selectedDoctorId = req.query.doctorId ? Number(req.query.doctorId) : null
+            
             const suppliers = await prisma.supplier.findMany({
+                where: getDoctorFilter(user, selectedDoctorId),
                 orderBy: { name: 'asc' },
                 include: {
                     _count: {
@@ -38,8 +42,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 gstin,
                 paymentTerms,
                 creditLimit,
-                notes
+                notes,
+                doctorId: providedDoctorId
             } = req.body
+            
+            const doctorId = getDoctorIdForCreate(user, providedDoctorId)
 
             const supplier = await prisma.supplier.create({
                 data: {
@@ -54,7 +61,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     gstin,
                     paymentTerms: paymentTerms || 'Net 30',
                     creditLimit: creditLimit ? Number(creditLimit) : 0,
-                    notes
+                    notes,
+                    doctorId
                 }
             })
 
@@ -74,7 +82,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 data: {
                     ...data,
                     creditLimit: data.creditLimit ? Number(data.creditLimit) : undefined,
-                    outstandingBalance: data.outstandingBalance ? Number(data.outstandingBalance) : undefined
+                    outstandingBalance: data.outstandingBalance ? Number(data.outstandingBalance) : undefined,
+                    doctorId: getDoctorIdForCreate(user, req.body.doctorId)
                 }
             })
 

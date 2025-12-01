@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useDataCache } from '../contexts/DataCacheContext'
+import { useDoctor } from '../contexts/DoctorContext'
 import RefreshButton from '../components/RefreshButton'
 
 export default function AnalyticsPage() {
@@ -9,42 +10,39 @@ export default function AnalyticsPage() {
     const [invoices, setInvoices] = useState<any[]>([])
     const [transactions, setTransactions] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [user, setUser] = useState<any>(null)
     const { getCache, setCache } = useDataCache()
+    const { selectedDoctorId } = useDoctor()
 
-    useEffect(() => {        
-        // Check cache first
-        const cachedAnalytics = getCache<any>('analytics')
-        if (cachedAnalytics) {
-            setProducts(cachedAnalytics.products || [])
-            setSuppliers(cachedAnalytics.suppliers || [])
-            setPurchaseOrders(cachedAnalytics.purchaseOrders || [])
-            setInvoices(cachedAnalytics.invoices || [])
-            setTransactions(cachedAnalytics.transactions || [])
-            setLoading(false)
-        }
-        
-        // Fetch in background
-        fetchAllData()
-        
-        // Cleanup on unmount
-        return () => {
-            setProducts([])
-            setSuppliers([])
-            setPurchaseOrders([])
-            setInvoices([])
-            setTransactions([])
+    // Fetch user data
+    useEffect(() => {
+        const cachedUser = sessionStorage.getItem('currentUser')
+        if (cachedUser) {
+            setUser(JSON.parse(cachedUser))
+        } else {
+            fetch('/api/auth/me').then(r => r.json()).then(d => {
+                setUser(d.user)
+                sessionStorage.setItem('currentUser', JSON.stringify(d.user))
+            })
         }
     }, [])
 
-    const fetchAllData = async () => {
+    const fetchAllData = useCallback(async () => {
         setLoading(true)
         try {
+            // Build query params with doctorId
+            const params = new URLSearchParams()
+            if (selectedDoctorId) {
+                params.append('doctorId', selectedDoctorId.toString())
+            }
+            const queryString = params.toString() ? `?${params.toString()}` : ''
+            
             const [productsRes, suppliersRes, posRes, invoicesRes, txnRes] = await Promise.all([
-                fetch('/api/products/public'),
-                fetch('/api/suppliers'),
-                fetch('/api/purchase-orders'),
-                fetch('/api/customer-invoices'),
-                fetch('/api/stock-transactions?limit=1000')
+                fetch(`/api/products/public${queryString}`),
+                fetch(`/api/suppliers${queryString}`),
+                fetch(`/api/purchase-orders${queryString}`),
+                fetch(`/api/customer-invoices${queryString}`),
+                fetch(`/api/stock-transactions?limit=1000${selectedDoctorId ? `&doctorId=${selectedDoctorId}` : ''}`)
             ])
 
             const [productsData, suppliersData, posData, invoicesData, txnData] = await Promise.all([
@@ -68,13 +66,52 @@ export default function AnalyticsPage() {
             setPurchaseOrders(analyticsData.purchaseOrders)
             setInvoices(analyticsData.invoices)
             setTransactions(analyticsData.transactions)
-            setCache('analytics', analyticsData)
+            
+            // Cache with doctor-specific key
+            const cacheKey = `analytics_${selectedDoctorId || 'all'}`
+            setCache(cacheKey, analyticsData)
         } catch (error) {
             console.error('Error fetching analytics data:', error)
         } finally {
             setLoading(false)
         }
-    }
+    }, [selectedDoctorId, setCache])
+
+    useEffect(() => {        
+        // Check cache first with doctor-specific key
+        const cacheKey = `analytics_${selectedDoctorId || 'all'}`
+        const cachedAnalytics = getCache<any>(cacheKey)
+        if (cachedAnalytics) {
+            setProducts(cachedAnalytics.products || [])
+            setSuppliers(cachedAnalytics.suppliers || [])
+            setPurchaseOrders(cachedAnalytics.purchaseOrders || [])
+            setInvoices(cachedAnalytics.invoices || [])
+            setTransactions(cachedAnalytics.transactions || [])
+            setLoading(false)
+        }
+        
+        // Fetch in background
+        fetchAllData()
+        
+        // Cleanup on unmount
+        return () => {
+            setProducts([])
+            setSuppliers([])
+            setPurchaseOrders([])
+            setInvoices([])
+            setTransactions([])
+        }
+    }, [selectedDoctorId, fetchAllData])
+    
+    // Listen for doctor change events
+    useEffect(() => {
+        const handleDoctorChange = () => {
+            fetchAllData()
+        }
+        
+        window.addEventListener('doctor-changed', handleDoctorChange)
+        return () => window.removeEventListener('doctor-changed', handleDoctorChange)
+    }, [fetchAllData])
 
     // Calculate metrics
     const totalProducts = products.length

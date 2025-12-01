@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import LoadingModal from '../components/LoadingModal'
 import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
 import { useToast } from '../hooks/useToast'
 import { useDataCache } from '../contexts/DataCacheContext'
+import { useDoctor } from '../contexts/DoctorContext'
 import RefreshButton from '../components/RefreshButton'
 import * as XLSX from 'xlsx'
 
@@ -39,6 +40,7 @@ export default function SuppliersPage() {
     
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const { getCache, setCache } = useDataCache()
+    const { selectedDoctorId } = useDoctor()
 
     const emptyForm = {
         name: '',
@@ -72,7 +74,17 @@ export default function SuppliersPage() {
         return () => {
             setSuppliers([])
         }
-    }, [])
+    }, [selectedDoctorId, fetchSuppliers, getCache])
+    
+    // Listen for doctor change events
+    useEffect(() => {
+        const handleDoctorChange = () => {
+            fetchSuppliers()
+        }
+        
+        window.addEventListener('doctor-changed', handleDoctorChange)
+        return () => window.removeEventListener('doctor-changed', handleDoctorChange)
+    }, [fetchSuppliers])
 
     const fetchInitialData = async () => {
         setLoading(true)
@@ -86,13 +98,15 @@ export default function SuppliersPage() {
         }
     }
 
-    const fetchSuppliers = async () => {
-        const response = await fetch('/api/suppliers')
+    const fetchSuppliers = useCallback(async () => {
+        const params = new URLSearchParams()
+        if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+        const response = await fetch(`/api/suppliers${params.toString() ? `?${params}` : ''}`)
         const data = await response.json()
         const suppliersData = Array.isArray(data) ? data : []
         setSuppliers(suppliersData)
         setCache('suppliers', suppliersData)
-    }
+    }, [selectedDoctorId, setCache])
 
     const [user, setUser] = useState<any>(null)
 

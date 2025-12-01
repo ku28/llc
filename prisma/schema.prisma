@@ -9,15 +9,24 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  email        String?  @unique
-  name         String?
-  passwordHash String?
-  role         String   @default("staff")
-  createdAt    DateTime @default(now())
-  profileImage String?
-  verified     Boolean  @default(false)
-  phone        String?  @unique
+  id               Int               @id @default(autoincrement())
+  email            String?           @unique
+  name             String?
+  passwordHash     String?
+  role             String            @default("staff")
+  createdAt        DateTime          @default(now())
+  profileImage     String?
+  verified         Boolean           @default(false)
+  phone            String?           @unique
+  patients         Patient[]         @relation("DoctorPatients")
+  visits           Visit[]           @relation("DoctorVisits")
+  treatments       Treatment[]       @relation("DoctorTreatments")
+  prescriptions    Prescription[]    @relation("DoctorPrescriptions")
+  customerInvoices CustomerInvoice[] @relation("DoctorInvoices")
+  products         Product[]         @relation("DoctorProducts")
+  categories       Category[]        @relation("DoctorCategories")
+  suppliers        Supplier[]        @relation("DoctorSuppliers")
+  purchaseOrders   PurchaseOrder[]   @relation("DoctorPurchaseOrders")
 }
 
 model PendingUser {
@@ -64,11 +73,15 @@ model Patient {
   investigations            String?
   provisionalDiagnosis      String?
   improvements              String?
+  doctorId                  Int?
   appointments              Appointment[]
   customerInvoices          CustomerInvoice[]
   invoices                  Invoice[]
   visits                    Visit[]
   tokens                    Token[]
+  doctor                    User?             @relation("DoctorPatients", fields: [doctorId], references: [id])
+
+  @@index([doctorId])
 }
 
 model Token {
@@ -132,24 +145,33 @@ model Product {
   totalSales           Int                   @default(0)
   unit                 String?
   categoryId           Int?
+  doctorId             Int?
   customerInvoiceItems CustomerInvoiceItem[]
   demandForecasts      DemandForecast[]
   prescriptions        Prescription[]
   category             Category?             @relation(fields: [categoryId], references: [id])
+  doctor               User?                 @relation("DoctorProducts", fields: [doctorId], references: [id])
   batches              ProductBatch[]
   productOrders        ProductOrder[]
   purchaseOrderItems   PurchaseOrderItem[]
   stockTransactions    StockTransaction[]
   treatmentProducts    TreatmentProduct[]
+
+  @@index([doctorId])
 }
 
 model Category {
   id           Int       @id @default(autoincrement())
-  name         String    @unique
+  name         String
   code         String?
   createdAt    DateTime  @default(now())
   reorderLevel Int       @default(0)
+  doctorId     Int?
   products     Product[]
+  doctor       User?     @relation("DoctorCategories", fields: [doctorId], references: [id])
+
+  @@unique([name, doctorId])
+  @@index([doctorId])
 }
 
 model Treatment {
@@ -170,10 +192,13 @@ model Treatment {
   treatmentPlan     String?
   planNumber        String?
   deleted           Boolean?           @default(false)
+  doctorId          Int?
   prescriptions     Prescription[]
   treatmentProducts TreatmentProduct[]
+  doctor            User?              @relation("DoctorTreatments", fields: [doctorId], references: [id])
 
   @@unique([provDiagnosis, planNumber])
+  @@index([doctorId])
 }
 
 model TreatmentProduct {
@@ -240,9 +265,13 @@ model Visit {
   helper               String?
   reportsAttachments   String?           @db.Text
   createdAt            DateTime          @default(now())
+  doctorId             Int?
   prescriptions        Prescription[]
   patient              Patient           @relation(fields: [patientId], references: [id])
+  doctor               User?             @relation("DoctorVisits", fields: [doctorId], references: [id])
   invoice              CustomerInvoice?
+
+  @@index([doctorId])
 }
 
 model Prescription {
@@ -270,9 +299,13 @@ model Prescription {
   procedure        String?
   productId        Int?
   timing           String?
+  doctorId         Int?
   product          Product?   @relation(fields: [productId], references: [id])
   treatment        Treatment? @relation(fields: [treatmentId], references: [id])
   visit            Visit      @relation(fields: [visitId], references: [id])
+  doctor           User?      @relation("DoctorPrescriptions", fields: [doctorId], references: [id])
+
+  @@index([doctorId])
 }
 
 model ProductBatch {
@@ -337,7 +370,11 @@ model Supplier {
   notes              String?
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
+  doctorId           Int?
   purchaseOrders     PurchaseOrder[]
+  doctor             User?           @relation("DoctorSuppliers", fields: [doctorId], references: [id])
+
+  @@index([doctorId])
 }
 
 model PurchaseOrder {
@@ -358,8 +395,12 @@ model PurchaseOrder {
   billUrl      String?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
+  doctorId     Int?
   supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  doctor       User?               @relation("DoctorPurchaseOrders", fields: [doctorId], references: [id])
   items        PurchaseOrderItem[]
+
+  @@index([doctorId])
 }
 
 model PurchaseOrderItem {
@@ -401,10 +442,14 @@ model CustomerInvoice {
   termsAndConditions String?
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
+  doctorId           Int?
   visit              Visit?                @relation(fields: [visitId], references: [id])
   patient            Patient?              @relation(fields: [patientId], references: [id])
+  doctor             User?                 @relation("DoctorInvoices", fields: [doctorId], references: [id])
   items              CustomerInvoiceItem[]
   payments           Payment[]
+
+  @@index([doctorId])
 }
 
 model CustomerInvoiceItem {

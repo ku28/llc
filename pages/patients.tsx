@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import * as XLSX from 'xlsx'
 import DateInput from '../components/DateInput'
@@ -6,9 +6,9 @@ import ToastNotification from '../components/ToastNotification'
 import { useToast } from '../hooks/useToast'
 import CustomSelect from '../components/CustomSelect'
 import ImportPatientsModal from '../components/ImportPatientsModal'
-import LoadingModal from '../components/LoadingModal'
 import { useImportContext } from '../contexts/ImportContext'
 import { useDataCache } from '../contexts/DataCacheContext'
+import { useDoctor } from '../contexts/DoctorContext'
 import RefreshButton from '../components/RefreshButton'
 import PhoneNumber from '../components/PhoneNumber'
 import genderOptions from '../data/gender.json'
@@ -53,11 +53,14 @@ export default function PatientsPage() {
     const [successMessage, setSuccessMessage] = useState('')
     const [itemsPerPage] = useState(10)
     const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false)
+    const [doctors, setDoctors] = useState<any[]>([])
+    const [doctorsLoading, setDoctorsLoading] = useState(false)
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const { addTask, updateTask } = useImportContext()
     const { getCache, setCache, clearCache } = useDataCache()
+    const { selectedDoctorId } = useDoctor()
     
-    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', date: '', age: '', address: '', gender: '', imageUrl: '', fatherHusbandGuardianName: '' }
+    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', date: '', age: '', address: '', gender: '', imageUrl: '', fatherHusbandGuardianName: '', doctorId: '' }
     const [form, setForm] = useState(emptyForm)
 
     // Calculate age from date of birth
@@ -92,19 +95,20 @@ export default function PatientsPage() {
 
     // Handle age change
     const handleAgeChange = (age: string) => {
-        if (!form.dob) {
-            const dob = calculateDobFromAge(age)
-            setForm({ ...form, age, dob })
-        } else {
-            setForm({ ...form, age })
-        }
+        const dob = calculateDobFromAge(age)
+        setForm({ ...form, age, dob })
     }
 
     // Fetch patients data with caching
-    const fetchPatients = async () => {
+    const fetchPatients = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('/api/patients')
+            const params = new URLSearchParams()
+            if (selectedDoctorId) {
+                params.append('doctorId', selectedDoctorId.toString())
+            }
+            
+            const res = await fetch(`/api/patients?${params}`)
             const data = await res.json()
             setPatients(data)
             setCache('patients', data)
@@ -113,7 +117,7 @@ export default function PatientsPage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [selectedDoctorId, setCache, showError])
 
     // Load cached data or fetch if not available
     useEffect(() => { 
@@ -129,7 +133,17 @@ export default function PatientsPage() {
         return () => {
             setPatients([])
         }
-    }, [])
+    }, [selectedDoctorId])
+
+    // Listen for doctor change events
+    useEffect(() => {
+        const handleDoctorChange = () => {
+            fetchPatients()
+        }
+        
+        window.addEventListener('doctor-changed', handleDoctorChange)
+        return () => window.removeEventListener('doctor-changed', handleDoctorChange)
+    }, [fetchPatients]) // Re-fetch when selectedDoctorId changes
     
     useEffect(() => { 
         const cachedUser = sessionStorage.getItem('currentUser')
@@ -148,6 +162,23 @@ export default function PatientsPage() {
                 .catch(() => setUserLoading(false))
         }
     }, [])
+
+    // Fetch doctors list for receptionist and admin
+    useEffect(() => {
+        if (user && (user.role === 'receptionist' || user.role === 'admin')) {
+            setDoctorsLoading(true)
+            fetch('/api/doctors/list')
+                .then(r => r.json())
+                .then(data => {
+                    setDoctors(data.doctors || [])
+                    setDoctorsLoading(false)
+                })
+                .catch(() => {
+                    setDoctorsLoading(false)
+                    showError('Failed to fetch doctors')
+                })
+        }
+    }, [user])
 
     // Listen for maximize events from notification dropdown
     useEffect(() => {
@@ -202,6 +233,11 @@ export default function PatientsPage() {
     }, [router.isReady, router.query])
 
     function openModal() {
+        setForm({
+            ...emptyForm,
+            date: new Date().toISOString().split('T')[0],
+            doctorId: user?.role === 'doctor' ? user.id.toString() : ''
+        })
         setIsModalOpen(true)
         document.body.style.overflow = 'hidden'
         setTimeout(() => setIsAnimating(true), 10)
@@ -462,18 +498,22 @@ export default function PatientsPage() {
     function editPatient(patient: any) {
         setEditingId(patient.id)
         
+        const dobValue = patient.dob ? new Date(patient.dob).toISOString().slice(0, 10) : ''
+        const ageValue = patient.age ? String(patient.age) : (dobValue ? calculateAge(dobValue) : '')
+        
         setForm({
             firstName: patient.firstName || '',
             lastName: patient.lastName || '',
             phone: patient.phone || '',
             email: patient.email || '',
-            dob: patient.dob ? new Date(patient.dob).toISOString().slice(0, 10) : '',
+            dob: dobValue,
             date: patient.date ? new Date(patient.date).toISOString().slice(0, 10) : '',
-            age: patient.age ? String(patient.age) : '',
+            age: ageValue,
             address: patient.address || '',
             gender: patient.gender || '',
             imageUrl: patient.imageUrl || '',
-            fatherHusbandGuardianName: patient.fatherHusbandGuardianName || ''
+            fatherHusbandGuardianName: patient.fatherHusbandGuardianName || '',
+            doctorId: patient.doctorId ? patient.doctorId.toString() : (user?.role === 'doctor' ? user.id.toString() : '')
         })
         setImagePreview(patient.imageUrl || '')
         openModal()
@@ -493,7 +533,10 @@ export default function PatientsPage() {
 
         setSubmitting(true);
         try {
-            const payload: any = { ...form };
+            const payload: any = { 
+                ...form,
+                doctorId: form.doctorId ? parseInt(form.doctorId) : (user?.role === 'doctor' ? user.id : null)
+            };
             // If email is blank, set to null so Prisma does not trigger unique constraint
             if (!payload.email || payload.email.trim() === '') {
                 payload.email = null;
@@ -846,6 +889,9 @@ export default function PatientsPage() {
                 {user && (
                     <div className="flex gap-2 items-center">
                         <RefreshButton onRefresh={fetchPatients} />
+                        {/* Hide import/export for receptionist */}
+                        {user.role !== 'receptionist' && (
+                        <>
                         <div className="relative">
                             <button 
                                 onClick={() => setShowExportDropdown(!showExportDropdown)}
@@ -902,6 +948,8 @@ export default function PatientsPage() {
                             </svg>
                             <span className="font-semibold hidden sm:inline">Import</span>
                         </button>
+                        </>
+                        )}
                         <button onClick={openModal} className="btn btn-primary" title="Register new patient">
                             <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1140,7 +1188,7 @@ export default function PatientsPage() {
                                     </div>
                                     
                                     <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-                                        <form onSubmit={submitPatient} className="space-y-6">
+                                        <form onSubmit={submitPatient} className="space-y-5">
                                             {/* Photo Section - Minimalistic */}
                                             <div className="flex items-center gap-4 pb-4 border-b border-gray-100 dark:border-gray-800">
                                                 {imagePreview ? (
@@ -1172,49 +1220,88 @@ export default function PatientsPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Personal Info */}
+                                            {/* Personal Info - 2 Columns */}
                                             <div className={isGenderDropdownOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Personal Information</h3>
-                                                <div className="grid grid-cols-2 gap-4">
+                                                <div className="grid grid-cols-2 gap-3">
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">First Name *</label>
-                                                        <input required placeholder="John" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value.toUpperCase() })} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" />
+                                                        <input required placeholder="John" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
                                                     </div>
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Last Name *</label>
-                                                        <input required placeholder="Doe" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value.toUpperCase() })} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" />
+                                                        <input required placeholder="Doe" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
                                                     </div>
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Date of Birth</label>
-                                                        <DateInput type="date" placeholder="Select DOB" value={form.dob} onChange={e => handleDobChange(e.target.value)} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" />
+                                                        <DateInput type="date" placeholder="Select DOB" value={form.dob} onChange={e => handleDobChange(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
                                                     </div>
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Age</label>
-                                                        <input placeholder="35" type="number" value={(form as any).age || ''} onChange={e => handleAgeChange(e.target.value)} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" />
+                                                        <input placeholder="35" type="number" value={(form as any).age || ''} onChange={e => handleAgeChange(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
                                                     </div>
-                                                    <div className="col-span-2">
+                                                    <div>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Gender</label>
                                                         <CustomSelect value={(form as any).gender || ''} onChange={(val) => setForm({ ...form, gender: val })} options={genderOptions} placeholder="Select gender" allowCustom={true} onOpenChange={setIsGenderDropdownOpen} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Guardian Name</label>
+                                                        <input placeholder="Guardian Name" value={form.fatherHusbandGuardianName || ''} onChange={e => setForm({ ...form, fatherHusbandGuardianName: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {/* Contact Info */}
+                                            {/* Doctor Assignment - Show for receptionist, doctor, and admin */}
+                                            {user && (user.role === 'receptionist' || user.role === 'doctor' || user.role === 'admin') && (
+                                                <div>
+                                                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Doctor Assignment</h3>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                                                Assigned Doctor {user.role === 'receptionist' && <span className="text-red-500">*</span>}
+                                                            </label>
+                                                            {user.role === 'doctor' ? (
+                                                                <input
+                                                                    type="text"
+                                                                    value={user.name || 'Current Doctor'}
+                                                                    disabled
+                                                                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-400 cursor-not-allowed text-sm"
+                                                                />
+                                                            ) : (
+                                                                <CustomSelect
+                                                                    value={form.doctorId}
+                                                                    onChange={(val) => setForm({ ...form, doctorId: val })}
+                                                                    options={[
+                                                                        { value: '', label: 'Select doctor' },
+                                                                        ...doctors.map(d => ({
+                                                                            value: d.id.toString(),
+                                                                            label: d.name || d.email
+                                                                        }))
+                                                                    ]}
+                                                                    placeholder={doctorsLoading ? 'Loading doctors...' : 'Select doctor'}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Contact Info - 2 Columns */}
                                             <div>
                                                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Contact Information</h3>
-                                                <div className="space-y-4">
+                                                <div className="grid grid-cols-2 gap-3">
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Phone</label>
-                                                        <input placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.toUpperCase() })} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" />
+                                                        <input placeholder="+91 98765 43210" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
                                                     </div>
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
-                                                        <input type="email" placeholder="john.doe@example.com" value={form.email} onChange={e => { setForm({ ...form, email: e.target.value.toUpperCase() }); setFieldErrors(prev => ({ ...prev, email: '' })); }} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" />
+                                                        <input type="email" placeholder="john.doe@example.com" value={form.email} onChange={e => { setForm({ ...form, email: e.target.value.toUpperCase() }); setFieldErrors(prev => ({ ...prev, email: '' })); }} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
                                                         {fieldErrors.email && <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>}
                                                     </div>
-                                                    <div>
+                                                    <div className="col-span-2">
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Address</label>
-                                                        <input placeholder="123 Main St, City" value={(form as any).address || ''} onChange={e => setForm({ ...form, address: e.target.value.toUpperCase() })} className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all" />
+                                                        <input placeholder="123 Main St, City" value={(form as any).address || ''} onChange={e => setForm({ ...form, address: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
                                                     </div>
                                                 </div>
                                             </div>
@@ -1539,6 +1626,15 @@ export default function PatientsPage() {
                                                 {p.phone && <PhoneNumber phone={p.phone} className="mr-2" />}
                                                 {p.age && <span>Age: {p.age}</span>}
                                             </div>
+                                            {/* Display Doctor Name */}
+                                            {p.doctor && (
+                                                <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                    </svg>
+                                                    <span>{p.doctor.name || p.doctor.email}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         {/* Action Buttons */}
@@ -1631,6 +1727,16 @@ export default function PatientsPage() {
                                                     <div>
                                                         <div className="text-xs text-muted mb-1">Date of Birth</div>
                                                         <div className="text-sm font-medium">{p.dob ? new Date(p.dob).toLocaleDateString() : '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">Father/Husband/Guardian</div>
+                                                        <div className="text-sm font-medium">{p.fatherHusbandGuardianName || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">Doctor</div>
+                                                        <div className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                                                            {p.doctor ? `${p.doctor.name || p.doctor.email}` : '-'}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

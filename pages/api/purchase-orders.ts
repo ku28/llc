@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
 import { requireStaffOrAbove } from '../../lib/auth'
+import { getDoctorFilter, getDoctorIdForCreate } from '../../lib/doctorUtils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Purchase orders restricted to staff and above
@@ -9,7 +10,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (req.method === 'GET') {
         try {
+            const selectedDoctorId = req.query.doctorId ? Number(req.query.doctorId) : undefined
             const purchaseOrders = await prisma.purchaseOrder.findMany({
+                where: getDoctorFilter(user, selectedDoctorId),
                 orderBy: { orderDate: 'desc' },
                 include: {
                     supplier: true,
@@ -81,6 +84,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     shippingCost: Math.round(shippingCost || 0),
                     totalAmount,
                     notes,
+                    doctorId: getDoctorIdForCreate(user, req.body.doctorId),
                     items: {
                         create: orderItems
                     }

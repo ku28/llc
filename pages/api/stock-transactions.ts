@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
 import { requireStaffOrAbove } from '../../lib/auth'
+import { getDoctorFilter } from '../../lib/doctorUtils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Stock transactions restricted to staff and above
@@ -9,11 +10,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (req.method === 'GET') {
         try {
-            const { productId, type, limit } = req.query
+            const { productId, type, limit, doctorId } = req.query
 
             const where: any = {}
             if (productId) where.productId = Number(productId)
             if (type) where.transactionType = type
+            
+            // Filter by doctor through product relationship
+            if (doctorId || user.role === 'doctor') {
+                const selectedDoctorId = doctorId ? Number(doctorId) : undefined
+                const doctorFilter = getDoctorFilter(user, selectedDoctorId)
+                where.product = doctorFilter
+            }
 
             const transactions = await prisma.stockTransaction.findMany({
                 where,

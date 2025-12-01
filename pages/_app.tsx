@@ -10,6 +10,7 @@ import { useToast } from '../hooks/useToast'
 import { ImportProvider } from '../contexts/ImportContext'
 import { DataCacheProvider } from '../contexts/DataCacheContext'
 import { AuthProvider } from '../contexts/AuthContext'
+import { DoctorProvider } from '../contexts/DoctorContext'
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
@@ -86,9 +87,10 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <>
       <AuthProvider>
-        <DataCacheProvider>
-          <ImportProvider>
-          <ToastNotification toasts={toasts} removeToast={removeToast} />
+        <DoctorProvider>
+          <DataCacheProvider>
+            <ImportProvider>
+            <ToastNotification toasts={toasts} removeToast={removeToast} />
         <Head>
           <title>{pageTitle}</title>
           {/* Prefer a PNG file (browsers reliably show PNG); keep .ico for legacy */}
@@ -160,6 +162,7 @@ export default function App({ Component, pageProps }: AppProps) {
       )}
           </ImportProvider>
         </DataCacheProvider>
+        </DoctorProvider>
       </AuthProvider>
     </>
   )

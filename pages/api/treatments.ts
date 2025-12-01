@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
 import { requireDoctorOrAdmin, requireAuth } from '../../lib/auth'
+import { getDoctorFilter, getDoctorIdForCreate } from '../../lib/doctorUtils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Treatments restricted to doctors and admins only
@@ -9,13 +10,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (req.method === 'GET') {
         try {
-            // Check if we want to include deleted treatments
+            const selectedDoctorId = req.query.doctorId ? Number(req.query.doctorId) : null
             const includeDeleted = req.query.includeDeleted === 'true'
             
+            const whereClause = {
+                ...getDoctorFilter(user, selectedDoctorId),
+                ...(includeDeleted ? {} : { deleted: { not: true } })
+            }
+            
             const items = await prisma.treatment.findMany({ 
-                where: includeDeleted ? {} : {
-                    deleted: { not: true }
-                },
+                where: whereClause,
                 orderBy: { createdAt: 'desc' },
                 include: {
                     treatmentProducts: {
@@ -54,6 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     treatmentPlan,
                     administration,
                     notes,
+                    doctorId: getDoctorIdForCreate(user, req.body.doctorId),
                     // Create related products with medicine-specific fields
                     treatmentProducts: {
                         create: (products || []).map((p: any) => ({
@@ -119,6 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     treatmentPlan,
                     administration,
                     notes,
+                    doctorId: getDoctorIdForCreate(user, req.body.doctorId),
                     // Create new product relationships with medicine-specific fields
                     treatmentProducts: {
                         create: (products || []).map((p: any) => ({

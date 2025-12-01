@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
 import { requireStaffOrAbove } from '../../lib/auth'
+import { getDoctorFilter, getDoctorIdForCreate } from '../../lib/doctorUtils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Products restricted to staff and above (not reception)
@@ -9,7 +10,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (req.method === 'GET') {
         try {
+            const selectedDoctorId = req.query.doctorId ? Number(req.query.doctorId) : null
+            
             const items = await prisma.product.findMany({
+                where: getDoctorFilter(user, selectedDoctorId),
                 include: {
                     category: true
                 }
@@ -22,7 +26,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-        const { name, categoryId, unit, priceRupees, purchasePriceRupees, totalPurchased, totalSales, quantity, actualInventory } = req.body
+        const { name, categoryId, unit, priceRupees, purchasePriceRupees, totalPurchased, totalSales, quantity, actualInventory, doctorId: providedDoctorId } = req.body
+        
+        const doctorId = getDoctorIdForCreate(user, providedDoctorId)
+        
         try {
             const ratePerUnit = Number(priceRupees || 0)
             const purchase = Number(totalPurchased || quantity || 0)
@@ -51,7 +58,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     totalPurchased: purchase,
                     purchaseValue: purchaseValue || null,
                     totalSales: sales,
-                    salesValue: salesValue || null
+                    salesValue: salesValue || null,
+                    doctorId
                 },
                 include: {
                     category: true

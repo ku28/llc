@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { useImportContext } from '../contexts/ImportContext'
+import { useDoctor } from '../contexts/DoctorContext'
 
 interface ImportVisitsModalProps {
     isOpen: boolean
@@ -73,10 +74,13 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
     const [showCancelConfirm, setShowCancelConfirm] = useState(false)
     const [duplicateInfo, setDuplicateInfo] = useState<any>(null)
     const [includeDuplicates, setIncludeDuplicates] = useState(false)
+    const [selectedDoctorForImport, setSelectedDoctorForImport] = useState<number | null>(null)
+    const [user, setUser] = useState<any>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const cancelRef = useRef(false)
     const abortControllerRef = useRef<AbortController | null>(null)
     const { addTask, updateTask, removeTask, cancelTask } = useImportContext()
+    const { doctors, selectedDoctorId } = useDoctor()
 
     // Listen for maximize events from notification dropdown
     useEffect(() => {
@@ -89,7 +93,22 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
         return () => window.removeEventListener('maximizeTask', handleMaximize)
     }, [taskId])
 
+    // Fetch user info
+    useEffect(() => {
+        fetch('/api/auth/me').then(r => r.json()).then(d => {
+            setUser(d.user)
+            // Set default doctor selection for admin
+            if (d.user?.role === 'admin' && selectedDoctorId) {
+                setSelectedDoctorForImport(selectedDoctorId)
+            } else if (d.user?.role === 'doctor') {
+                setSelectedDoctorForImport(d.user.id)
+            }
+        })
+    }, [selectedDoctorId])
+
     if (!isOpen) return null
+
+    const isAdmin = user?.role === 'admin'
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0]
@@ -398,7 +417,10 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                     const response = await fetch('/api/visits/bulk', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ visits: batch }),
+                        body: JSON.stringify({ 
+                            visits: batch,
+                            doctorId: selectedDoctorForImport 
+                        }),
                         signal: abortControllerRef.current?.signal
                     })
 
@@ -560,6 +582,31 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                 <div className="p-6">
                     {step === 'select' && (
                         <div className="space-y-4">
+                            {/* Doctor Selection for Admin */}
+                            {isAdmin && (
+                                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                                    <label className="block text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-2">
+                                        Select Doctor for Import
+                                    </label>
+                                    <select
+                                        value={selectedDoctorForImport || ''}
+                                        onChange={(e) => setSelectedDoctorForImport(Number(e.target.value))}
+                                        className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                                        required
+                                    >
+                                        <option value="">-- Select Doctor --</option>
+                                        {doctors.filter(d => d.verified).map(doctor => (
+                                            <option key={doctor.id} value={doctor.id}>
+                                                {doctor.name} ({doctor.email})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                                        ⚠️ All imported visits will be assigned to the selected doctor
+                                    </p>
+                                </div>
+                            )}
+
                             <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
                                 <input
                                     ref={fileInputRef}
@@ -568,16 +615,26 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                                     onChange={handleFileSelect}
                                     className="hidden"
                                     id="visit-file-input"
+                                    disabled={isAdmin && !selectedDoctorForImport}
                                 />
                                 <label
                                     htmlFor="visit-file-input"
-                                    className="cursor-pointer inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                    className={`cursor-pointer inline-flex items-center px-4 py-2 rounded-lg ${
+                                        isAdmin && !selectedDoctorForImport 
+                                            ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    }`}
                                 >
                                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                     </svg>
                                     Choose File
                                 </label>
+                                {isAdmin && !selectedDoctorForImport && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                        Please select a doctor first
+                                    </p>
+                                )}
                             </div>
 
                             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">

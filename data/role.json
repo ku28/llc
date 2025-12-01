@@ -8,6 +8,10 @@
         "label": "Admin"
     },
     {
+        "value": "doctor",
+        "label": "Doctor"
+    },
+    {
         "value": "receptionist",
         "label": "Receptionist"
     }

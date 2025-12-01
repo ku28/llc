@@ -4,6 +4,7 @@ import { useRouter } from 'next/router'
 import { canAccessRoute } from '../lib/permissions'
 import ImportNotifications from './ImportNotifications'
 import AppSwitcherModal from './AppSwitcherModal'
+import { useDoctor } from '../contexts/DoctorContext'
 
 interface HeaderProps {
   title?: string
@@ -22,6 +23,7 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
   const submenuNavRef = useRef<HTMLDivElement>(null)
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const router = useRouter()
+  const { selectedDoctorId, setSelectedDoctorId, doctors, loading: doctorsLoading } = useDoctor()
 
   // Determine current app and title
   const landingPages = ['/', '/about', '/services', '/gallery', '/contact']
@@ -35,8 +37,8 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
     return canAccessRoute(user.role, route)
   }
 
-  // Helper to check if user is reception
-  const isReception = user?.role === 'reception'
+  // Helper to check if user is receptionist
+  const isReception = user?.role === 'receptionist'
   
   // Helper to check if user is a patient (user role)
   const isPatient = user?.role?.toLowerCase() === 'user'
@@ -275,6 +277,21 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
             {/* Staff/Admin/Doctor/Reception Navigation */}
             {!isPatient && (
               <>
+                {/* Receptionist sees only Patients and Tasks */}
+                {isReception && canAccess('/patients') && (
+                  <>
+                    <Link href="/patients" data-active={router.pathname === '/patients'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/patients' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                      Patients
+                    </Link>
+                    <Link href="/tasks" data-active={router.pathname === '/tasks'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/tasks' ? 'text-green-600 dark:text-green-400' : ''}`}>
+                      Tasks
+                    </Link>
+                  </>
+                )}
+                
+                {/* Full navigation for non-reception staff */}
+                {!isReception && (
+                <>
                 {canAccess('/dashboard') && (
                   <Link href="/dashboard" data-active={router.pathname === '/dashboard'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/dashboard' ? 'text-green-600 dark:text-green-400' : ''}`}>
                     Dashboard
@@ -300,12 +317,7 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                     Visits
                   </Link>
                 )}
-                
-                {/* Show Invoices link directly for reception, or in dropdown for others */}
-                {isReception && canAccess('/invoices') && (
-                  <Link href="/invoices" data-active={router.pathname === '/invoices'} className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm relative ${router.pathname === '/invoices' ? 'text-green-600 dark:text-green-400' : ''}`}>
-                    Invoices
-                  </Link>
+                </>
                 )}
                 
                 {/* Accounting Expandable Menu - only show for non-reception users who can access accounting features */}
@@ -327,10 +339,10 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
 
         </div>
         <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
-          {/* Import Notifications - only for admin/reception */}
-          {user && !isPatient && <ImportNotifications />}
+          {/* Import Notifications - only for admin/staff/doctor, not reception */}
+          {user && !isPatient && !isReception && <ImportNotifications />}
 
-          {/* Tokens button for admin/reception - hide on small screens */}
+          {/* Tokens button for all staff including receptionist - hide on small screens */}
           {user && !isPatient && (
             <button 
               onClick={onOpenTokenSidebar}
@@ -343,8 +355,8 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
             </button>
           )}
 
-          {/* Requests button for admin/reception - hide on small screens */}
-          {user && !isPatient && (
+          {/* Requests button for admin/staff/doctor, not reception - hide on small screens */}
+          {user && !isPatient && !isReception && (
             <Link 
               href="/requests"
               className="hidden sm:block p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors relative"
@@ -418,16 +430,81 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
 
               {/* User Dropdown Menu */}
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm py-2 z-50 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
+                <div className="absolute right-0 mt-2 w-56 rounded-xl border border-emerald-300/60 dark:border-emerald-600/60 bg-white/95 dark:bg-gray-900/95 shadow-2xl backdrop-blur-xl py-2 z-50 overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/10 via-transparent to-green-500/10 pointer-events-none rounded-xl"></div>
                   <div className="relative">
+                  
+                  {/* Doctor Switcher for Admin */}
+                  {user?.role === 'admin' && (
+                    <>
+                      <div className="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        View as Doctor
+                      </div>
+                      {doctorsLoading ? (
+                        <div className="px-4 py-3 flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-2 border-emerald-500 border-t-transparent"></div>
+                        </div>
+                      ) : doctors.length > 0 ? (
+                        <div className="max-h-48 overflow-y-auto">
+                          {doctors.map(doctor => (
+                            <button
+                              key={doctor.id}
+                              onClick={() => {
+                                setSelectedDoctorId(doctor.id)
+                                setUserDropdownOpen(false)
+                                // Dispatch event to trigger data refresh
+                                window.dispatchEvent(new CustomEvent('doctor-changed', { 
+                                  detail: { doctorId: doctor.id } 
+                                }))
+                              }}
+                              className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                                selectedDoctorId === doctor.id
+                                  ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+                                  : 'text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                              <span className="truncate">{doctor.name || 'Unnamed Doctor'}</span>
+                            </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400">
+                          No doctors found
+                        </div>
+                      )}
+                      <hr className="my-1 border-gray-200 dark:border-gray-700" />
+                    </>
+                  )}
+                  
+                  {/* Current Doctor Display (for doctors) */}
+                  {user?.role === 'doctor' && (
+                    <>
+                      <div className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          <span className="font-medium">{user.name}</span>
+                        </div>
+                      </div>
+                      <hr className="my-1 border-gray-200 dark:border-gray-700" />
+                    </>
+                  )}
+                  
                   <Link 
                     href="/profile" 
                     className="block px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
                     onClick={() => setUserDropdownOpen(false)}
                   >
                     <div className="flex items-center gap-2">
-                      <span>👤</span>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
                       <span>View Profile</span>
                     </div>
                   </Link>
@@ -437,7 +514,9 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                     className="w-full text-left px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <span>🚪</span>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
                       <span>Logout</span>
                     </div>
                   </button>
@@ -617,8 +696,8 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                 </button>
               )}
               
-              {/* Requests Button for Mobile (Admin/Reception) */}
-              {user && !isPatient && (
+              {/* Requests Button for Mobile (Admin/Staff/Doctor, not reception) */}
+              {user && !isPatient && !isReception && (
                 <Link
                   href="/requests"
                   className="w-full px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
@@ -689,6 +768,35 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
             {/* Staff/Admin/Doctor/Reception Mobile Navigation */}
             {!isPatient && (
               <>
+                {/* Receptionist sees only Patients and Tasks */}
+                {isReception && canAccess('/patients') && (
+                  <>
+                    <Link 
+                      href="/patients" 
+                      className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <span>Patients</span>
+                    </Link>
+                    <Link 
+                      href="/tasks" 
+                      className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                      </svg>
+                      <span>Tasks</span>
+                    </Link>
+                  </>
+                )}
+                
+                {/* Full navigation for non-reception staff */}
+                {!isReception && (
+                <>
                 {canAccess('/dashboard') && (
                   <Link 
                     href="/" 
@@ -805,6 +913,8 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                     </svg>
                     <span>Analytics</span>
                   </Link>
+                )}
+                </>
                 )}
               </>
             )}

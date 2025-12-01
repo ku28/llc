@@ -144,7 +144,7 @@ export default function CustomSelect({
 
     // Filter options based on input value
     const filteredOptions = options.filter(option => 
-        option.label.toLowerCase().includes(inputValue.toLowerCase())
+        option.value !== '' && option.label.toLowerCase().includes(inputValue.toLowerCase())
     )
 
     // Handle keyboard navigation

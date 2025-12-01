@@ -78,10 +78,10 @@ export default function SignupPage() {
     return (
         <>
             <ToastNotification toasts={toasts} removeToast={removeToast} />
-            <div className={`max-w-md mx-auto mt-6 sm:mt-12 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg mx-4 ${isRoleDropdownOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
+            <div className={`max-w-md mx-auto mt-6 sm:mt-12 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg ${isRoleDropdownOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
                 <h2 className="text-xl sm:text-2xl font-bold mb-2">Staff Registration</h2>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-4 sm:mb-6">
-                    Register as Admin or Reception. Your request will be sent to the administrator for approval.
+                    Register as Admin, Doctor, or Reception. Your request will be sent to the administrator for approval.
                 </p>
                 <form onSubmit={submit} className="space-y-3 sm:space-y-4">
                 <div>

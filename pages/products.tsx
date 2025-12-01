@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 import CustomSelect from '../components/CustomSelect'
 import ConfirmModal from '../components/ConfirmModal'
@@ -8,6 +8,7 @@ import { useToast } from '../hooks/useToast'
 import { requireStaffOrAbove } from '../lib/withAuth'
 import { useImportContext } from '../contexts/ImportContext'
 import { useDataCache } from '../contexts/DataCacheContext'
+import { useDoctor } from '../contexts/DoctorContext'
 import RefreshButton from '../components/RefreshButton'
 import categoriesData from '../data/categories.json'
 import unitTypes from '../data/unitTypes.json'
@@ -63,6 +64,7 @@ function ProductsPage() {
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const { addTask, updateTask } = useImportContext()
     const { getCache, setCache } = useDataCache()
+    const { selectedDoctorId } = useDoctor()
     
     // Filter states
     const [filterCategory, setFilterCategory] = useState<string>('')
@@ -88,13 +90,16 @@ function ProductsPage() {
     
     const [form, setForm] = useState(emptyForm)
 
-    async function fetchProducts() {
+    const fetchProducts = useCallback(async () => {
         try {
             setLoading(true)
+            const params = new URLSearchParams()
+            if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+            const queryString = params.toString() ? `?${params}` : ''
             const [productsData, categoriesData, suppliersData] = await Promise.all([
-                fetch('/api/products').then(r => r.json()),
-                fetch('/api/categories').then(r => r.json()),
-                fetch('/api/suppliers').then(r => r.json())
+                fetch(`/api/products${queryString}`).then(r => r.json()),
+                fetch(`/api/categories${queryString}`).then(r => r.json()),
+                fetch(`/api/suppliers${queryString}`).then(r => r.json())
             ])
             setItems(Array.isArray(productsData) ? productsData : [])
             setCategories(Array.isArray(categoriesData) ? categoriesData : [])
@@ -105,7 +110,7 @@ function ProductsPage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [selectedDoctorId, setCache])
 
     useEffect(() => {
         const cachedProducts = getCache<any[]>('products')
@@ -118,22 +123,24 @@ function ProductsPage() {
             fetchProducts()
         }
         
-        // Fetch categories and suppliers if needed
-        Promise.all([
-            fetch('/api/categories').then(r => r.json()),
-            fetch('/api/suppliers').then(r => r.json())
-        ]).then(([categoriesData, suppliersData]) => {
-            setCategories(Array.isArray(categoriesData) ? categoriesData : [])
-            setSuppliers(Array.isArray(suppliersData) ? suppliersData.filter((s: any) => s.status === 'active') : [])
-        })
-        
         // Cleanup on unmount
         return () => {
             setItems([])
             setCategories([])
             setSuppliers([])
         }
-    }, [])
+    }, [selectedDoctorId, fetchProducts, getCache])
+    
+    // Listen for doctor change events
+    useEffect(() => {
+        const handleDoctorChange = () => {
+            fetchProducts()
+        }
+        
+        window.addEventListener('doctor-changed', handleDoctorChange)
+        return () => window.removeEventListener('doctor-changed', handleDoctorChange)
+    }, [fetchProducts])
+    
     const [user, setUser] = useState<any>(null)
     useEffect(() => {
         const cachedUser = sessionStorage.getItem('currentUser')
@@ -445,7 +452,9 @@ function ProductsPage() {
             }
 
             // Refresh data
-            setItems(await (await fetch('/api/products')).json())
+            const params = new URLSearchParams()
+            if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+            setItems(await (await fetch(`/api/products${params.toString() ? `?${params}` : ''}`)).json())
             setSelectedProductIds(new Set())
             
             // Update task to success
@@ -698,16 +707,18 @@ function ProductsPage() {
         try {
             // Start the delete API call
             const response = await fetch('/api/products', { 
-                method: 'DELETE', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ id: deleteId }) 
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: deleteId })
             })
             if (response.ok) {
                 // Wait for fade animation (700ms) before updating the list
                 await new Promise(resolve => setTimeout(resolve, 700))
                 
                 // NOW update the list - item fades out first, then gets removed
-                const updatedItems = await (await fetch('/api/products')).json()
+                const params = new URLSearchParams()
+                if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+                const updatedItems = await (await fetch(`/api/products${params.toString() ? `?${params}` : ''}`)).json()
                 setItems(updatedItems)
                 setCache('products', updatedItems)
                 
@@ -1863,7 +1874,7 @@ function ProductsPage() {
                 onImportSuccess={() => {
                     setLoading(true)
                     Promise.all([
-                        fetch('/api/products').then(r => r.json()),
+                        fetch(`/api/products${selectedDoctorId ? `?doctorId=${selectedDoctorId}` : ''}`).then(r => r.json()),
                         fetch('/api/categories').then(r => r.json())
                     ]).then(([productsData, categoriesData]) => {
                         setItems(Array.isArray(productsData) ? productsData : [])

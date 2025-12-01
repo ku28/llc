@@ -3,7 +3,7 @@ export const ROLES = {
     ADMIN: 'admin',
     DOCTOR: 'doctor',
     STAFF: 'staff',
-    RECEPTION: 'reception',
+    RECEPTION: 'receptionist',
     USER: 'user'  // Patient/User role
 } as const
 
@@ -12,17 +12,19 @@ export type Role = typeof ROLES[keyof typeof ROLES]
 // Define what each role can access
 export const PERMISSIONS = {
     // Patient Management
-    VIEW_PATIENTS: ['admin', 'doctor', 'staff', 'reception'],
-    CREATE_PATIENTS: ['admin', 'doctor', 'staff', 'reception'],
-    EDIT_PATIENTS: ['admin', 'doctor', 'staff', 'reception'],
-    DELETE_PATIENTS: ['admin', 'doctor'],
+    VIEW_PATIENTS: ['admin', 'doctor', 'staff', 'receptionist'],
+    CREATE_PATIENTS: ['admin', 'doctor', 'staff', 'receptionist'],
+    EDIT_PATIENTS: ['admin', 'doctor', 'staff', 'receptionist'],
+    DELETE_PATIENTS: ['admin', 'doctor', 'receptionist'],
+    IMPORT_PATIENTS: ['admin', 'doctor', 'staff'],
+    EXPORT_PATIENTS: ['admin', 'doctor', 'staff'],
     
     // Visits & Prescriptions
-    VIEW_VISITS: ['admin', 'doctor', 'staff', 'reception', 'user'],  // Users can view their visits
+    VIEW_VISITS: ['admin', 'doctor', 'staff', 'receptionist', 'user'],  // Users can view their visits
     CREATE_VISITS: ['admin', 'doctor', 'staff'],
     EDIT_VISITS: ['admin', 'doctor', 'staff'],
     DELETE_VISITS: ['admin', 'doctor'],
-    VIEW_PRESCRIPTIONS: ['admin', 'doctor', 'staff', 'reception', 'user'],  // Users can view their prescriptions
+    VIEW_PRESCRIPTIONS: ['admin', 'doctor', 'staff', 'receptionist', 'user'],  // Users can view their prescriptions
     CREATE_PRESCRIPTIONS: ['admin', 'doctor', 'staff'],
     EDIT_PRESCRIPTIONS: ['admin', 'doctor', 'staff'],
     DELETE_PRESCRIPTIONS: ['admin', 'doctor'],
@@ -55,11 +57,11 @@ export const PERMISSIONS = {
     RECEIVE_PURCHASE_ORDERS: ['admin', 'staff'],
     
     // Accounting - Invoices
-    VIEW_INVOICES: ['admin', 'doctor', 'staff', 'reception'],
-    CREATE_INVOICES: ['admin', 'staff', 'reception'],
+    VIEW_INVOICES: ['admin', 'doctor', 'staff', 'receptionist'],
+    CREATE_INVOICES: ['admin', 'staff', 'receptionist'],
     EDIT_INVOICES: ['admin', 'staff'],
     DELETE_INVOICES: ['admin'],
-    RECORD_PAYMENTS: ['admin', 'staff', 'reception'],
+    RECORD_PAYMENTS: ['admin', 'staff', 'receptionist'],
     
     // Stock Transactions
     VIEW_STOCK_TRANSACTIONS: ['admin', 'staff'],
@@ -76,14 +78,18 @@ export const PERMISSIONS = {
     DELETE_USERS: ['admin'],
     
     // Dashboard
-    VIEW_DASHBOARD: ['admin', 'doctor', 'staff', 'reception'],
+    VIEW_DASHBOARD: ['admin', 'doctor', 'staff', 'receptionist'],
     VIEW_USER_DASHBOARD: ['user'],  // Patient dashboard
     VIEW_LOW_STOCK_ALERTS: ['admin', 'staff'],
     VIEW_REVENUE_METRICS: ['admin', 'doctor', 'staff'],
     
+    // Tasks
+    VIEW_TASKS: ['receptionist'],
+    MANAGE_TASKS: ['receptionist'],
+    
     // Appointment Requests
-    VIEW_APPOINTMENT_REQUESTS: ['admin', 'doctor', 'staff', 'reception', 'user'],
-    MANAGE_APPOINTMENT_REQUESTS: ['admin', 'doctor', 'staff', 'reception'],
+    VIEW_APPOINTMENT_REQUESTS: ['admin', 'doctor', 'staff', 'receptionist', 'user'],
+    MANAGE_APPOINTMENT_REQUESTS: ['admin', 'doctor', 'staff', 'receptionist'],
 } as const
 
 export type Permission = keyof typeof PERMISSIONS
@@ -110,6 +116,7 @@ export function canAccessRoute(userRole: string, route: string): boolean {
         '/stock-transactions': 'VIEW_STOCK_TRANSACTIONS',
         '/analytics': 'VIEW_ANALYTICS',
         '/users': 'VIEW_USERS',
+        '/tasks': 'VIEW_TASKS',
         '/requests': 'MANAGE_APPOINTMENT_REQUESTS',
         '/my-requests': 'VIEW_APPOINTMENT_REQUESTS',
     }
@@ -126,7 +133,7 @@ export function getRoleDisplayName(role: string): string {
         admin: 'Administrator',
         doctor: 'Doctor',
         staff: 'Staff',
-        reception: 'Reception',
+        receptionist: 'Receptionist',
         user: 'Patient'
     }
     return names[role] || role

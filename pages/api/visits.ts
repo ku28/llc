@@ -2,16 +2,23 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
 import { requireAuth } from '../../lib/auth'
 import { generateOpdNo } from '../../lib/utils'
+import { getDoctorFilter, getDoctorIdForCreate } from '../../lib/doctorUtils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'GET') {
+        const user = await requireAuth(req, res)
+        if (!user) return
+        
         try {
-            const { id, patientId, limit, offset, includePrescriptions } = req.query
+            const { id, patientId, limit, offset, includePrescriptions, doctorId: selectedDoctorId } = req.query
             
             // If ID is provided, fetch single visit
             if (id) {
-                const visit = await prisma.visit.findUnique({
-                    where: { id: Number(id) },
+                const visit = await prisma.visit.findFirst({
+                    where: { 
+                        id: Number(id),
+                        ...getDoctorFilter(user, selectedDoctorId ? Number(selectedDoctorId) : null)
+                    },
                     include: {
                         prescriptions: {
                             include: {
@@ -32,7 +39,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // If patientId is provided, fetch visits for that patient
             if (patientId) {
                 const items = await prisma.visit.findMany({ 
-                    where: { patientId: Number(patientId) },
+                    where: { 
+                        patientId: Number(patientId),
+                        ...getDoctorFilter(user, selectedDoctorId ? Number(selectedDoctorId) : null)
+                    },
                     orderBy: { date: 'desc' },
                     include: {
                         prescriptions: includePrescriptions === 'true' ? {
@@ -51,6 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const offsetNum = offset ? Number(offset) : 0
             
             const items = await prisma.visit.findMany({ 
+                where: getDoctorFilter(user, selectedDoctorId ? Number(selectedDoctorId) : null),
                 take: limitNum,
                 skip: offsetNum,
                 orderBy: { date: 'desc' },
@@ -226,7 +237,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     balance: balance ? Number(balance) : undefined,
                     visitNumber: visitNumber ? Number(visitNumber) : undefined,
                     followUpCount: followUpCount ? Number(followUpCount) : undefined,
-                    reportsAttachments: reportsAttachments !== undefined ? reportsAttachments : undefined
+                    reportsAttachments: reportsAttachments !== undefined ? reportsAttachments : undefined,
+                    doctorId: getDoctorIdForCreate(user, req.body.doctorId)
                 }
                 
                 let visit

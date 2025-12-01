@@ -6,6 +6,7 @@ import PatientSelectionModal from '../components/PatientSelectionModal'
 import { useToast } from '../hooks/useToast'
 import { useImportContext } from '../contexts/ImportContext'
 import { useDataCache } from '../contexts/DataCacheContext'
+import { useDoctor } from '../contexts/DoctorContext'
 import RefreshButton from '../components/RefreshButton'
 import PhoneNumber from '../components/PhoneNumber'
 
@@ -46,6 +47,7 @@ export default function VisitsPage() {
     const { toasts, removeToast, showSuccess, showError } = useToast()
     const { addTask, updateTask, cancelTask } = useImportContext()
     const { getCache, setCache } = useDataCache()
+    const { selectedDoctorId } = useDoctor()
     
     // Listen for maximize events from notification dropdown
     useEffect(() => {
@@ -73,9 +75,12 @@ export default function VisitsPage() {
     const fetchVisits = useCallback(async () => {
         setLoading(true)
         try {
+            const params = new URLSearchParams({ limit: '1000', includePrescriptions: 'false' })
+            if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+            
             const [visitsResponse, patientsData] = await Promise.all([
-                fetch('/api/visits?limit=1000&includePrescriptions=false').then(r => r.json()),
-                fetch('/api/patients').then(r => r.json())
+                fetch(`/api/visits?${params}`).then(r => r.json()),
+                fetch(`/api/patients${selectedDoctorId ? `?doctorId=${selectedDoctorId}` : ''}`).then(r => r.json())
             ])
             
             console.log('API Response:', visitsResponse)
@@ -117,7 +122,7 @@ export default function VisitsPage() {
         } finally {
             setLoading(false)
         }
-    }, [user, setCache])
+    }, [user, selectedDoctorId, setCache])
 
     useEffect(() => {
         if (!user) return
@@ -141,19 +146,33 @@ export default function VisitsPage() {
         return () => {
             setVisits([])
         }
-    }, [user, fetchVisits, getCache])
+    }, [user, selectedDoctorId, fetchVisits, getCache])
+    
+    // Listen for doctor change events
+    useEffect(() => {
+        const handleDoctorChange = () => {
+            if (user) fetchVisits()
+        }
+        
+        window.addEventListener('doctor-changed', handleDoctorChange)
+        return () => window.removeEventListener('doctor-changed', handleDoctorChange)
+    }, [user, fetchVisits])
 
     async function create(e: any) {
         e.preventDefault()
         const response = await fetch('/api/visits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
         if (response.ok) {
             const newVisit = await response.json()
-            const allVisitsResponse = await (await fetch('/api/visits?limit=1000&includePrescriptions=false')).json()
+            const params = new URLSearchParams({ limit: '1000', includePrescriptions: 'false' })
+            if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+            const allVisitsResponse = await (await fetch(`/api/visits?${params}`)).json()
             const allVisits = Array.isArray(allVisitsResponse.data) ? allVisitsResponse.data : 
                               Array.isArray(allVisitsResponse) ? allVisitsResponse : []
             setVisits(allVisits)
         } else {
-            const visitsResponse = await (await fetch('/api/visits?limit=1000&includePrescriptions=false')).json()
+            const params = new URLSearchParams({ limit: '1000', includePrescriptions: 'false' })
+            if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+            const visitsResponse = await (await fetch(`/api/visits?${params}`)).json()
             const visitsArray = Array.isArray(visitsResponse.data) ? visitsResponse.data : 
                                 Array.isArray(visitsResponse) ? visitsResponse : []
             setVisits(visitsArray)
@@ -1381,7 +1400,9 @@ export default function VisitsPage() {
                 isOpen={showImportModal}
                 onClose={() => setShowImportModal(false)}
                 onImportSuccess={() => {
-                    fetch('/api/visits')
+                    const params = new URLSearchParams()
+                    if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
+                    fetch(`/api/visits${params.toString() ? `?${params}` : ''}`)
                         .then(r => r.json())
                         .then(data => setVisits(data))
                     showSuccess('Visits imported successfully!')

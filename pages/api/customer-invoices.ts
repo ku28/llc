@@ -1,10 +1,20 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../lib/prisma'
+import { getDoctorFilter } from '../../lib/doctorUtils'
+import { requireStaffOrAbove } from '../../lib/auth'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    const user = await requireStaffOrAbove(req, res)
+    if (!user) return
+    
     if (req.method === 'GET') {
         try {
+            const { doctorId } = req.query
+            const selectedDoctorId = doctorId ? Number(doctorId) : null
+            const doctorFilter = getDoctorFilter(user, selectedDoctorId)
+            
             const invoices = await prisma.customerInvoice.findMany({
+                where: doctorFilter,
                 orderBy: { invoiceDate: 'desc' },
                 include: {
                     patient: true,
@@ -40,6 +50,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 notes,
                 termsAndConditions
             } = req.body
+
+            // Get doctorId from user
+            const doctorId = user.role === 'doctor' ? user.id : undefined
 
             // Generate Invoice Number
             const lastInvoice = await prisma.customerInvoice.findFirst({
@@ -77,6 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 data: {
                     invoiceNumber,
                     patientId: patientId ? Number(patientId) : null,
+                    doctorId,
                     customerName,
                     customerEmail,
                     customerPhone,

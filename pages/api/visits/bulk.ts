@@ -1,15 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../../lib/prisma'
+import { requireAuth } from '../../../lib/auth'
+import { getDoctorIdForCreate } from '../../../lib/doctorUtils'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'POST') {
-        const { visits } = req.body
+        const user = await requireAuth(req, res)
+        if (!user) return
+        
+        const { visits, doctorId: requestDoctorId } = req.body
 
         if (!Array.isArray(visits) || visits.length === 0) {
             return res.status(400).json({ error: 'Invalid visits array' })
         }
 
-        console.log(`[Bulk Create Visits] Received ${visits.length} visits to import`)
+        // Get the effective doctorId (doctor's own ID, or admin's selected doctor)
+        const doctorId = getDoctorIdForCreate(user, requestDoctorId)
+
+        console.log(`[Bulk Create Visits] Received ${visits.length} visits to import for doctor ID ${doctorId}`)
 
         // Helper function to safely parse dates
         const parseDate = (dateStr: any): Date | null => {
@@ -180,7 +188,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     fatherHusbandGuardianName: visitFields.fatherHusbandGuardianName || null,
                                     gender: visitFields.gender || null,
                                     dob: parseDate(visitFields.dob),
-                                    age: visitFields.age || null
+                                    age: visitFields.age || null,
+                                    doctorId: doctorId
                                 }
                             })
                             // Add to map for subsequent lookups
@@ -279,6 +288,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 height: toNumber(visitFields.height),
                                 procedureAdopted: toString(procedureAdopted),
                                 discussion: toString(discussion),
+                                doctorId: doctorId,
                                 extra: (() => {
                                     const weightHistory = parseWeightHistory(visitFields.weight)
                                     if (weightHistory && weightHistory.includes('/')) {
@@ -331,7 +341,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     spy3: toString(prData.spy3),
                                     timing: toString(prData.timing),
                                     dosage: toString(prData.dosage),
-                                    additions: toString(prData.additions),
+                                    addition1: toString(prData.addition1),
+                                    addition2: toString(prData.addition2),
+                                    addition3: toString(prData.addition3),
                                     procedure: toString(prData.procedure),
                                     presentation: toString(prData.presentation),
                                     droppersToday: toNumber(prData.droppersToday)

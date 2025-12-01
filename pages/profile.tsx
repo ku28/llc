@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { useToast } from '../hooks/useToast'
+import { useDoctor } from '../contexts/DoctorContext'
 import ToastNotification from '../components/ToastNotification'
 
 type TabType = 'overview' | 'edit' | 'security' | 'account'
@@ -23,6 +24,7 @@ export default function ProfilePage() {
     const [uploading, setUploading] = useState(false)
     const [profileImage, setProfileImage] = useState<string | null>(null)
     const { toasts, removeToast, showSuccess, showError, showWarning } = useToast()
+    const { selectedDoctorId, setSelectedDoctorId, doctors, loading: doctorsLoading } = useDoctor()
     
     // Additional patient fields for user role
     const [phone, setPhone] = useState('')
@@ -44,6 +46,16 @@ export default function ProfilePage() {
             setActiveTab(tab as TabType)
         }
     }, [router.query])
+
+    // Trigger data refresh when doctor selection changes
+    useEffect(() => {
+        if (user?.role === 'admin' && selectedDoctorId) {
+            // Dispatch event to notify other components to refresh their data
+            window.dispatchEvent(new CustomEvent('doctor-changed', { 
+                detail: { doctorId: selectedDoctorId } 
+            }))
+        }
+    }, [selectedDoctorId, user?.role])
 
     const fetchUser = async () => {
         try {
@@ -391,10 +403,10 @@ export default function ProfilePage() {
     }
 
     const sidebarItems = [
-        { id: 'overview' as TabType, label: 'Overview', icon: '👤' },
-        { id: 'edit' as TabType, label: 'Edit Profile', icon: '✏️' },
-        { id: 'security' as TabType, label: 'Security', icon: '🔒' },
-        { id: 'account' as TabType, label: 'Account', icon: '⚙️' }
+        { id: 'overview' as TabType, label: 'Overview', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg> },
+        { id: 'edit' as TabType, label: 'Edit Profile', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> },
+        { id: 'security' as TabType, label: 'Security', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg> },
+        { id: 'account' as TabType, label: 'Account', icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> }
     ]
 
     if (loading) {
@@ -425,7 +437,7 @@ export default function ProfilePage() {
                                                 : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
                                         }`}
                                     >
-                                        <span>{item.icon}</span>
+                                        <span className={activeTab === item.id ? 'text-white' : 'text-gray-600 dark:text-gray-400'}>{item.icon}</span>
                                         <span className="font-medium">{item.label}</span>
                                     </button>
                                 ))}
@@ -449,11 +461,74 @@ export default function ProfilePage() {
                                                     : 'hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-md'
                                             }`}
                                         >
-                                            <span className="text-xl">{item.icon}</span>
+                                            <span className={activeTab === item.id ? 'text-white' : 'text-gray-600 dark:text-gray-400'}>{item.icon}</span>
                                             <span>{item.label}</span>
                                         </button>
                                     ))}
                                 </nav>
+                                
+                                {/* Doctor Switcher for Admin */}
+                                {user?.role === 'admin' && (
+                                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                                        <h3 className="px-4 mb-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                            View as Doctor
+                                        </h3>
+                                        {doctorsLoading ? (
+                                            <div className="px-4 py-3 flex items-center justify-center">
+                                                <div className="animate-spin rounded-full h-6 w-6 border-2 border-emerald-500 border-t-transparent"></div>
+                                            </div>
+                                        ) : doctors.length > 0 ? (
+                                            <div className="space-y-1 max-h-64 overflow-y-auto">
+                                                {doctors.map(doctor => (
+                                                    <button
+                                                        key={doctor.id}
+                                                        onClick={() => {
+                                                            setSelectedDoctorId(doctor.id)
+                                                            // Dispatch event to trigger data refresh
+                                                            window.dispatchEvent(new CustomEvent('doctor-changed', { 
+                                                                detail: { doctorId: doctor.id } 
+                                                            }))
+                                                        }}
+                                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left ${
+                                                            selectedDoctorId === doctor.id
+                                                                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 font-medium'
+                                                                : 'hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-md text-gray-700 dark:text-gray-300'
+                                                        }`}
+                                                    >
+                                                        {doctor.profileImage ? (
+                                                            <img 
+                                                                src={doctor.profileImage} 
+                                                                alt={doctor.name} 
+                                                                className="w-8 h-8 rounded-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center flex-shrink-0">
+                                                                <span className="text-xs font-bold text-white">
+                                                                    {doctor.name?.[0]?.toUpperCase() || '👨‍⚕️'}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="truncate text-sm">{doctor.name || 'Unnamed Doctor'}</div>
+                                                            {doctor.email && (
+                                                                <div className="truncate text-xs text-gray-500 dark:text-gray-400">{doctor.email}</div>
+                                                            )}
+                                                        </div>
+                                                        {selectedDoctorId === doctor.id && (
+                                                            <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                                                No doctors found
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

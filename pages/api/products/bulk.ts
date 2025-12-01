@@ -1,15 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../../lib/prisma'
+import { requireAuth } from '../../../lib/auth'
+import { getDoctorIdForCreate } from '../../../lib/doctorUtils'
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'POST') {
-        const { products } = req.body
+        const user = await requireAuth(req, res)
+        if (!user) return
+        
+        const { products, doctorId: requestDoctorId } = req.body
 
         if (!Array.isArray(products) || products.length === 0) {
             return res.status(400).json({ error: 'Invalid products array' })
         }
 
-        console.log(`[Bulk Create Products] Received ${products.length} products to import`)
+        // Get the effective doctorId (doctor's own ID, or admin's selected doctor)
+        const doctorId = getDoctorIdForCreate(user, requestDoctorId)
+
+        console.log(`[Bulk Create Products] Received ${products.length} products to import for doctor ID ${doctorId}`)
 
         try {
             // Step 1: Collect all unique category names
@@ -27,8 +35,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 
                 for (const categoryName of uniqueCategoryNames) {
                     const existingCategory = await prisma.category.upsert({
-                        where: { name: categoryName },
-                        create: { name: categoryName },
+                        where: { 
+                            name_doctorId: {
+                                name: categoryName,
+                                doctorId: doctorId
+                            }
+                        },
+                        create: { 
+                            name: categoryName,
+                            doctorId: doctorId
+                        },
                         update: {}
                     })
                     categoryMap.set(categoryName, existingCategory.id)
@@ -113,7 +129,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     purchaseValue: purchaseValueFloat,
                                     salesValue: salesValueFloat,
                                     totalPurchased: totalPurchasedValue,
-                                    totalSales: totalSalesValue
+                                    totalSales: totalSalesValue,
+                                    doctorId: doctorId
                                 }
 
                                 if (existing) {

@@ -4,7 +4,6 @@ import Header from './Header'
 import Footer from './Footer'
 import FloatingPrescriptionButton from './FloatingPrescriptionButton'
 import FloatingBookButton from './FloatingBookButton'
-import LandingHeader from './LandingHeader'
 import TokenSidebar from './TokenSidebar'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -33,6 +32,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [])
 
   const isPatient = user?.role?.toLowerCase() === 'user'
+  const isReception = user?.role === 'receptionist'
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg)' }}>
@@ -47,8 +47,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Show FloatingPrescriptionButton for staff/admin/doctor/reception */}
-      {!isLanding && !isPatient && <FloatingPrescriptionButton />}
+      {/* Show FloatingPrescriptionButton for staff/admin/doctor but not reception */}
+      {!isLanding && !isPatient && !isReception && <FloatingPrescriptionButton />}
       
       {/* Show FloatingBookButton for patients (user role) */}
       {!isLanding && isPatient && <FloatingBookButton />}
@@ -56,7 +56,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Show FloatingBookButton on landing pages */}
       {isLanding && <FloatingBookButton />}
 
-      {/* Token Sidebar */}
+      {/* Token Sidebar - Show for reception and other staff roles */}
       {!isLanding && !isPatient && (
         <TokenSidebar 
           isOpen={tokenSidebarOpen} 

@@ -21,6 +21,10 @@ export default function LandingPage() {
       .then(d => {
         setUser(d.user)
         setLoading(false)
+        // Redirect receptionist to patients page
+        if (d.user && d.user.role === 'receptionist') {
+          router.push('/patients')
+        }
       })
       .catch(() => setLoading(false))
   }, [])
