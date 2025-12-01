@@ -438,13 +438,15 @@ function TreatmentsPage() {
                     <div className="relative">
                         <button 
                             onClick={() => setShowExportDropdown(!showExportDropdown)}
-                            className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50"
+                            className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50 px-2 sm:px-4"
+                            title={selectedTreatmentIds.size > 0 ? `Export ${selectedTreatmentIds.size} selected` : 'Export All'}
+                            aria-label={selectedTreatmentIds.size > 0 ? `Export ${selectedTreatmentIds.size} selected` : 'Export All'}
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                             </svg>
-                            <span className="font-semibold">{selectedTreatmentIds.size > 0 ? `Export (${selectedTreatmentIds.size})` : 'Export All'}</span>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <span className="font-semibold hidden sm:inline">{selectedTreatmentIds.size > 0 ? `Export (${selectedTreatmentIds.size})` : 'Export All'}</span>
+                            <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
                         </button>
@@ -482,18 +484,23 @@ function TreatmentsPage() {
                     </div>
                     <button 
                         onClick={() => setShowImportModal(true)}
-                        className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2"
+                        className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2 px-2 sm:px-4"
+                        title="Import treatments"
+                        aria-label="Import treatments"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                         </svg>
-                        <span className="font-semibold">Import</span>
+                        <span className="font-semibold hidden sm:inline">Import</span>
                     </button>
                     <button 
                         onClick={() => router.push('/treatments/new')}
-                        className="btn btn-primary"
+                        className="btn btn-primary px-2 sm:px-4"
+                        title="Add New Treatment"
+                        aria-label="Add New Treatment"
                     >
-                        + Add New Treatment
+                        <span>+</span>
+                        <span className="hidden sm:inline ml-1">Add New Treatment</span>
                     </button>
                 </div>
             </div>
@@ -519,12 +526,14 @@ function TreatmentsPage() {
                     <div className="relative">
                         <button
                             onClick={() => setShowSortDropdown(!showSortDropdown)}
-                            className="px-4 py-2.5 bg-white dark:bg-gray-800 border-2 border-emerald-200 dark:border-emerald-700 rounded-lg hover:border-emerald-400 dark:hover:border-emerald-600 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-sm hover:shadow-md"
+                            className="px-2 sm:px-4 py-2.5 bg-white dark:bg-gray-800 border-2 border-emerald-200 dark:border-emerald-700 rounded-lg hover:border-emerald-400 dark:hover:border-emerald-600 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-sm hover:shadow-md"
+                            title="Sort treatments"
+                            aria-label="Sort treatments"
                         >
                             <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                             </svg>
-                            <span>Sort</span>
+                            <span className="hidden sm:inline">Sort</span>
                         </button>
                         {showSortDropdown && (
                             <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[9999] overflow-hidden">
@@ -893,27 +902,47 @@ function TreatmentsPage() {
                                                         })
                                                         router.push(`/treatments/new?${params.toString()}`)
                                                     }}
-                                                    className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded"
+                                                    className="px-2 sm:px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded flex items-center gap-1"
                                                     title="Add Plan"
                                                 >
-                                                    + Add Plan
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                                    </svg>
+                                                    <span className="hidden sm:inline">Add Plan</span>
                                                 </button>
                                                 <button
                                                     onClick={() => openDeleteAllConfirmation(diagnosis, treatments.map((t: any) => t.id))}
-                                                    className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded flex items-center gap-1"
+                                                    className="px-2 sm:px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded flex items-center gap-1"
                                                     title="Delete All Plans"
                                                 >
                                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                     </svg>
-                                                    Delete All
+                                                    <span className="hidden sm:inline">Delete All</span>
                                                 </button>
                                                 <button
                                                     onClick={() => toggleRowExpansion(groupKey as any)}
-                                                    className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                                                    className="px-2 sm:px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded flex items-center gap-1"
                                                     title={isExpanded ? "Hide Details" : "View More"}
                                                 >
-                                                    {isExpanded ? '▲ Hide' : '▼ View More'}
+                                                    {isExpanded ? (
+                                                        <>
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                            </svg>
+                                                            <span className="hidden sm:inline">Hide</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <svg className="w-3 h-3 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                            <span className="hidden sm:inline">View More</span>
+                                                            <svg className="w-3 h-3 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </>
+                                                    )}
                                                 </button>
                                             </div>
                                         </div>

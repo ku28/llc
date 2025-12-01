@@ -26,6 +26,7 @@ interface TreatmentRow {
     additions?: string
     procedure?: string
     presentation?: string
+    bottleSize?: string
 }
 
 export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess }: ImportTreatmentModalProps) {
@@ -130,6 +131,7 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
             additions: row.additions || undefined,
             procedure: row.procedure || undefined,
             presentation: row.presentation || undefined,
+            bottleSize: row.bottleSize || undefined,
         }))
 
         // Validate required fields
@@ -213,6 +215,7 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                                 additions: row.additions,
                                 procedure: row.procedure,
                                 presentation: row.presentation,
+                                bottleSize: row.bottleSize,
                             })
                         } else {
                             console.warn(`Skipping duplicate product "${row.productName}" in plan ${firstRow.planNumber} (${firstRow.provDiagnosis})`)

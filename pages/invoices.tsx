@@ -141,9 +141,11 @@ export default function InvoicesPage() {
     }
 
     const fetchPatients = async () => {
-        const response = await fetch('/api/patients/public')
-        const data = await response.json()
-        setPatients(Array.isArray(data) ? data : [])
+        // Use cached patients data from DataCacheContext
+        const cachedPatients = getCache('patients')
+        if (cachedPatients) {
+            setPatients(Array.isArray(cachedPatients) ? cachedPatients : [])
+        }
     }
 
     const fetchProducts = async () => {
@@ -967,23 +969,27 @@ export default function InvoicesPage() {
                         <RefreshButton onRefresh={fetchInvoices} />
                         <button 
                             onClick={() => setIsImportModalOpen(true)}
-                            className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2"
+                            className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2 px-2 sm:px-4"
+                            title="Import PDF invoices"
+                            aria-label="Import PDF invoices"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                             </svg>
-                            <span className="font-semibold">Import PDF</span>
+                            <span className="font-semibold hidden sm:inline">Import PDF</span>
                         </button>
                         <div className="relative">
                             <button 
                                 onClick={() => setShowExportDropdown(!showExportDropdown)}
-                                className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50"
+                                className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50 px-2 sm:px-4"
+                                title={selectedInvoiceIds.size > 0 ? `Export ${selectedInvoiceIds.size} selected` : 'Export All'}
+                                aria-label={selectedInvoiceIds.size > 0 ? `Export ${selectedInvoiceIds.size} selected` : 'Export All'}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                                 </svg>
-                                <span className="font-semibold">{selectedInvoiceIds.size > 0 ? `Export (${selectedInvoiceIds.size})` : 'Export All'}</span>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <span className="font-semibold hidden sm:inline">{selectedInvoiceIds.size > 0 ? `Export (${selectedInvoiceIds.size})` : 'Export All'}</span>
+                                <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                             </button>
@@ -1026,17 +1032,18 @@ export default function InvoicesPage() {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                             </svg>
-                            <span className="font-semibold">Import</span>
+                            <span className="hidden sm:inline font-semibold">Import</span>
                         </button>
                         <button
                             onClick={generateInvoicesFromVisits}
                             disabled={loading}
-                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            <span className="font-semibold">{loading ? 'Generating...' : 'Generate from Visits'}</span>
+                            <span className="hidden sm:inline font-semibold">{loading ? 'Generating...' : 'Generate from Visits'}</span>
+                            <span className="sm:hidden text-sm font-semibold">{loading ? 'Gen...' : 'Generate'}</span>
                         </button>
                         <button
                             onClick={() => {
@@ -1044,28 +1051,30 @@ export default function InvoicesPage() {
                                 setIsAnimating(false)
                                 setTimeout(() => setIsAnimating(true), 10)
                             }}
-                            className="btn btn-primary"
+                            className="btn btn-primary flex items-center gap-1"
                         >
-                            + Create Invoice
+                            <span className="text-lg">+</span>
+                            <span className="hidden sm:inline">Create Invoice</span>
+                            <span className="sm:hidden">New</span>
                         </button>
                     </div>
                 )}
             </div>
 
             {/* Search and Filter Bar */}
-            <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 mb-4">
+            <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-3 sm:p-4 mb-4">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                <div className="relative flex items-center gap-3 flex-wrap">
-                    <div className="flex-1 relative min-w-[250px]">
+                <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+                    <div className="flex-1 relative min-w-0">
                         <input
                             type="text"
                             placeholder="🔍 Search invoices..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full p-3 pr-10 border border-emerald-200 dark:border-emerald-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
+                            className="w-full p-2 sm:p-3 pr-10 text-sm sm:text-base border border-emerald-200 dark:border-emerald-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-800 dark:text-white"
                         />
                     </div>
-                    <div className={`w-48 ${isFilterStatusOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
+                    <div className={`w-full sm:w-48 ${isFilterStatusOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
                         <CustomSelect
                             value={filterStatus}
                             onChange={(value) => setFilterStatus(value)}
@@ -1085,7 +1094,7 @@ export default function InvoicesPage() {
                                 setSearchQuery('')
                                 setFilterStatus('')
                             }}
-                            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            className="px-3 sm:px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                         >
                             Clear
                         </button>
@@ -1188,20 +1197,31 @@ export default function InvoicesPage() {
                                                         e.stopPropagation()
                                                         printInvoice(inv)
                                                     }}
-                                                    className="px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                                                    className="px-2 sm:px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors flex items-center gap-1"
                                                     title="Print Invoice"
                                                 >
-                                                    🖨️ Print
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                    </svg>
+                                                    <span className="hidden sm:inline">Print</span>
                                                 </button>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation()
                                                         editInvoice(inv)
                                                     }}
-                                                    className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                                                    className="px-2 sm:px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
                                                     title="Edit"
                                                 >
-                                                    ✏️ Edit
+                                                    <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                    <span className="hidden sm:flex items-center gap-1">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                        Edit
+                                                    </span>
                                                 </button>
                                                 <button
                                                     onClick={(e) => {
@@ -1209,10 +1229,18 @@ export default function InvoicesPage() {
                                                         deleteInvoice(inv.id)
                                                     }}
                                                     disabled={!user}
-                                                    className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                    className="px-2 sm:px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                                     title="Delete"
                                                 >
-                                                    🗑️ Delete
+                                                    <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                    <span className="hidden sm:flex items-center gap-1">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                        Delete
+                                                    </span>
                                                 </button>
                                                 <button
                                                     onClick={(e) => {
@@ -1283,12 +1311,14 @@ export default function InvoicesPage() {
                                 <button
                                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                     disabled={currentPage === 1}
-                                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="px-2 sm:px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    title="Previous page"
+                                    aria-label="Previous page"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
-                                    Previous
+                                    <span className="hidden sm:inline">Previous</span>
                                 </button>
                                 <span className="text-sm text-gray-700 dark:text-gray-300">
                                     Page {currentPage} of {Math.ceil(filteredInvoices.length / itemsPerPage)}
@@ -1296,9 +1326,11 @@ export default function InvoicesPage() {
                                 <button
                                     onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredInvoices.length / itemsPerPage), prev + 1))}
                                     disabled={currentPage === Math.ceil(filteredInvoices.length / itemsPerPage)}
-                                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="px-2 sm:px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    title="Next page"
+                                    aria-label="Next page"
                                 >
-                                    Next
+                                    <span className="hidden sm:inline">Next</span>
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
@@ -1317,10 +1349,24 @@ export default function InvoicesPage() {
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
                             
                             {/* Header */}
-                            <div className="relative bg-gradient-to-r from-emerald-50 to-green-50 dark:from-gray-800 dark:to-gray-800 px-6 py-4 border-b border-emerald-200/30 dark:border-emerald-700/30">
+                            <div className="relative bg-gradient-to-r from-emerald-50 to-green-50 dark:from-gray-800 dark:to-gray-800 px-4 sm:px-6 py-3 sm:py-4 border-b border-emerald-200/30 dark:border-emerald-700/30">
                                 <div className="flex justify-between items-center">
-                                    <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
-                                        {editingId ? '✏️ Edit Invoice' : '📄 New Invoice'}
+                                    <h2 className="text-lg sm:text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 flex items-center gap-2">
+                                        {editingId ? (
+                                            <>
+                                                <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                                Edit Invoice
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                New Invoice
+                                            </>
+                                        )}
                                     </h2>
                                     <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1331,12 +1377,12 @@ export default function InvoicesPage() {
                             </div>
 
                             {/* Form Content - Scrollable */}
-                            <div className="relative p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-                                <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="relative p-4 sm:p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                                     {/* Customer Information Section */}
                                     <div>
                                         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">👤 Customer Information</h3>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                             <div className={isPatientSelectOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Patient (Optional)</label>
                                                 <CustomSelect
@@ -1411,7 +1457,7 @@ export default function InvoicesPage() {
                                     {/* Invoice Details Section */}
                                     <div>
                                         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">📅 Invoice Details</h3>
-                                        <div className="grid grid-cols-3 gap-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Invoice Date *</label>
                                                 <input
@@ -1522,9 +1568,12 @@ export default function InvoicesPage() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => removeItem(index)}
-                                                                className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-md transition-colors"
+                                                                className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded-md transition-colors flex items-center gap-1"
                                                             >
-                                                                🗑️ Remove
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                </svg>
+                                                                Remove
                                                             </button>
                                                         )}
                                                     </div>

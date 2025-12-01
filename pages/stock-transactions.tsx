@@ -423,17 +423,17 @@ export default function StockTransactionsPage() {
                     {/* Export Dropdown */}
                     {user && (
                         <div className="relative">
-                            <button
-                                onClick={() => setShowExportDropdown(!showExportDropdown)}
-                                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all duration-200 font-medium"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                                {selectedTransactionIds.size > 0 ? `Export (${selectedTransactionIds.size})` : 'Export All'}
-                            </button>
-
-                            {showExportDropdown && (
+                        <button 
+                            onClick={() => setShowExportDropdown(!showExportDropdown)}
+                            className="px-2 sm:px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all duration-200 font-medium"
+                            title={selectedTransactionIds.size > 0 ? `Export ${selectedTransactionIds.size} selected` : 'Export All'}
+                            aria-label={selectedTransactionIds.size > 0 ? `Export ${selectedTransactionIds.size} selected` : 'Export All'}
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span className="hidden sm:inline">{selectedTransactionIds.size > 0 ? `Export (${selectedTransactionIds.size})` : 'Export All'}</span>
+                        </button>                            {showExportDropdown && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 z-[9999] overflow-hidden">
                                     <button
                                         onClick={() => exportData('csv')}
@@ -854,12 +854,14 @@ export default function StockTransactionsPage() {
                                     <button
                                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                         disabled={currentPage === 1}
-                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        className="px-2 sm:px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        title="Previous page"
+                                        aria-label="Previous page"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                         </svg>
-                                        Previous
+                                        <span className="hidden sm:inline">Previous</span>
                                     </button>
                                     <span className="text-sm text-gray-700 dark:text-gray-300">
                                         Page {currentPage} of {Math.ceil(transactions.length / itemsPerPage)}
@@ -867,9 +869,11 @@ export default function StockTransactionsPage() {
                                     <button
                                         onClick={() => setCurrentPage(prev => Math.min(Math.ceil(transactions.length / itemsPerPage), prev + 1))}
                                         disabled={currentPage === Math.ceil(transactions.length / itemsPerPage)}
-                                        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        className="px-2 sm:px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        title="Next page"
+                                        aria-label="Next page"
                                     >
-                                        Next
+                                        <span className="hidden sm:inline">Next</span>
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                         </svg>

@@ -9,7 +9,21 @@ html, body, #__next {
 
 html {
   scroll-behavior: smooth;
-  font-size: 95%;
+  font-size: 85%; /* Mobile base size */
+}
+
+/* Tablet and up: increase font size */
+@media (min-width: 640px) {
+  html {
+    font-size: 90%;
+  }
+}
+
+/* Desktop: default font size */
+@media (min-width: 1024px) {
+  html {
+    font-size: 95%;
+  }
 }
 
 body {
@@ -791,7 +805,7 @@ a:hover {
   font-weight: 500;
   margin-bottom: 0.25rem;
   background: transparent;
-  font-size: 0.85rem; /* 15% smaller than base 1rem */
+  font-size: 0.765rem; /* 10% smaller than 0.85rem */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

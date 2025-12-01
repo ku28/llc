@@ -659,15 +659,16 @@ export default function EditHomePage() {
                 return (
                     <div className="space-y-6">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-semibold">YouTube Video URLs</h3>
+                            <h3 className="text-base sm:text-lg font-semibold">YouTube Video URLs</h3>
                             <button
                                 onClick={addVideo}
-                                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                 </svg>
-                                Add Video
+                                <span className="hidden sm:inline">Add Video</span>
+                                <span className="sm:hidden">Add</span>
                             </button>
                         </div>
 
@@ -703,13 +704,13 @@ export default function EditHomePage() {
                 return (
                     <div className="space-y-6">
                         {/* Bulk Actions Bar */}
-                        <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center gap-3">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-2 sm:gap-3">
                                 <button
                                     onClick={selectAllAchievements}
-                                    className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                    className="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                                 >
-                                    <div className={`w-5 h-5 border-2 border-green-400 dark:border-green-600 rounded bg-white dark:bg-gray-700 transition-all duration-200 flex items-center justify-center shadow-sm ${
+                                    <div className={`w-4 h-4 sm:w-5 sm:h-5 border-2 border-green-400 dark:border-green-600 rounded bg-white dark:bg-gray-700 transition-all duration-200 flex items-center justify-center shadow-sm ${
                                         selectedAchievements.size === achievements.length && achievements.length > 0 
                                         ? 'bg-gradient-to-br from-green-500 to-emerald-600 border-green-500 shadow-lg shadow-green-500/50' 
                                         : ''
@@ -722,11 +723,12 @@ export default function EditHomePage() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
                                         </svg>
                                     </div>
-                                    Select All
+                                    <span className="hidden sm:inline">Select All</span>
+                                    <span className="sm:hidden">All</span>
                                 </button>
 
                                 {selectedAchievements.size > 0 && (
-                                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                                    <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                                         {selectedAchievements.size} selected
                                     </span>
                                 )}
@@ -735,17 +737,18 @@ export default function EditHomePage() {
                             {selectedAchievements.size > 0 && (
                                 <button
                                     onClick={bulkDeleteAchievements}
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                                    className="flex items-center justify-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
-                                    Delete Selected ({selectedAchievements.size})
+                                    <span className="hidden sm:inline">Delete Selected ({selectedAchievements.size})</span>
+                                    <span className="sm:hidden">Delete ({selectedAchievements.size})</span>
                                 </button>
                             )}
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                             {achievements.map((img, index) => (
                                 <div
                                     key={index}

@@ -237,8 +237,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         taxAmount: Math.round(taxAmount),
                         discount: 0,
                         totalAmount,
-                        balanceAmount: totalAmount,
-                        paymentMethod: null,
+                        balanceAmount: 0,  // Set to 0 for paid invoices
+                        paidAmount: totalAmount,  // Set paidAmount to totalAmount for paid status
+                        status: 'paid',  // Set status to paid
+                        paymentMethod: 'CASH',  // Set default payment method
                         notes: `Auto-generated from visit on ${new Date(visit.date).toLocaleDateString()} (visit ID: ${visit.id})`,
                         termsAndConditions: 'Payment due within 30 days.',
                         items: invoiceItems,

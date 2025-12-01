@@ -70,7 +70,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             addition2: p.addition2 || null,
                             addition3: p.addition3 || null,
                             procedure: p.procedure || null,
-                            presentation: p.presentation || null
+                            presentation: p.presentation || null,
+                            bottleSize: p.bottleSize || null
                         }))
                     }
                 },
@@ -134,7 +135,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             addition2: p.addition2 || null,
                             addition3: p.addition3 || null,
                             procedure: p.procedure || null,
-                            presentation: p.presentation || null
+                            presentation: p.presentation || null,
+                            bottleSize: p.bottleSize || null
                         }))
                     }
                 },

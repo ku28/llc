@@ -34,6 +34,7 @@ export default function PrescriptionsPage() {
     const [patients, setPatients] = useState<any[]>([])
     const [treatments, setTreatments] = useState<any[]>([])
     const [products, setProducts] = useState<any[]>([])
+    const [dataLoading, setDataLoading] = useState(false)
     const [selectedProductId, setSelectedProductId] = useState<string>('')
     const [selectedMedicines, setSelectedMedicines] = useState<string[]>([])
     const [attachments, setAttachments] = useState<Array<{ url: string, name: string, type: string }>>([])
@@ -58,14 +59,14 @@ export default function PrescriptionsPage() {
         improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '',
         nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '',
         height: '', heightFeet: '', heightInches: '', weight: '', fatherHusbandGuardianName: '', imageUrl: '',
-        // New financial fields
+        // New financial fields - ensure they're strings not undefined
         amount: '', discount: '', payment: '', balance: '',
-        // New tracking fields
+        // New tracking fields - ensure they're strings not undefined
         visitNumber: '', followUpCount: ''
     })
     const [prescriptions, setPrescriptions] = useState<any[]>([])
+    const [collapsedSections, setCollapsedSections] = useState<{[key: number]: {spy46: boolean, additions: boolean}}>({})
     const [loading, setLoading] = useState(false)
-    const [dataLoading, setDataLoading] = useState(true)
     const [lastCreatedVisitId, setLastCreatedVisitId] = useState<number | null>(null)
     const [lastCreatedVisit, setLastCreatedVisit] = useState<any | null>(null)
     const [previousWeight, setPreviousWeight] = useState<string>('')
@@ -188,6 +189,39 @@ export default function PrescriptionsPage() {
         fetchData()
     }, [])
 
+    // Initialize default droppers for new prescriptions (not in edit mode)
+    useEffect(() => {
+        if (!isEditMode && products.length > 0 && prescriptions.length === 0) {
+            const defaultDroppers = [
+                'DRP SCOROFOLOSO',
+                'DRP CANCEROSO',
+                'DRP FEBRIFUGO'
+            ]
+
+            const defaultPrescriptions = defaultDroppers.map(dropperName => {
+                // Try to find the product by name
+                const product = products.find(p => 
+                    p.name.toUpperCase().includes(dropperName) || 
+                    dropperName.includes(p.name.toUpperCase())
+                )
+
+                return {
+                    treatmentId: '',
+                    productId: product ? String(product.id) : '',
+                    quantity: 10,
+                    bottleSize: '15ml',
+                    dosage: '10|TDS|WTR', // dose|doseTiming|dilution
+                    spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
+                    addition1: '', addition2: '', addition3: '',
+                    timing: '', presentation: '', procedure: '', administration: '',
+                    droppersToday: '', medicineQuantity: '', patientHasMedicine: false
+                }
+            })
+
+            setPrescriptions(defaultPrescriptions)
+        }
+    }, [products, isEditMode])
+
     // Set patientId and visitNumber from URL query parameters
     useEffect(() => {
         const { patientId, visitNumber } = router.query
@@ -208,19 +242,19 @@ export default function PrescriptionsPage() {
                         }
 
                         setForm((prev: any) => ({
-                            ...prev,
+            ...prev,
                             patientId: String(patientId),
-                            opdNo: latestVisit?.opdNo || previewOpdNo,
-                            visitNumber: visitNumber ? String(visitNumber) : prev.visitNumber,
-                            dob: formatDateForInput(found.dob),
-                            age: found.age ?? '',
+                            opdNo: latestVisit?.opdNo || previewOpdNo || '',
+                            visitNumber: visitNumber ? String(visitNumber) : (prev.visitNumber || ''),
+                            dob: formatDateForInput(found.dob) || '',
+                            age: String(found.age ?? ''),
                             address: found.address || '',
                             gender: found.gender || '',
                             phone: found.phone || '',
                             occupation: found.occupation || '',
-                            pendingPaymentCents: found.pendingPaymentCents ?? '',
-                            height: found.height ?? '',
-                            weight: found.weight ?? '',
+                            pendingPaymentCents: String(found.pendingPaymentCents ?? ''),
+                            height: String(found.height ?? ''),
+                            weight: String(found.weight ?? ''),
                             fatherHusbandGuardianName: found.fatherHusbandGuardianName || '',
                             // Load clinical information from patient record
                             temperament: found.temperament || '',
@@ -239,16 +273,16 @@ export default function PrescriptionsPage() {
                             ...prev,
                             patientId: String(patientId),
                             opdNo: '',
-                            visitNumber: visitNumber ? String(visitNumber) : prev.visitNumber,
-                            dob: formatDateForInput(found.dob),
-                            age: found.age ?? '',
+                            visitNumber: visitNumber ? String(visitNumber) : (prev.visitNumber || ''),
+                            dob: formatDateForInput(found.dob) || '',
+                            age: String(found.age ?? ''),
                             address: found.address || '',
                             gender: found.gender || '',
                             phone: found.phone || '',
                             occupation: found.occupation || '',
-                            pendingPaymentCents: found.pendingPaymentCents ?? '',
-                            height: found.height ?? '',
-                            weight: found.weight ?? '',
+                            pendingPaymentCents: String(found.pendingPaymentCents ?? ''),
+                            height: String(found.height ?? ''),
+                            weight: String(found.weight ?? ''),
                             fatherHusbandGuardianName: found.fatherHusbandGuardianName || '',
                             // Load clinical information from patient record
                             temperament: found.temperament || '',
@@ -308,20 +342,20 @@ export default function PrescriptionsPage() {
                 totalAmount += (Number(product.priceRupees) * quantity)
             }
 
-            // Add spy bottle price only once if any spy4-spy6 are filled
-            if (!spyBottleAdded && (pr.spy4 || pr.spy5 || pr.spy6) && pr.spyBottleSize) {
-                const bottlePrice = bottlePricing.find(b => b.value === pr.spyBottleSize)
-                if (bottlePrice) {
-                    totalAmount += bottlePrice.price
+            // Add bottle price based on bottle size selection and filled components
+            if (pr.bottleSize) {
+                const bottlePriceData = bottlePricing.find(b => b.value === pr.bottleSize)
+                const bottlePrice = bottlePriceData ? bottlePriceData.price : 0
+
+                // Add for SPY components (spy4-spy6)
+                if (!spyBottleAdded && (pr.spy4 || pr.spy5 || pr.spy6) && bottlePrice > 0) {
+                    totalAmount += bottlePrice
                     spyBottleAdded = true
                 }
-            }
 
-            // Add additions bottle price only once if any addition1-addition3 are filled
-            if (!additionsBottleAdded && (pr.addition1 || pr.addition2 || pr.addition3) && pr.additionsBottleSize) {
-                const bottlePrice = bottlePricing.find(b => b.value === pr.additionsBottleSize)
-                if (bottlePrice) {
-                    totalAmount += bottlePrice.price
+                // Add for Additions (addition1-addition3)
+                if (!additionsBottleAdded && (pr.addition1 || pr.addition2 || pr.addition3) && bottlePrice > 0) {
+                    totalAmount += bottlePrice
                     additionsBottleAdded = true
                 }
             }
@@ -1063,12 +1097,12 @@ export default function PrescriptionsPage() {
         setPrescriptions([...prescriptions, {
             treatmentId: '', productId: String(prod.id),
             spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
-            quantity: 1, timing: '', dosage: '',
+            quantity: 1, timing: '', dosage: '|TDS|WTR',
             addition1: '', addition2: '', addition3: '',
             procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
             administration: '', patientHasMedicine: false,
-            spyBottleSize: '', additionsBottleSize: ''
+            bottleSize: ''
         }])
     }
 
@@ -1099,12 +1133,12 @@ export default function PrescriptionsPage() {
             treatmentId: selectedTreatmentId || '', // Use selected treatment plan if any
             productId: productId,
             spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
-            quantity: 1, timing: '', dosage: '',
+            quantity: 1, timing: '', dosage: '|TDS|WTR',
             addition1: '', addition2: '', addition3: '',
             procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
             administration: '', patientHasMedicine: false,
-            spyBottleSize: '', additionsBottleSize: ''
+            bottleSize: ''
         }))
 
         setPrescriptions([...prescriptions, ...newPrescriptions])
@@ -1244,12 +1278,12 @@ export default function PrescriptionsPage() {
         setPrescriptions([...prescriptions, {
             treatmentId: '', productId: '',
             spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
-            quantity: 1, timing: '', dosage: '',
+            quantity: 1, timing: '', dosage: '|TDS|WTR',
             addition1: '', addition2: '', addition3: '',
             procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
             administration: '', patientHasMedicine: false,
-            spyBottleSize: '', additionsBottleSize: ''
+            bottleSize: ''
         }])
     }
 
@@ -1627,18 +1661,18 @@ export default function PrescriptionsPage() {
                                                             setForm((prev: any) => ({
                                                                 ...prev,
                                                                 patientId: String(found.id),
-                                                                opdNo: latestVisit?.opdNo || previewOpdNo,
-                                                                dob: formatDateForInput(found.dob),
-                                                                age: found.age ?? '',
+                                                                opdNo: latestVisit?.opdNo || previewOpdNo || '',
+                                                                dob: formatDateForInput(found.dob) || '',
+                                                                age: String(found.age ?? ''),
                                                                 address: found.address || '',
                                                                 gender: found.gender || '',
                                                                 phone: found.phone || '',
-                                                                nextVisitDate,
-                                                                nextVisitTime,
+                                                                nextVisitDate: nextVisitDate || '',
+                                                                nextVisitTime: nextVisitTime || '',
                                                                 occupation: found.occupation || '',
-                                                                pendingPaymentCents: found.pendingPaymentCents ?? '',
-                                                                height: found.height ?? '',
-                                                                weight: found.weight ?? '',
+                                                                pendingPaymentCents: String(found.pendingPaymentCents ?? ''),
+                                                                height: String(found.height ?? ''),
+                                                                weight: String(found.weight ?? ''),
                                                                 imageUrl: found.imageUrl || ''
                                                             }))
                                                         })
@@ -1647,17 +1681,17 @@ export default function PrescriptionsPage() {
                                                                 ...prev,
                                                                 patientId: String(found.id),
                                                                 opdNo: '',
-                                                                dob: formatDateForInput(found.dob),
-                                                                age: found.age ?? '',
+                                                                dob: formatDateForInput(found.dob) || '',
+                                                                age: String(found.age ?? ''),
                                                                 address: found.address || '',
                                                                 gender: found.gender || '',
                                                                 phone: found.phone || '',
-                                                                nextVisitDate,
-                                                                nextVisitTime,
+                                                                nextVisitDate: nextVisitDate || '',
+                                                                nextVisitTime: nextVisitTime || '',
                                                                 occupation: found.occupation || '',
-                                                                pendingPaymentCents: found.pendingPaymentCents ?? '',
-                                                                height: found.height ?? '',
-                                                                weight: found.weight ?? '',
+                                                                pendingPaymentCents: String(found.pendingPaymentCents ?? ''),
+                                                                height: String(found.height ?? ''),
+                                                                weight: String(found.weight ?? ''),
                                                                 imageUrl: found.imageUrl || ''
                                                             }))
                                                         })
@@ -1739,7 +1773,7 @@ export default function PrescriptionsPage() {
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Age</label>
-                                            <input type="number" placeholder="35" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} className="w-full p-2 border rounded" />
+                                            <input type="number" placeholder="35" value={form.age || ''} onChange={e => setForm({ ...form, age: e.target.value })} className="w-full p-2 border rounded" />
                                         </div>
                                         <div className={isGenderOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                             <label className="block text-sm font-medium mb-1.5">Gender</label>
@@ -1772,7 +1806,7 @@ export default function PrescriptionsPage() {
                                             <label className="block text-sm font-medium mb-1.5">Height</label>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {/* CM Input */}
-                                                <div className="flex items-center rounded overflow-hidden bg-white dark:bg-gray-800 w-32">
+                                                <div className="flex items-center rounded overflow-hidden bg-white dark:bg-gray-800 w-full sm:w-32">
                                                     <input
                                                         type="number"
                                                         placeholder="175"
@@ -1816,11 +1850,11 @@ export default function PrescriptionsPage() {
                                                     </span>
                                                 )}
                                             </label>
-                                            <input type="number" placeholder="70" value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} className="w-full p-2 border rounded" />
+                                            <input type="number" placeholder="70" value={form.weight || ''} onChange={e => setForm({ ...form, weight: e.target.value })} className="w-full p-2 border rounded" />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium mb-1.5">Pending Payment (₹)</label>
-                                            <input type="number" step="0.01" placeholder="500.00" value={form.pendingPaymentCents} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} className="w-full p-2 border rounded" />
+                                            <input type="number" step="0.01" placeholder="500.00" value={form.pendingPaymentCents || ''} onChange={e => setForm({ ...form, pendingPaymentCents: e.target.value })} className="w-full p-2 border rounded" />
                                         </div>
                                     </div>
                                 </div>
@@ -1833,9 +1867,11 @@ export default function PrescriptionsPage() {
                                 <button
                                     type="button"
                                     onClick={nextStep}
-                                    className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    className="px-4 sm:px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    title="Next: Clinical Info"
                                 >
-                                    Next: Clinical Info
+                                    <span className="hidden sm:inline">Next: Clinical Info</span>
+                                    <span className="sm:hidden">Next</span>
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
@@ -2004,19 +2040,22 @@ export default function PrescriptionsPage() {
                                 <button
                                     type="button"
                                     onClick={prevStep}
-                                    className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    className="px-4 sm:px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    title="Back to previous step"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
-                                    Back
+                                    <span className="hidden sm:inline">Back</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={nextStep}
-                                    className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    className="px-4 sm:px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    title="Next: Visit Tracking"
                                 >
-                                    Next: Visit Tracking
+                                    <span className="hidden sm:inline">Next: Visit Tracking</span>
+                                    <span className="sm:hidden">Next</span>
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
@@ -2037,11 +2076,11 @@ export default function PrescriptionsPage() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Visit Number (V)</label>
-                                    <input type="number" placeholder="1" value={form.visitNumber} onChange={e => setForm({ ...form, visitNumber: e.target.value })} className="w-full p-2 border rounded" />
+                                    <input type="number" placeholder="1" value={form.visitNumber || ''} onChange={e => setForm({ ...form, visitNumber: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Follow-Up Count (FU)</label>
-                                    <input type="number" placeholder="0" value={form.followUpCount} onChange={e => setForm({ ...form, followUpCount: e.target.value })} className="w-full p-2 border rounded" />
+                                    <input type="number" placeholder="0" value={form.followUpCount || ''} onChange={e => setForm({ ...form, followUpCount: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                             </div>
                         </div>
@@ -2052,19 +2091,22 @@ export default function PrescriptionsPage() {
                                 <button
                                     type="button"
                                     onClick={prevStep}
-                                    className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    className="px-4 sm:px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    title="Back to previous step"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
-                                    Back
+                                    <span className="hidden sm:inline">Back</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={nextStep}
-                                    className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    className="px-4 sm:px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    title="Next: Select Medicines"
                                 >
-                                    Next: Select Medicines
+                                    <span className="hidden sm:inline">Next: Select Medicines</span>
+                                    <span className="sm:hidden">Next</span>
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
@@ -2115,8 +2157,7 @@ export default function PrescriptionsPage() {
                                                     medicineQuantity: tp.medicineQuantity?.toString() || '',
                                                     administration: treatment.administration || '',
                                                     patientHasMedicine: false,
-                                                    spyBottleSize: tp.spyBottleSize || '',
-                                                    additionsBottleSize: tp.additionsBottleSize || ''
+                                                    bottleSize: tp.bottleSize || ''
                                                 }))
                                                 setPrescriptions(newPrescriptions) // Replace, not add
                                                 setSelectedTreatmentId(String(treatment.id))
@@ -2276,19 +2317,22 @@ export default function PrescriptionsPage() {
                                 <button
                                     type="button"
                                     onClick={prevStep}
-                                    className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    className="px-4 sm:px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    title="Back to previous step"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
-                                    Back
+                                    <span className="hidden sm:inline">Back</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={nextStep}
-                                    className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    className="px-4 sm:px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    title="Next: Prescription Details"
                                 >
-                                    Next: Prescription Details
+                                    <span className="hidden sm:inline">Next: Prescription Details</span>
+                                    <span className="sm:hidden">Next</span>
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
@@ -2303,7 +2347,12 @@ export default function PrescriptionsPage() {
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
                             <div className="relative flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Prescriptions</h3>
-                                <button type="button" onClick={addEmptyPrescription} className="px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-700 rounded-lg transition-colors shadow-sm hover:shadow-md">+ Add Empty Row</button>
+                                <button type="button" onClick={addEmptyPrescription} className="px-3 sm:px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-700 rounded-lg transition-colors shadow-sm hover:shadow-md" title="Add empty prescription row">
+                                    <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    <span className="hidden sm:inline">Add Empty Row</span>
+                                </button>
                             </div>
                             {prescriptions.length === 0 ? (
                                 <div className="relative text-center py-8 text-gray-500 dark:text-gray-400">
@@ -2329,12 +2378,25 @@ export default function PrescriptionsPage() {
                                                 )}
                                                 <div className="relative p-4">
                                                     {/* Row 1: Medicine Name (Left) + 3x3 SPY Grid (Right) */}
-                                                    <div className="flex gap-4 mb-3">
+                                                    <div className="flex flex-col lg:flex-row gap-4 mb-3">
                                                         {/* LEFT: Medicine Info */}
-                                                        <div className="w-64 flex-shrink-0">
-                                                            <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Medicine</label>
+                                                        <div className="w-full lg:w-64 lg:flex-shrink-0">
+                                                            <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Medicine</label>
                                                             {pr.productId ? (
-                                                                <div className="p-3 text-xs text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg border border-gray-200 dark:border-gray-700">
+                                                                <div className="relative p-3 text-xs text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg border border-gray-200 dark:border-gray-700">
+                                                                    {/* Edit Icon */}
+                                                                    {!isDeleted && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => updatePrescription(i, { productId: '' })}
+                                                                            className="absolute top-2 right-2 p-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded transition-colors"
+                                                                            title="Edit medicine"
+                                                                        >
+                                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                            </svg>
+                                                                        </button>
+                                                                    )}
                                                                     {(() => {
                                                                         const product = products.find(p => String(p.id) === String(pr.productId))
                                                                         return (
@@ -2364,7 +2426,23 @@ export default function PrescriptionsPage() {
                                                                                                 )
                                                                                             })()}
                                                                                         </div>
-                                                                                        {product && <div className="text-[10px] text-gray-500">Stock: {product.quantity}</div>}
+                                                                                        {product && (
+                                                                                            <div className="space-y-1">
+                                                                                                <div className="text-[10px] text-gray-500">Stock: {product.quantity}</div>
+                                                                                                <div className="mt-2">
+                                                                                                    <CustomSelect
+                                                                                                        value={pr.bottleSize || ''}
+                                                                                                        onChange={(val) => !isDeleted && updatePrescription(i, { bottleSize: val })}
+                                                                                                        options={bottlePricing.map(bp => ({
+                                                                                                            value: bp.value,
+                                                                                                            label: bp.label
+                                                                                                        }))}
+                                                                                                        placeholder="Bottle Size"
+                                                                                                        className="text-xs h-8"
+                                                                                                    />
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        )}
                                                                                     </div>
                                                                                 )}
                                                                             </div>
@@ -2392,7 +2470,7 @@ export default function PrescriptionsPage() {
                                                         <div className={`flex-1 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
                                                             <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Spagyric Components</label>
                                                             {/* Row 1: SPY 1-3 */}
-                                                            <div className="grid grid-cols-3 gap-3 mb-3">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3">
                                                                 {[1, 2, 3].map(num => {
                                                                     const spyKey = `spy${num}` as keyof typeof pr
                                                                     const spyValue = pr[spyKey] as string || ''
@@ -2417,96 +2495,104 @@ export default function PrescriptionsPage() {
                                                                                     updatePrescription(i, { [spyKey]: formatComponent(parsed.name, e.target.value) })
                                                                                 }}
                                                                                 placeholder="Vol"
-                                                                                className="flex-1 min-w-[64px] p-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                                className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
                                                                             />
                                                                         </div>
                                                                     )
                                                                 })}
                                                             </div>
-                                                            <label className="block text-xs font-semibold mb-2 mt-2 text-gray-600 dark:text-gray-400">SPY 4-6 & Bottle Size</label>
-                                                            {/* Row 2: SPY 4-6 + SPY Bottle */}
-                                                            <div className="grid grid-cols-4 gap-3 mb-3">
-                                                                {[4, 5, 6].map(num => {
-                                                                    const spyKey = `spy${num}` as keyof typeof pr
-                                                                    const spyValue = pr[spyKey] as string || ''
-                                                                    return (
-                                                                        <div key={num} className="flex gap-1">
+                                                            <label 
+                                                                className="flex items-center gap-2 text-xs font-semibold mb-2 mt-2 text-gray-600 dark:text-gray-400 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                                                onClick={() => {
+                                                                    setCollapsedSections(prev => ({
+                                                                        ...prev,
+                                                                        [i]: {
+                                                                            ...prev[i],
+                                                                            spy46: !prev[i]?.spy46
+                                                                        }
+                                                                    }))
+                                                                }}
+                                                            >
+                                                                <svg className={`w-3 h-3 transition-transform ${collapsedSections[i]?.spy46 ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                                </svg>
+                                                                SPY 4-6
+                                                            </label>
+                                                            {/* Row 2: SPY 4-6 */}
+                                                            {!collapsedSections[i]?.spy46 && (
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+                                                                    {[4, 5, 6].map(num => {
+                                                                        const spyKey = `spy${num}` as keyof typeof pr
+                                                                        const spyValue = pr[spyKey] as string || ''
+                                                                        return (
+                                                                            <div key={num} className="flex gap-1">
+                                                                                <CustomSelect
+                                                                                    value={parseComponent(spyValue).name}
+                                                                                    onChange={(val) => {
+                                                                                        const parsed = parseComponent(spyValue)
+                                                                                        updatePrescription(i, { [spyKey]: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                                    }}
+                                                                                    options={components}
+                                                                                    placeholder={`SPY${num}`}
+                                                                                    allowCustom={true}
+                                                                                    className="flex-1 text-xs h-8"
+                                                                                />
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={parseComponent(spyValue).volume}
+                                                                                    onChange={(e) => {
+                                                                                        const parsed = parseComponent(spyValue)
+                                                                                        updatePrescription(i, { [spyKey]: formatComponent(parsed.name, e.target.value) })
+                                                                                    }}
+                                                                                    placeholder="Vol"
+                                                                                    className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                                />
+                                                                            </div>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                            <label 
+                                                                className="flex items-center gap-2 text-xs font-semibold mb-2 mt-2 text-blue-600 dark:text-blue-400 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                                                onClick={() => {
+                                                                    setCollapsedSections(prev => ({
+                                                                        ...prev,
+                                                                        [i]: {
+                                                                            ...prev[i],
+                                                                            additions: !prev[i]?.additions
+                                                                        }
+                                                                    }))
+                                                                }}
+                                                            >
+                                                                <svg className={`w-3 h-3 transition-transform ${collapsedSections[i]?.additions ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                                </svg>
+                                                                Additions
+                                                            </label>
+                                                            {/* Row 3: Add 1-3 */}
+                                                            {!collapsedSections[i]?.additions && (
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                                    {[1, 2, 3].map(num => (
+                                                                        <div key={num}>
                                                                             <CustomSelect
-                                                                                value={parseComponent(spyValue).name}
-                                                                                onChange={(val) => {
-                                                                                    const parsed = parseComponent(spyValue)
-                                                                                    updatePrescription(i, { [spyKey]: formatComponent(val.toUpperCase(), parsed.volume) })
-                                                                                }}
-                                                                                options={components}
-                                                                                placeholder={`SPY${num}`}
+                                                                                value={pr[`addition${num}` as keyof typeof pr] as string || ''}
+                                                                                onChange={(val) => updatePrescription(i, { [`addition${num}`]: val.toUpperCase() })}
+                                                                                options={additions}
+                                                                                placeholder={`Add ${num}`}
                                                                                 allowCustom={true}
-                                                                                className="flex-1 text-xs h-8"
-                                                                            />
-                                                                            <input
-                                                                                type="text"
-                                                                                value={parseComponent(spyValue).volume}
-                                                                                onChange={(e) => {
-                                                                                    const parsed = parseComponent(spyValue)
-                                                                                    updatePrescription(i, { [spyKey]: formatComponent(parsed.name, e.target.value) })
-                                                                                }}
-                                                                                placeholder="Vol"
-                                                                                className="flex-1 min-w-[64px] p-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                                className="text-xs h-8"
                                                                             />
                                                                         </div>
-                                                                    )
-                                                                })}
-                                                                {/* SPY Bottle Size */}
-                                                                <div>
-                                                                    <CustomSelect
-                                                                        value={pr.spyBottleSize || ''}
-                                                                        onChange={(val) => updatePrescription(i, { spyBottleSize: val })}
-                                                                        options={bottlePricing.map(opt => ({
-                                                                            ...opt,
-                                                                            label: `${opt.label} (+${opt.price})`
-                                                                        }))}
-                                                                        placeholder="SPY Btl"
-                                                                        disabled={!pr.spy4 && !pr.spy5 && !pr.spy6}
-                                                                        className="text-xs h-8 [&_option]:text-green-600 dark:[&_option]:text-green-400"
-                                                                    />
+                                                                    ))}
                                                                 </div>
-                                                            </div>
-                                                            <label className="block text-xs font-semibold mb-2 mt-2 text-blue-600 dark:text-blue-400">Additions & Bottle Size</label>
-                                                            {/* Row 3: Add 1-3 + Add Bottle */}
-                                                            <div className="grid grid-cols-4 gap-3">
-                                                                {[1, 2, 3].map(num => (
-                                                                    <div key={num}>
-                                                                        <CustomSelect
-                                                                            value={pr[`addition${num}` as keyof typeof pr] as string || ''}
-                                                                            onChange={(val) => updatePrescription(i, { [`addition${num}`]: val.toUpperCase() })}
-                                                                            options={additions}
-                                                                            placeholder={`Add ${num}`}
-                                                                            allowCustom={true}
-                                                                            className="text-xs h-8"
-                                                                        />
-                                                                    </div>
-                                                                ))}
-                                                                {/* Add Bottle Size */}
-                                                                <div>
-                                                                    <CustomSelect
-                                                                        value={pr.additionsBottleSize || ''}
-                                                                        onChange={(val) => updatePrescription(i, { additionsBottleSize: val })}
-                                                                        options={bottlePricing.map(opt => ({
-                                                                            ...opt,
-                                                                            label: `${opt.label} (+${opt.price})`
-                                                                        }))}
-                                                                        placeholder="Add Btl"
-                                                                        disabled={!pr.addition1 && !pr.addition2 && !pr.addition3}
-                                                                        className="text-xs h-8 [&_option]:text-green-600 dark:[&_option]:text-green-400"
-                                                                    />
-                                                                </div>
-                                                            </div>
+                                                            )}
                                                         </div>
                                                     </div>
 
                                                     {/* Row 2: Remaining Fields in ONE LINE */}
                                                     <div className="mt-4">
                                                         <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Dosage & Administration Details</label>
-                                                        <div className={`flex gap-3 items-end w-full ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
+                                                        <div className={`flex flex-wrap gap-3 items-end w-full ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
                                                             {/* Qty, Timing, Dosage */}
                                                             <div className="flex-1 min-w-[56px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Qty</label>
@@ -2519,6 +2605,10 @@ export default function PrescriptionsPage() {
                                                             <div className="flex-1 min-w-[80px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dose</label>
                                                                 <CustomSelect value={parseDosage(pr.dosage || '').quantity} onChange={(val) => { const parsed = parseDosage(pr.dosage || ''); updatePrescription(i, { dosage: formatDosage(val, parsed.timing, parsed.dilution) }) }} options={doseQuantity} placeholder="Dose" allowCustom={true} className="text-xs h-8" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-[80px]">
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">DoseTiming</label>
+                                                                <CustomSelect value={parseDosage(pr.dosage || '').timing} onChange={(val) => { const parsed = parseDosage(pr.dosage || ''); updatePrescription(i, { dosage: formatDosage(parsed.quantity, val, parsed.dilution) }) }} options={doseTiming} placeholder="Time" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[80px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dilution</label>
@@ -2584,19 +2674,22 @@ export default function PrescriptionsPage() {
                                 <button
                                     type="button"
                                     onClick={prevStep}
-                                    className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    className="px-4 sm:px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    title="Back to previous step"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
-                                    Back
+                                    <span className="hidden sm:inline">Back</span>
                                 </button>
                                 <button
                                     type="button"
                                     onClick={nextStep}
-                                    className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    className="px-4 sm:px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                    title="Next: Payment & Submit"
                                 >
-                                    Next: Payment & Submit
+                                    <span className="hidden sm:inline">Next: Payment & Submit</span>
+                                    <span className="sm:hidden">Next</span>
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
@@ -2613,19 +2706,19 @@ export default function PrescriptionsPage() {
                             <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Amount (₹)</label>
-                                    <input type="number" step="0.01" placeholder="1000.00" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className="w-full p-2 border rounded" />
+                                    <input type="number" step="0.01" placeholder="1000.00" value={form.amount || ''} onChange={e => setForm({ ...form, amount: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Discount (₹)</label>
-                                    <input type="number" step="0.01" placeholder="100.00" value={form.discount} onChange={e => setForm({ ...form, discount: e.target.value })} className="w-full p-2 border rounded" />
+                                    <input type="number" step="0.01" placeholder="100.00" value={form.discount || ''} onChange={e => setForm({ ...form, discount: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Payment Received (₹)</label>
-                                    <input type="number" step="0.01" placeholder="900.00" value={form.payment} onChange={e => setForm({ ...form, payment: e.target.value })} className="w-full p-2 border rounded" />
+                                    <input type="number" step="0.01" placeholder="900.00" value={form.payment || ''} onChange={e => setForm({ ...form, payment: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Balance Due (₹)</label>
-                                    <input type="number" step="0.01" placeholder="0.00" value={form.balance} onChange={e => setForm({ ...form, balance: e.target.value })} className="w-full p-2 border rounded" />
+                                    <input type="number" step="0.01" placeholder="0.00" value={form.balance || ''} onChange={e => setForm({ ...form, balance: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                             </div>
                         </div>
@@ -2641,23 +2734,26 @@ export default function PrescriptionsPage() {
                                         <span className="font-medium">{prescriptions.length} prescription(s) added</span>
                                     )}
                                 </div>
-                                <div className="flex gap-3">
+                                <div className="flex flex-wrap gap-2 sm:gap-3">
                                     <button
                                         type="button"
                                         onClick={prevStep}
-                                        className="px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                        className="px-4 sm:px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
+                                        title="Back to previous step"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                         </svg>
-                                        Back
+                                        <span className="hidden sm:inline">Back</span>
                                     </button>
-                                    <button disabled={loading} className="px-6 py-3 text-base font-semibold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-300 transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed">
-                                        {loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Visit & Prescriptions' : 'Save Visit & Prescriptions')}
+                                    <button disabled={loading} className="px-4 sm:px-6 py-3 text-sm sm:text-base font-semibold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-300 transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed">
+                                        <span className="hidden sm:inline">{loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Visit & Prescriptions' : 'Save Visit & Prescriptions')}</span>
+                                        <span className="sm:hidden">{loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Save')}</span>
                                     </button>
                                     {lastCreatedVisitId && (
-                                        <a href={`/visits/${lastCreatedVisitId}`} target="_blank" rel="noreferrer" className="px-6 py-3 text-base font-medium text-emerald-700 dark:text-emerald-300 bg-white dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-2 border-emerald-300 dark:border-emerald-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
-                                            Open Last Visit
+                                        <a href={`/visits/${lastCreatedVisitId}`} target="_blank" rel="noreferrer" className="px-3 sm:px-6 py-3 text-sm sm:text-base font-medium text-emerald-700 dark:text-emerald-300 bg-white dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-2 border-emerald-300 dark:border-emerald-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
+                                            <span className="hidden sm:inline">Open Last Visit</span>
+                                            <span className="sm:hidden">View</span>
                                         </a>
                                     )}
                                 </div>

@@ -10,6 +10,7 @@ import LoadingModal from '../components/LoadingModal'
 import { useImportContext } from '../contexts/ImportContext'
 import { useDataCache } from '../contexts/DataCacheContext'
 import RefreshButton from '../components/RefreshButton'
+import PhoneNumber from '../components/PhoneNumber'
 import genderOptions from '../data/gender.json'
 
 export default function PatientsPage() {
@@ -849,12 +850,13 @@ export default function PatientsPage() {
                             <button 
                                 onClick={() => setShowExportDropdown(!showExportDropdown)}
                                 className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50"
+                                title={selectedPatientIds.size > 0 ? `Export ${selectedPatientIds.size} patients` : 'Export All'}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                                 </svg>
-                                <span className="font-semibold">{selectedPatientIds.size > 0 ? `Export (${selectedPatientIds.size})` : 'Export All'}</span>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <span className="font-semibold hidden sm:inline">{selectedPatientIds.size > 0 ? `Export (${selectedPatientIds.size})` : 'Export All'}</span>
+                                <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                             </button>
@@ -893,14 +895,18 @@ export default function PatientsPage() {
                         <button 
                             onClick={() => setShowImportModal(true)} 
                             className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2"
+                            title="Import patients"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                             </svg>
-                            <span className="font-semibold">Import</span>
+                            <span className="font-semibold hidden sm:inline">Import</span>
                         </button>
-                        <button onClick={openModal} className="btn btn-primary">
-                            + Register New Patient
+                        <button onClick={openModal} className="btn btn-primary" title="Register new patient">
+                            <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span className="hidden sm:inline">Register New Patient</span>
                         </button>
                     </div>
                 )}
@@ -934,12 +940,13 @@ export default function PatientsPage() {
                     <div className="relative">
                         <button
                             onClick={() => setShowSortDropdown(!showSortDropdown)}
-                            className="px-4 py-2.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-400 dark:hover:border-green-600 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-sm hover:shadow-md"
+                            className="px-3 sm:px-4 py-2.5 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-400 dark:hover:border-green-600 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-sm hover:shadow-md"
+                            title="Sort patients"
                         >
                             <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                             </svg>
-                            <span>Sort</span>
+                            <span className="hidden sm:inline">Sort</span>
                         </button>
                         {showSortDropdown && (
                             <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
@@ -1529,7 +1536,7 @@ export default function PatientsPage() {
                                                 })()}
                                             </div>
                                             <div className="text-xs text-muted mt-0.5">
-                                                {p.phone && <span className="mr-2">📞 {p.phone}</span>}
+                                                {p.phone && <PhoneNumber phone={p.phone} className="mr-2" />}
                                                 {p.age && <span>Age: {p.age}</span>}
                                             </div>
                                         </div>
@@ -1538,24 +1545,54 @@ export default function PatientsPage() {
                                         <div className="flex items-center gap-2 flex-shrink-0">
                                             <button
                                                 onClick={() => editPatient(p)}
-                                                className="px-3 py-1.5 text-xs bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded"
+                                                className="px-2 sm:px-3 py-1.5 text-xs bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded"
                                                 title="Edit"
                                             >
-                                                ✏️ Edit
+                                                <span className="sm:hidden">
+                                                    <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                </span>
+                                                <span className="hidden sm:inline">
+                                                    <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                    Edit
+                                                </span>
                                             </button>
                                             <button
                                                 onClick={() => deletePatient(p.id)}
-                                                className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+                                                className="px-2 sm:px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
                                                 title="Delete"
                                             >
-                                                🗑️ Delete
+                                                <span className="sm:hidden">
+                                                    <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </span>
+                                                <span className="hidden sm:inline">
+                                                    <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                    Delete
+                                                </span>
                                             </button>
                                             <button
                                                 onClick={() => toggleRowExpansion(p.id)}
-                                                className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                                                className="px-2 sm:px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
                                                 title={isExpanded ? "Hide Details" : "View More"}
                                             >
-                                                {isExpanded ? '▲ Hide' : '▼ View More'}
+                                                <span className="sm:hidden">
+                                                    <svg className={`w-4 h-4 inline transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </span>
+                                                <span className="hidden sm:inline">
+                                                    <svg className={`w-4 h-4 inline mr-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                    {isExpanded ? 'Hide' : 'View More'}
+                                                </span>
                                             </button>
                                         </div>
                                     </div>
@@ -1603,7 +1640,7 @@ export default function PatientsPage() {
                                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                                     <div>
                                                         <div className="text-xs text-muted mb-1">Phone</div>
-                                                        <div className="text-sm font-medium">{p.phone || '-'}</div>
+                                                        <div className="text-sm font-medium">{p.phone ? <PhoneNumber phone={p.phone} /> : '-'}</div>
                                                     </div>
                                                     <div>
                                                         <div className="text-xs text-muted mb-1">Email</div>
@@ -1641,7 +1678,7 @@ export default function PatientsPage() {
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
-                                    Previous
+                                    <span className="hidden sm:inline">Previous</span>
                                 </button>
                                 <span className="text-sm text-gray-600 dark:text-gray-400">
                                     Page {currentPage} of {totalPages}
@@ -1651,7 +1688,7 @@ export default function PatientsPage() {
                                     disabled={currentPage === totalPages}
                                     className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                 >
-                                    Next
+                                    <span className="hidden sm:inline">Next</span>
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>

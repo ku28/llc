@@ -71,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             })
 
             const totalAmount = Math.round(subtotal + taxAmount - (discount || 0))
-            const balanceAmount = totalAmount
+            const balanceAmount = 0  // Set to 0 for paid invoices
 
             const invoice = await prisma.customerInvoice.create({
                 data: {
@@ -89,7 +89,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     discount: Math.round(discount || 0),
                     totalAmount,
                     balanceAmount,
-                    paymentMethod,
+                    paidAmount: totalAmount,  // Set paidAmount to totalAmount for paid status
+                    status: 'paid',  // Set status to paid
+                    paymentMethod: paymentMethod || 'CASH',
                     notes,
                     termsAndConditions,
                     items: {

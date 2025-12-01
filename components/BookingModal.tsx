@@ -332,9 +332,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="px-4 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors whitespace-nowrap text-sm"
+                className="px-4 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors whitespace-nowrap text-sm flex items-center gap-2"
               >
-                ← Back
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back
               </button>
             )}
             <button

@@ -62,7 +62,8 @@ export default function CustomSelect({
         if (onOpenChange) {
             onOpenChange(isOpen)
         }
-    }, [isOpen, onOpenChange])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen])
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -323,7 +324,6 @@ export default function CustomSelect({
                                     onMouseLeave={() => setHoveredOption(null)}
                                     style={{ cursor: 'pointer', position: 'relative' }}
                                 >
-                                    {value === option.value && <span className="checkmark">✓ </span>}
                                     <div className="flex items-center gap-2" style={{ flexWrap: 'nowrap', minWidth: 0 }}>
                                         <span className="flex-1" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{option.label}</span>
                                         {isSuggested && (

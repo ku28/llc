@@ -971,13 +971,15 @@ export default function PurchaseOrdersPage() {
                             <div className="relative">
                                 <button 
                                     onClick={() => setShowExportDropdown(!showExportDropdown)}
-                                    className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50"
+                                    className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50 px-2 sm:px-4"
+                                    title={selectedPOIds.size > 0 ? `Export ${selectedPOIds.size} selected` : 'Export All'}
+                                    aria-label={selectedPOIds.size > 0 ? `Export ${selectedPOIds.size} selected` : 'Export All'}
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                                     </svg>
-                                    <span className="font-semibold">{selectedPOIds.size > 0 ? `Export (${selectedPOIds.size})` : 'Export All'}</span>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span className="font-semibold hidden sm:inline">{selectedPOIds.size > 0 ? `Export (${selectedPOIds.size})` : 'Export All'}</span>
+                                    <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                     </svg>
                                 </button>
@@ -1015,12 +1017,14 @@ export default function PurchaseOrdersPage() {
                             </div>
                             <button 
                                 onClick={() => setIsImportModalOpen(true)} 
-                                className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2"
+                                className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2 px-2 sm:px-4"
+                                title="Import purchase orders"
+                                aria-label="Import purchase orders"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                 </svg>
-                                <span className="font-semibold">Import</span>
+                                <span className="font-semibold hidden sm:inline">Import</span>
                             </button>
                         </div>
                     )}
@@ -1038,22 +1042,25 @@ export default function PurchaseOrdersPage() {
                             <div className="flex gap-2">
                                 <button
                                     onClick={addManualItem}
-                                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                                    className="px-2 sm:px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                                    title="Add item to demand list"
+                                    aria-label="Add item to demand list"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                                     </svg>
-                                    Add Item
+                                    <span className="hidden sm:inline">Add Item</span>
                                 </button>
                                 <button
                                     onClick={openSupplierModal}
                                     disabled={demandList.length === 0}
-                                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                                    className="px-3 sm:px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-1 sm:gap-2 text-sm sm:text-base"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                     </svg>
-                                    Send Demand
+                                    <span className="hidden sm:inline">Send Demand</span>
+                                    <span className="sm:hidden">Send</span>
                                 </button>
                             </div>
                         </div>
@@ -1224,27 +1231,29 @@ export default function PurchaseOrdersPage() {
                     </div>
 
                     {/* Purchase Order Records */}
-                    <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
+                    <div className="relative rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-4 sm:p-6">
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                        <div className="relative flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
-                                Purchase Order Records {selectedPOIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">({selectedPOIds.size} selected)</span>}
+                        <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-4">
+                            <h2 className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                                <span className="hidden sm:inline">Purchase Order Records</span>
+                                <span className="sm:hidden">PO Records</span>
+                                {selectedPOIds.size > 0 && <span className="px-2 py-0.5 ml-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full text-xs font-bold">({selectedPOIds.size})</span>}
                             </h2>
                         </div>
                     
                         {/* Tabs and Upload Bill Button */}
-                        <div className="relative flex justify-between items-center mb-4">
-                            <div className="flex gap-2 border-b border-emerald-200 dark:border-emerald-700">
+                        <div className="relative flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-4">
+                            <div className="flex gap-1 sm:gap-2 border-b border-emerald-200 dark:border-emerald-700 overflow-x-auto">
                                 <button
                                     onClick={() => setActiveTab('pending')}
-                                    className={`px-4 py-2 font-medium transition-all text-sm ${
+                                    className={`px-2 sm:px-4 py-2 font-medium transition-all text-xs sm:text-sm whitespace-nowrap ${
                                         activeTab === 'pending'
                                             ? 'text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400'
                                             : 'text-gray-600 dark:text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400'
                                     }`}
                                 >
                                     Pending
-                                    <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                                    <span className={`ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded text-xs ${
                                         activeTab === 'pending'
                                             ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
                                             : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
@@ -1254,14 +1263,14 @@ export default function PurchaseOrdersPage() {
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('received')}
-                                    className={`px-4 py-2 font-medium transition-all text-sm ${
+                                    className={`px-2 sm:px-4 py-2 font-medium transition-all text-xs sm:text-sm whitespace-nowrap ${
                                         activeTab === 'received'
                                             ? 'text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400'
                                             : 'text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400'
                                     }`}
                                 >
                                     Received
-                                    <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                                    <span className={`ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded text-xs ${
                                         activeTab === 'received'
                                             ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
                                             : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
@@ -1271,14 +1280,14 @@ export default function PurchaseOrdersPage() {
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('deleted')}
-                                    className={`px-4 py-2 font-medium transition-all text-sm ${
+                                    className={`px-2 sm:px-4 py-2 font-medium transition-all text-xs sm:text-sm whitespace-nowrap ${
                                         activeTab === 'deleted'
                                             ? 'text-red-600 dark:text-red-400 border-b-2 border-red-600 dark:border-red-400'
                                             : 'text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400'
                                     }`}
                                 >
                                     Deleted
-                                    <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                                    <span className={`ml-1 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded text-xs ${
                                         activeTab === 'deleted'
                                             ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
                                             : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
@@ -1291,26 +1300,27 @@ export default function PurchaseOrdersPage() {
                                 <RefreshButton onRefresh={fetchSentDemands} />
                                 <button
                                     onClick={() => setIsDirectBillUploadModalOpen(true)}
-                                    className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium transition-all shadow-md text-sm flex items-center gap-2"
+                                    className="px-2 sm:px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium transition-all shadow-md text-xs sm:text-sm flex items-center gap-1 sm:gap-2"
                                 >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                     </svg>
-                                    Upload Bill
+                                    <span className="hidden sm:inline">Upload Bill</span>
+                                    <span className="sm:hidden">Upload</span>
                                 </button>
                             </div>
                         </div>
                         
                         {/* Search and Filter */}
-                        <div className="relative flex gap-2 mb-4">
+                        <div className="relative flex flex-col sm:flex-row gap-2 mb-4">
                             <input
                                 type="text"
                                 placeholder="🔍 Search PO or Supplier..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="flex-1 px-3 py-1.5 text-sm border border-emerald-200 dark:border-emerald-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="flex-1 px-3 py-2 text-sm border border-emerald-200 dark:border-emerald-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             />
-                            <div className={isFilterSupplierOpen ? 'relative z-[10000]' : 'relative z-0'}>
+                            <div className={`w-full sm:w-40 ${isFilterSupplierOpen ? 'relative z-[10000]' : 'relative z-0'}`}>
                                 <CustomSelect
                                     value={filterSupplier}
                                     onChange={(value) => setFilterSupplier(value)}
@@ -1350,7 +1360,7 @@ export default function PurchaseOrdersPage() {
                                                 demand.status === 'received' ? 'border-l-4 border-l-green-500' :
                                                 'border-l-4 border-l-gray-400'
                                             }`}>
-                                                <div className="p-3 flex items-center gap-3">
+                                                <div className="p-3 flex items-center gap-2 sm:gap-3 flex-wrap">
                                                                     {/* Status Dot */}
                                                                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                                                                         demand.status === 'pending' ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50' :
@@ -1374,12 +1384,12 @@ export default function PurchaseOrdersPage() {
                                                     </label>
 
                                                     {/* PO Number */}
-                                                    <div className="font-medium text-gray-900 dark:text-white font-mono text-sm min-w-[100px]">
-                                                        PON. {demand.poNumber}
+                                                    <div className="font-medium text-gray-900 dark:text-white font-mono text-xs sm:text-sm min-w-[80px] sm:min-w-[100px]">
+                                                        <span className="hidden sm:inline">PON. </span>{demand.poNumber}
                                                     </div>
 
                                                     {/* Items Count */}
-                                                    <div className="flex items-center gap-1 text-sm">
+                                                    <div className="flex items-center gap-1 text-xs sm:text-sm">
                                                         <span className="text-gray-500 dark:text-gray-400">Items:</span>
                                                         <span className="font-medium text-gray-900 dark:text-white">{demand.items?.length || 0}</span>
                                                     </div>
@@ -1794,9 +1804,9 @@ export default function PurchaseOrdersPage() {
                 <div className={`fixed inset-0 bg-black flex items-center justify-center p-4 transition-opacity duration-300 ${supplierModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }}>
                     <div className={`relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-lg w-full transform transition-all duration-300 ${supplierModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
-                        <div className="relative p-5">
-                            <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 mb-4">Select Supplier</h2>
-                            <p className="text-gray-600 dark:text-gray-400 mb-6">
+                        <div className="relative p-4 sm:p-5">
+                            <h2 className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 mb-3 sm:mb-4">Select Supplier</h2>
+                            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4 sm:mb-6">
                                 Choose a supplier to send this demand to. An email will be sent automatically.
                             </p>
                             
@@ -1827,17 +1837,17 @@ export default function PurchaseOrdersPage() {
                                 </div>
                             )}
 
-                            <div className="flex justify-end gap-3">
+                            <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
                                 <button
                                     onClick={closeSupplierModal}
-                                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors text-sm sm:text-base"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={sendDemand}
                                     disabled={!selectedSupplier || sendingEmail}
-                                    className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-lg font-medium transition-colors shadow-md"
+                                    className="px-4 sm:px-6 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-lg font-medium transition-colors shadow-md text-sm sm:text-base"
                                 >
                                     {sendingEmail ? 'Sending...' : '📧 Send Demand'}
                                 </button>
@@ -1852,11 +1862,11 @@ export default function PurchaseOrdersPage() {
                 <div className={`fixed inset-0 bg-black flex items-center justify-center p-4 transition-opacity duration-300 ${receivingModalAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }}>
                     <div className={`relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-3xl w-full max-h-[85vh] overflow-y-auto transform transition-all duration-300 ${receivingModalAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
-                        <form onSubmit={handleReceiveGoods} className="relative p-5">
-                            <div className="flex justify-between items-start mb-4">
+                        <form onSubmit={handleReceiveGoods} className="relative p-4 sm:p-5">
+                            <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4">
                                 <div>
-                                    <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Receive Goods - {receivingPO.poNumber}</h2>
-                                    <p className="text-gray-600 dark:text-gray-400 mt-2">
+                                    <h2 className="text-lg sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Receive Goods - {receivingPO.poNumber}</h2>
+                                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
                                         Supplier: <strong>{receivingPO.supplier?.name}</strong> | 
                                         Order Date: <strong>{receivingPO.orderDate ? new Date(receivingPO.orderDate).toLocaleDateString() : '-'}</strong>
                                     </p>
@@ -1864,25 +1874,26 @@ export default function PurchaseOrdersPage() {
                                 <button
                                     type="button"
                                     onClick={() => setIsBillUploadModalOpen(true)}
-                                    className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium transition-all shadow-md text-sm flex items-center gap-2"
+                                    className="px-2 sm:px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-medium transition-all shadow-md text-xs sm:text-sm flex items-center gap-1 sm:gap-2"
                                 >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                     </svg>
-                                    Upload Bill
+                                    <span className="hidden sm:inline">Upload Bill</span>
+                                    <span className="sm:hidden">Bill</span>
                                 </button>
                             </div>
 
-                            <div className="overflow-x-auto mb-6">
-                                <table className="w-full">
+                            <div className="overflow-x-auto mb-4 sm:mb-6 -mx-4 sm:mx-0">
+                                <table className="w-full min-w-[600px]">
                                     <thead className="bg-gray-50 dark:bg-gray-800">
                                         <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Product</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ordered</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Previously Received</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Receiving Now</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Unit Price</th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Product</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ordered</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Prev. Recv.</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Recv. Now</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Unit Price</th>
+                                            <th className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">

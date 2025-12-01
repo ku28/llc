@@ -885,35 +885,39 @@ function ProductsPage() {
                     <button 
                         onClick={autoGeneratePurchaseOrder}
                         disabled={generatingPO}
-                        className="btn bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="btn bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center px-2 sm:px-4"
+                        title="Order Low Stock Items"
+                        aria-label="Order Low Stock Items"
                     >
                         {generatingPO ? (
                             <>
-                                <svg className="w-4 h-4 mr-2 inline animate-spin" fill="none" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 inline animate-spin" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                Processing...
+                                <span className="ml-2 hidden sm:inline">Processing...</span>
                             </>
                         ) : (
                             <>
-                                <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                                 </svg>
-                                Order Low Stock Items
+                                <span className="ml-2 hidden sm:inline">Order Low Stock Items</span>
                             </>
                         )}
                     </button>
                     <div className="relative">
                         <button 
                             onClick={() => setShowExportDropdown(!showExportDropdown)}
-                            className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50"
+                            className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white transition-all duration-200 flex items-center gap-2 shadow-lg shadow-green-200 dark:shadow-green-900/50 px-2 sm:px-4"
+                            title={selectedProductIds.size > 0 ? `Export ${selectedProductIds.size} selected` : 'Export All'}
+                            aria-label={selectedProductIds.size > 0 ? `Export ${selectedProductIds.size} selected` : 'Export All'}
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                             </svg>
-                            <span className="font-semibold">{selectedProductIds.size > 0 ? `Export (${selectedProductIds.size})` : 'Export All'}</span>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <span className="font-semibold hidden sm:inline">{selectedProductIds.size > 0 ? `Export (${selectedProductIds.size})` : 'Export All'}</span>
+                            <svg className="w-4 h-4 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
                         </button>
@@ -951,12 +955,14 @@ function ProductsPage() {
                     </div>
                     <button 
                         onClick={() => setShowImportModal(true)} 
-                        className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2"
+                        className="btn bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200 dark:shadow-green-900/50 transition-all duration-200 flex items-center gap-2 px-2 sm:px-4"
+                        title="Import products"
+                        aria-label="Import products"
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                         </svg>
-                        <span className="font-semibold">Import</span>
+                        <span className="font-semibold hidden sm:inline">Import</span>
                     </button>
                     <button 
                         onClick={() => {
@@ -966,9 +972,12 @@ function ProductsPage() {
                             setIsAnimating(false)
                             setTimeout(() => setIsAnimating(true), 10)
                         }}
-                        className="btn btn-primary"
+                        className="btn btn-primary px-2 sm:px-4"
+                        title="Add New Product"
+                        aria-label="Add New Product"
                     >
-                        + Add New Product
+                        <span>+</span>
+                        <span className="hidden sm:inline ml-1">Add New Product</span>
                     </button>
                 </div>
             </div>
@@ -1684,24 +1693,54 @@ function ProductsPage() {
                                                 <div className="flex items-center gap-2 flex-shrink-0">
                                                     <button
                                                         onClick={() => editProduct(p)}
-                                                        className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded"
+                                                        className="px-2 sm:px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded"
                                                         title="Edit"
                                                     >
-                                                        ✏️ Edit
+                                                        <span className="sm:hidden">
+                                                            <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                            </svg>
+                                                        </span>
+                                                        <span className="hidden sm:inline">
+                                                            <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                            </svg>
+                                                            Edit
+                                                        </span>
                                                     </button>
                                                     <button
                                                         onClick={() => deleteProduct(p.id)}
-                                                        className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+                                                        className="px-2 sm:px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
                                                         title="Delete"
                                                     >
-                                                        🗑️ Delete
+                                                        <span className="sm:hidden">
+                                                            <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </span>
+                                                        <span className="hidden sm:inline">
+                                                            <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                            Delete
+                                                        </span>
                                                     </button>
                                                     <button
                                                         onClick={() => toggleRowExpansion(p.id)}
-                                                        className="px-3 py-1.5 text-xs bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded shadow-sm"
+                                                        className="px-2 sm:px-3 py-1.5 text-xs bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded shadow-sm"
                                                         title={isExpanded ? "Hide Details" : "View More"}
                                                     >
-                                                        {isExpanded ? '▲ Hide' : '▼ View More'}
+                                                        <span className="sm:hidden">
+                                                            <svg className={`w-4 h-4 inline transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </span>
+                                                        <span className="hidden sm:inline">
+                                                            <svg className={`w-4 h-4 inline mr-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                            {isExpanded ? 'Hide' : 'View More'}
+                                                        </span>
                                                     </button>
                                                 </div>
                                             </div>
@@ -1762,12 +1801,14 @@ function ProductsPage() {
                                 <button
                                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                     disabled={currentPage === 1}
-                                    className="px-4 py-2 bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="px-2 sm:px-4 py-2 bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    title="Previous page"
+                                    aria-label="Previous page"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
-                                    Previous
+                                    <span className="hidden sm:inline">Previous</span>
                                 </button>
                                 <span className="text-sm">
                                     Page {currentPage} of {Math.ceil(getFilteredProducts().length / itemsPerPage)}
@@ -1775,9 +1816,11 @@ function ProductsPage() {
                                 <button
                                     onClick={() => setCurrentPage(prev => Math.min(Math.ceil(getFilteredProducts().length / itemsPerPage), prev + 1))}
                                     disabled={currentPage >= Math.ceil(getFilteredProducts().length / itemsPerPage)}
-                                    className="px-4 py-2 bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="px-2 sm:px-4 py-2 bg-gray-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    title="Next page"
+                                    aria-label="Next page"
                                 >
-                                    Next
+                                    <span className="hidden sm:inline">Next</span>
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>

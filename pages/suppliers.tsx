@@ -426,12 +426,14 @@ export default function SuppliersPage() {
                         <div className="relative">
                             <button
                                 onClick={() => setShowExportDropdown(!showExportDropdown)}
-                                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all duration-200 font-medium"
+                                className="px-2 sm:px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg shadow-lg shadow-emerald-500/30 flex items-center gap-2 transition-all duration-200 font-medium"
+                                title={selectedSupplierIds.size > 0 ? `Export ${selectedSupplierIds.size} selected` : 'Export All'}
+                                aria-label={selectedSupplierIds.size > 0 ? `Export ${selectedSupplierIds.size} selected` : 'Export All'}
                             >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                                {selectedSupplierIds.size > 0 ? `Export (${selectedSupplierIds.size})` : 'Export All'}
+                                <span className="hidden sm:inline">{selectedSupplierIds.size > 0 ? `Export (${selectedSupplierIds.size})` : 'Export All'}</span>
                             </button>
 
                             {showExportDropdown && (
@@ -483,12 +485,14 @@ export default function SuppliersPage() {
                             setIsAnimating(false)
                             setTimeout(() => setIsAnimating(true), 10)
                         }}
-                        className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg shadow-lg flex items-center gap-2 transition-all duration-200 font-medium"
+                        className="px-2 sm:px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg shadow-lg flex items-center gap-2 transition-all duration-200 font-medium"
+                        title="Add Supplier"
+                        aria-label="Add Supplier"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                        Add Supplier
+                        <span className="hidden sm:inline">Add Supplier</span>
                     </button>
                 </div>
             </div>
@@ -824,21 +828,54 @@ export default function SuppliersPage() {
                                             <div className="flex items-center gap-2 flex-shrink-0">
                                                 <button
                                                     onClick={() => editSupplier(s)}
-                                                    className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded"
+                                                    className="px-2 sm:px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded"
+                                                    title="Edit"
                                                 >
-                                                    ✏️ Edit
+                                                    <span className="sm:hidden">
+                                                        <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                    </span>
+                                                    <span className="hidden sm:inline">
+                                                        <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                        Edit
+                                                    </span>
                                                 </button>
                                                 <button
                                                     onClick={() => deleteSupplier(s.id)}
-                                                    className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+                                                    className="px-2 sm:px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded"
+                                                    title="Delete"
                                                 >
-                                                    🗑️ Delete
+                                                    <span className="sm:hidden">
+                                                        <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </span>
+                                                    <span className="hidden sm:inline">
+                                                        <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                        Delete
+                                                    </span>
                                                 </button>
                                                 <button
                                                     onClick={() => toggleRowExpansion(s.id)}
-                                                    className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                                                    className="px-2 sm:px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded"
+                                                    title={isExpanded ? "Hide Details" : "View More"}
                                                 >
-                                                    {isExpanded ? '▲ Hide' : '▼ View More'}
+                                                    <span className="sm:hidden">
+                                                        <svg className={`w-4 h-4 inline transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </span>
+                                                    <span className="hidden sm:inline">
+                                                        <svg className={`w-4 h-4 inline mr-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                        {isExpanded ? 'Hide' : 'View More'}
+                                                    </span>
                                                 </button>
                                             </div>
                                         </div>

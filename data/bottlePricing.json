@@ -1,17 +1,27 @@
 [
     {
-        "value": "30 ML",
-        "label": "30 ML",
+        "value": "15ml",
+        "label": "15ml",
         "price": 25
     },
     {
-        "value": "60 ML",
-        "label": "60 ML",
+        "value": "30ml",
+        "label": "30ml",
         "price": 50
     },
     {
-        "value": "100 ML",
-        "label": "100 ML",
+        "value": "60ml",
+        "label": "60ml",
         "price": 100
+    },
+    {
+        "value": "100ml",
+        "label": "100ml",
+        "price": 0
+    },
+    {
+        "value": "120ml",
+        "label": "120ml",
+        "price": 0
     }
 ]

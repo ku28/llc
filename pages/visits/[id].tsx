@@ -1328,22 +1328,36 @@ export default function VisitDetail() {
 
     return (
         <div className="bg-gray-50 min-h-screen py-6">
+            <style dangerouslySetInnerHTML={{__html: `
+                .prescription-container-wrapper {
+                    width: 100%;
+                    overflow-x: auto;
+                    overflow-y: auto;
+                    -webkit-overflow-scrolling: touch;
+                }
+                
+                .prescription-container {
+                    width: 210mm;
+                    min-height: 297mm;
+                    margin: 0 auto;
+                }
+            `}} />
             <div className="max-w-7xl mx-auto px-4">
                 {/* Info Bar - Simple, No Background with Dark Mode */}
-                <div className="no-print flex justify-between items-center mb-4">
-                    <div className="flex items-center gap-6">
+                <div className="no-print flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 w-full sm:w-auto">
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">OPD No:</span>
                             <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{visit?.opdNo || visit?.id || 'N/A'}</span>
                         </div>
-                        <span className="text-gray-300 dark:text-gray-600">|</span>
+                        <span className="hidden sm:inline text-gray-300 dark:text-gray-600">|</span>
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Patient:</span>
                             <span className="text-base font-bold text-gray-800 dark:text-gray-200">
                                 {visit?.patient?.firstName || ''} {visit?.patient?.lastName || ''}
                             </span>
                         </div>
-                        <span className="text-gray-300 dark:text-gray-600">|</span>
+                        <span className="hidden sm:inline text-gray-300 dark:text-gray-600">|</span>
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Date:</span>
                             <span className="text-base font-semibold text-gray-700 dark:text-gray-300">
@@ -1351,18 +1365,28 @@ export default function VisitDetail() {
                             </span>
                         </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                         <button
                             onClick={() => router.push('/visits')}
-                            className="px-3 py-1.5 bg-gray-600 dark:bg-gray-700 text-white text-sm rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-all shadow-sm"
+                            className="px-2 sm:px-3 py-1.5 bg-gray-600 dark:bg-gray-700 text-white text-sm rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-all shadow-sm flex items-center gap-1"
+                            title="Back to visits"
+                            aria-label="Back to visits"
                         >
-                            ← Back
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            <span className="hidden sm:inline">Back</span>
                         </button>
                         <button
                             onClick={() => router.push(`/prescriptions?visitId=${visit.id}&edit=true`)}
-                            className="px-3 py-1.5 bg-orange-500 dark:bg-orange-600 text-white text-sm rounded-md hover:bg-orange-600 dark:hover:bg-orange-500 transition-all shadow-sm"
+                            className="px-2 sm:px-3 py-1.5 bg-orange-500 dark:bg-orange-600 text-white text-sm rounded-md hover:bg-orange-600 dark:hover:bg-orange-500 transition-all shadow-sm flex items-center gap-1"
+                            title="Edit visit"
+                            aria-label="Edit visit"
                         >
-                            ✏️ Edit
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            <span className="hidden sm:inline">Edit</span>
                         </button>
 
                         {/* Copy Type Toggle */}
@@ -1393,7 +1417,9 @@ export default function VisitDetail() {
                                 onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
                                 onBlur={() => setTimeout(() => setShowDownloadDropdown(false), 200)}
                                 disabled={isGeneratingPDF}
-                                className="px-3 py-1.5 bg-green-600 dark:bg-green-700 text-white text-sm rounded-md hover:bg-green-700 dark:hover:bg-green-600 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                className="px-2 sm:px-3 py-1.5 bg-green-600 dark:bg-green-700 text-white text-sm rounded-md hover:bg-green-700 dark:hover:bg-green-600 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                title="Download PDF"
+                                aria-label="Download PDF"
                             >
                                 {isGeneratingPDF ? (
                                     <>
@@ -1401,13 +1427,17 @@ export default function VisitDetail() {
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        <span>Saving...</span>
+                                        <span className="hidden sm:inline">Saving...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <span>📄</span>
-                                        <span>Download</span>
-                                        <span>▼</span>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        <span className="hidden sm:inline">Download</span>
+                                        <svg className="w-3 h-3 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
                                     </>
                                 )}
                             </button>
@@ -1443,11 +1473,17 @@ export default function VisitDetail() {
                                     setShowPrintDropdown(false)
                                     setShowPrintSubmenu(null)
                                 }, 200)}
-                                className="px-3 py-1.5 bg-emerald-600/90 dark:bg-emerald-700/90 text-white text-sm rounded-md hover:bg-emerald-700 dark:hover:bg-emerald-600 transition-all shadow-sm flex items-center gap-1.5 backdrop-blur-sm"
+                                className="px-2 sm:px-3 py-1.5 bg-emerald-600/90 dark:bg-emerald-700/90 text-white text-sm rounded-md hover:bg-emerald-700 dark:hover:bg-emerald-600 transition-all shadow-sm flex items-center gap-1.5 backdrop-blur-sm"
+                                title="Print"
+                                aria-label="Print"
                             >
-                                <span>🖨️</span>
-                                <span>Print</span>
-                                <span>▼</span>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                </svg>
+                                <span className="hidden sm:inline">Print</span>
+                                <svg className="w-3 h-3 hidden sm:inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
                             </button>
                             {showPrintDropdown && (
                                 <div className="absolute right-0 mt-1 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg z-50">
@@ -1539,10 +1575,11 @@ export default function VisitDetail() {
                 </div>
 
                 {/* Main Content Area with PDF Preview and Reports Sidebar */}
-                <div className="flex gap-6">
+                <div className="flex flex-col lg:flex-row gap-6">
                     {/* Prescription Sheet - Left Side */}
-                    <div className="flex-1">
-                        <div ref={prescriptionRef} className="prescription-container" style={{ background: 'white', color: 'black', padding: '0', position: 'relative', width: '210mm', minHeight: '297mm', margin: '0 auto', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <div className="flex-1 w-full lg:w-auto overflow-hidden">
+                        <div className="prescription-container-wrapper">
+                        <div ref={prescriptionRef} className="prescription-container" style={{ background: 'white', color: 'black', padding: '0', position: 'relative', width: '210mm', minHeight: '297mm', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                     {/* Watermark - Only show in PATIENT copy */}
                     {copyType === 'PATIENT' && (
                         <div className="watermark-container" style={{ position: 'absolute', top: 'calc(50% - 30px)', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.5, zIndex: 0, pointerEvents: 'none' }}>
@@ -1989,9 +2026,10 @@ export default function VisitDetail() {
                     </div>
                 </div>
             </div>
+            </div>
 
                     {/* Reports Sidebar - Right Side */}
-                    <div className="w-80 flex-shrink-0">
+                    <div className="w-full lg:w-80 flex-shrink-0">
                         <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-lg shadow-md p-4 sticky top-4 border border-emerald-200 dark:border-emerald-700">
                             <h2 className="text-lg font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2123,7 +2161,7 @@ export default function VisitDetail() {
             </div>
 
             {/* Print and Animation Styles */}
-            <style jsx global>{`
+            <style dangerouslySetInnerHTML={{__html: `
                 @keyframes fadeIn {
                     from {
                         opacity: 0;
@@ -2280,7 +2318,7 @@ export default function VisitDetail() {
                     opacity: 0 !important;
                     visibility: hidden !important;
                 }
-            `}</style>
+            `}} />
         </div>
     )
 }

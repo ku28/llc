@@ -44,8 +44,8 @@ export default function ConfirmationModal({
     const colors = colorClasses[type]
 
     return (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn" style={{ zIndex: 9999 }}>
-            <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm p-6 w-full max-w-md mx-4 animate-scaleIn">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn p-4" style={{ zIndex: 9999 }}>
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm p-4 sm:p-6 w-full max-w-md animate-scaleIn">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
                 {/* Icon */}
                 <div className="relative flex items-center justify-center mb-4">
@@ -57,26 +57,25 @@ export default function ConfirmationModal({
                 </div>
 
                 {/* Title */}
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white text-center mb-2">
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white text-center mb-2">
                     {title}
                 </h3>
 
                 {/* Message */}
-                <p className="text-gray-600 dark:text-gray-300 text-center mb-6">
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 text-center mb-4 sm:mb-6">
                     {message}
                 </p>
 
                 {/* Buttons */}
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                     <button
                         onClick={onCancel}
-                        className="flex-1 px-4 py-2.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500"
-                    >
+                        className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500 text-sm sm:text-base">
                         {cancelText}
                     </button>
                     <button
                         onClick={onConfirm}
-                        className={`flex-1 px-4 py-2.5 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 ${colors.button}`}
+                        className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 text-sm sm:text-base ${colors.button}`}>
                     >
                         {confirmText}
                     </button>

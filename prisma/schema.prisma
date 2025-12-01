@@ -194,6 +194,7 @@ model TreatmentProduct {
   presentation     String?
   procedure        String?
   timing           String?
+  bottleSize       String?
   product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   treatment        Treatment @relation(fields: [treatmentId], references: [id], onDelete: Cascade)
 

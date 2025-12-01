@@ -179,11 +179,11 @@ export default function EditServicesPage() {
                 <>
                 <div className="space-y-6">
                     {services.map((service, index) => (
-                        <div key={index} className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 overflow-hidden">
+                        <div key={index} className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 sm:p-6 overflow-hidden">
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
                             <div className="relative">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-xl font-bold text-green-600">Service #{index + 1}</h3>
+                                <h3 className="text-lg sm:text-xl font-bold text-green-600">Service #{index + 1}</h3>
                                 <button
                                     onClick={() => deleteService(index)}
                                     className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
@@ -195,7 +195,7 @@ export default function EditServicesPage() {
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                                 <div className="space-y-4">
                                     <div>
                                         <label className="block text-sm font-medium mb-2">Service Image</label>
@@ -299,16 +299,16 @@ export default function EditServicesPage() {
                         Add New Service
                     </button>
 
-                    <div className="flex justify-end gap-4 pt-4">
+                    <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-4">
                         <button
                             onClick={() => router.push('/services')}
-                            className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            className="px-4 sm:px-6 py-2.5 sm:py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-sm sm:text-base"
                         >
                             Preview
                         </button>
                         <button
                             onClick={handleSave}
-                            className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                            className="px-4 sm:px-6 py-2.5 sm:py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                         >
                             Save Changes
                         </button>

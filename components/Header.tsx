@@ -20,6 +20,7 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null)
   const navRef = useRef<HTMLDivElement>(null)
   const submenuNavRef = useRef<HTMLDivElement>(null)
+  const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const router = useRouter()
 
   // Determine current app and title
@@ -172,6 +173,20 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
     }
   }
 
+  const handleDropdownEnter = () => {
+    if (dropdownTimeoutRef.current) {
+      clearTimeout(dropdownTimeoutRef.current)
+      dropdownTimeoutRef.current = null
+    }
+    setUserDropdownOpen(true)
+  }
+
+  const handleDropdownLeave = () => {
+    dropdownTimeoutRef.current = setTimeout(() => {
+      setUserDropdownOpen(false)
+    }, 300) // 300ms delay before closing
+  }
+
   return (
     <>
       <AppSwitcherModal 
@@ -203,23 +218,23 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
           </button>
 
           {/* Logo and Title with App Switcher Icon */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1 sm:gap-2">
             <img 
               src="/favicon.png" 
               alt="LLC Logo" 
-              className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 object-contain"
             />
-            <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-brand to-green-600 bg-clip-text text-transparent">{title}</h1>
+            <h1 className="text-base sm:text-lg md:text-xl font-bold bg-gradient-to-r from-brand to-green-600 bg-clip-text text-transparent">{title}</h1>
             
             {/* App Switcher Icon Button */}
             <button
               onClick={() => setAppSwitcherModalOpen(true)}
-              className="p-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-all duration-200 group"
+              className="p-1.5 sm:p-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-all duration-200 group"
               aria-label="Switch application"
               title="Switch between Last Leaf Care and LLC ERP"
             >
               <svg 
-                className="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" 
+                className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -311,15 +326,15 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
           </nav>
 
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
           {/* Import Notifications - only for admin/reception */}
           {user && !isPatient && <ImportNotifications />}
 
-          {/* Tokens button for admin/reception */}
+          {/* Tokens button for admin/reception - hide on small screens */}
           {user && !isPatient && (
             <button 
               onClick={onOpenTokenSidebar}
-              className="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors relative"
+              className="hidden sm:block p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors relative"
               title="Token Queue"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -328,11 +343,11 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
             </button>
           )}
 
-          {/* Requests button for admin/reception */}
+          {/* Requests button for admin/reception - hide on small screens */}
           {user && !isPatient && (
             <Link 
               href="/requests"
-              className="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors relative"
+              className="hidden sm:block p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors relative"
               title="Appointment Requests"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,11 +356,11 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
             </Link>
           )}
           
-          {/* My Requests button for patients */}
+          {/* My Requests button for patients - hide on small screens */}
           {user && isPatient && (
             <Link 
               href="/my-requests"
-              className="p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors relative"
+              className="hidden sm:block p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors relative"
               title="My Appointment Requests"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -378,24 +393,24 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
           {user ? (
             <div 
               className="relative"
-              onMouseEnter={() => setUserDropdownOpen(true)}
-              onMouseLeave={() => setUserDropdownOpen(false)}
+              onMouseEnter={handleDropdownEnter}
+              onMouseLeave={handleDropdownLeave}
             >
-              <Link href="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
+              <Link href="/profile" className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
                 {user.profileImage ? (
                   <img 
                     src={user.profileImage} 
                     alt="Profile" 
-                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
+                    className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600">
-                    <span className="text-sm font-bold text-white">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center border-2 border-gray-300 dark:border-gray-600">
+                    <span className="text-xs sm:text-sm font-bold text-white">
                       {user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}
                     </span>
                   </div>
                 )}
-                <div className="text-sm hidden sm:block">
+                <div className="text-sm hidden lg:block">
                   <div className="font-medium">{user.name || user.email}</div>
                   <div className="text-xs text-muted">{user.role}</div>
                 </div>
@@ -508,32 +523,165 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
       </div>
       </div>
       </header>
+      
+      {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-200 dark:border-gray-700 mt-4 pt-4 px-2 sm:px-4">
-          <nav className="flex flex-col space-y-1">
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          
+          {/* Mobile Menu Panel */}
+          <div className="fixed top-0 left-0 right-0 bottom-0 bg-white dark:bg-gray-900 z-50 md:hidden overflow-y-auto">
+            {/* Mobile Menu Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <img 
+                  src="/favicon.png" 
+                  alt="LLC Logo" 
+                  className="w-8 h-8 object-contain"
+                />
+                <h1 className="text-lg font-bold bg-gradient-to-r from-brand to-green-600 bg-clip-text text-transparent">{title}</h1>
+              </div>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                aria-label="Close menu"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Mobile Menu Content */}
+            <nav className="flex flex-col p-4 space-y-1">
+            
+            {/* Quick Actions Section for Mobile */}
+            <div className="pb-3 mb-3 border-b border-gray-200 dark:border-gray-700">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-4">Quick Actions</p>
+              
+              {/* App Switcher for Mobile */}
+              <button
+                onClick={() => {
+                  setAppSwitcherModalOpen(true)
+                  setMobileMenuOpen(false)
+                }}
+                className="w-full px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
+              >
+                <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span>Switch App</span>
+              </button>
+              
+              {/* Theme Toggle for Mobile */}
+              <button
+                onClick={() => {
+                  toggleTheme()
+                }}
+                className="w-full px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
+              >
+                {dark ? (
+                  <>
+                    <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M6.76 4.84l-1.8-1.79L3.17 4.84l1.79 1.8 1.8-1.8zM1 13h3v-2H1v2zm10-9h2V1h-2v3zm7.03 1.05l1.8-1.8-1.8-1.79-1.79 1.79 1.79 1.8zM17 13h3v-2h-3v2zM6.76 19.16l-1.8 1.79L3.17 19.16l1.79-1.79 1.8 1.79zM12 20a1 1 0 110 2 1 1 0 010-2zm0-6a4 4 0 100-8 4 4 0 000 8z" />
+                    </svg>
+                    <span>Switch to Light Mode</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                    </svg>
+                    <span>Switch to Dark Mode</span>
+                  </>
+                )}
+              </button>
+              
+              {/* Tokens Button for Mobile (Admin/Reception) */}
+              {user && !isPatient && onOpenTokenSidebar && (
+                <button
+                  onClick={() => {
+                    onOpenTokenSidebar()
+                    setMobileMenuOpen(false)
+                  }}
+                  className="w-full px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
+                >
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                  </svg>
+                  <span>Token Queue</span>
+                </button>
+              )}
+              
+              {/* Requests Button for Mobile (Admin/Reception) */}
+              {user && !isPatient && (
+                <Link
+                  href="/requests"
+                  className="w-full px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>Appointment Requests</span>
+                </Link>
+              )}
+              
+              {/* My Requests for Mobile (Patients) */}
+              {user && isPatient && (
+                <Link
+                  href="/my-requests"
+                  className="w-full px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  <span>My Requests</span>
+                </Link>
+              )}
+            </div>
+            
+            {/* Navigation Section */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-4">Navigation</p>
+            
             {/* Patient/User Mobile Navigation */}
             {isPatient && (
               <>
                 <Link 
                   href="/user-dashboard" 
-                  className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                  className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Dashboard
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  <span>Dashboard</span>
                 </Link>
                 <Link 
                   href="/visits" 
-                  className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                  className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Appointments
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>Appointments</span>
                 </Link>
                 <Link 
                   href="/prescriptions" 
-                  className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                  className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Prescriptions
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>Prescriptions</span>
                 </Link>
               </>
             )}
@@ -544,7 +692,7 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                 {canAccess('/dashboard') && (
                   <Link 
                     href="/" 
-                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Dashboard
@@ -553,88 +701,117 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                 {canAccess('/patients') && (
                   <Link 
                     href="/patients" 
-                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Patients
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>Patients</span>
                   </Link>
                 )}
                 {canAccess('/treatments') && (
                   <Link 
                     href="/treatments" 
-                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Treatments
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    </svg>
+                    <span>Treatments</span>
                   </Link>
                 )}
                 {canAccess('/products') && (
                   <Link 
                     href="/products" 
-                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Inventory
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    <span>Inventory</span>
                   </Link>
                 )}
                 {canAccess('/visits') && (
                   <Link 
                     href="/visits" 
-                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Visits
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                    <span>Visits</span>
                   </Link>
                 )}
                 {canAccess('/invoices') && (
                   <Link 
                     href="/invoices" 
-                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Invoices
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Invoices</span>
                   </Link>
                 )}
                 {canAccess('/suppliers') && (
                   <Link 
                     href="/suppliers" 
-                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Suppliers
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <span>Suppliers</span>
                   </Link>
                 )}
                 {canAccess('/purchase-orders') && (
                   <Link 
                     href="/purchase-orders" 
-                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    PO & Billing
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    <span>PO & Billing</span>
                   </Link>
                 )}
                 {canAccess('/stock-transactions') && (
                   <Link 
                     href="/stock-transactions" 
-                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Inventory History
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Inventory History</span>
                   </Link>
                 )}
                 {canAccess('/analytics') && (
                   <Link 
                     href="/analytics" 
-                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm"
+                    className="px-4 py-3 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm flex items-center gap-3"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Analytics
+                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <span>Analytics</span>
                   </Link>
                 )}
               </>
             )}
+            </div>
           </nav>
         </div>
+        </>
       )}
     </>
   )

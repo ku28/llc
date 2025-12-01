@@ -156,6 +156,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                 additions: p.additions || null,
                                 procedure: p.procedure || null,
                                 presentation: p.presentation || null,
+                                bottleSize: p.bottleSize || null,
                             }
                         }).filter((p: any) => p !== null) // Remove entries with no product name
 
