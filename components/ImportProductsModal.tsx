@@ -494,7 +494,7 @@ export default function ImportProductsModal({ isOpen, onClose, onImportSuccess }
                                         required
                                     >
                                         <option value="">-- Select Doctor --</option>
-                                        {doctors.filter(d => d.verified).map(doctor => (
+                                        {doctors.map(doctor => (
                                             <option key={doctor.id} value={doctor.id}>
                                                 {doctor.name} ({doctor.email})
                                             </option>

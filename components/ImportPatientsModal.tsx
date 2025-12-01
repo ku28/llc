@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { useImportContext } from '../contexts/ImportContext'
-import { useDoctor } from '../contexts/DoctorContext'
 
 interface ImportPatientsModalProps {
     isOpen: boolean
