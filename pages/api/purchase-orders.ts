@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (req.method === 'GET') {
         try {
-            const selectedDoctorId = req.query.doctorId ? Number(req.query.doctorId) : undefined
+            const selectedDoctorId = req.query.doctorId ? Number(req.query.doctorId) : null
             const purchaseOrders = await prisma.purchaseOrder.findMany({
                 where: getDoctorFilter(user, selectedDoctorId),
                 orderBy: { orderDate: 'desc' },
