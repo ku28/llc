@@ -76,7 +76,6 @@ export default function ConfirmationModal({
                     <button
                         onClick={onConfirm}
                         className={`flex-1 px-3 sm:px-4 py-2 sm:py-2.5 text-white font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 text-sm sm:text-base ${colors.button}`}>
-                    >
                         {confirmText}
                     </button>
                 </div>
