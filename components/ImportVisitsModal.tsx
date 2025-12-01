@@ -594,8 +594,8 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                                         className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
                                         required
                                     >
-                                        <option value="">-- Select Doctor --</option>
-                                        {doctors.filter(d => d.verified).map(doctor => (
+                                        <option value="">Select Doctor</option>
+                                        {doctors.map(doctor => (
                                             <option key={doctor.id} value={doctor.id}>
                                                 {doctor.name} ({doctor.email})
                                             </option>
