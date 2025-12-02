@@ -264,6 +264,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 },
                                 opdNo: opdNo,
                                 date: parseDate(date) || new Date(),
+                                isImported: true, // Mark as imported to skip PDF generation
                                 visitNumber: toNumber(visitFields.visitNumber),
                                 provisionalDiagnosis: toString(visitFields.provDiagnosis),
                                 temperament: toString(visitFields.temperament),

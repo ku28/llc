@@ -32,6 +32,42 @@ export default function Dashboard() {
   const [authChecked, setAuthChecked] = useState(false)
   const { getCache, setCache } = useDataCache()
 
+  // IMMEDIATE redirect for Receptionist - runs before ANY rendering
+  if (typeof window !== 'undefined') {
+    try {
+      const cachedUser = sessionStorage.getItem('currentUser')
+      if (cachedUser) {
+        const user = JSON.parse(cachedUser)
+        if (user.role?.toLowerCase() === 'receptionist') {
+          if (typeof window !== 'undefined' && router.pathname === '/dashboard') {
+            router.replace('/patients')
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
+  }
+
+  // Immediate check for receptionist role to prevent any rendering
+  useEffect(() => {
+    const immediateCheck = async () => {
+      try {
+        const cachedUser = sessionStorage.getItem('currentUser')
+        if (cachedUser) {
+          const user = JSON.parse(cachedUser)
+          if (user.role?.toLowerCase() === 'receptionist') {
+            window.location.replace('/patients')
+            return
+          }
+        }
+      } catch (e) {
+        // Continue to normal auth check
+      }
+    }
+    immediateCheck()
+  }, [])
+
   useEffect(() => {
     // Check authentication first
     const checkAuth = async () => {
@@ -59,6 +95,12 @@ export default function Dashboard() {
         // If user role is 'user', redirect to user dashboard
         if (user.role?.toLowerCase() === 'user') {
           router.push('/user-dashboard')
+          return
+        }
+        
+        // If user role is 'receptionist', redirect to patients page
+        if (user.role?.toLowerCase() === 'receptionist') {
+          router.replace('/patients')
           return
         }
         

@@ -27,6 +27,9 @@ model User {
   categories       Category[]        @relation("DoctorCategories")
   suppliers        Supplier[]        @relation("DoctorSuppliers")
   purchaseOrders   PurchaseOrder[]   @relation("DoctorPurchaseOrders")
+  tasksAssignedTo  Task[]            @relation("TasksAssignedTo")
+  tasksAssignedBy  Task[]            @relation("TasksAssignedBy")
+  doctorTasks      Task[]            @relation("DoctorTasks")
 }
 
 model PendingUser {
@@ -264,12 +267,16 @@ model Visit {
   balance              Float?
   helper               String?
   reportsAttachments   String?           @db.Text
+  patientCopyPdfUrl    String?           @db.Text
+  officeCopyPdfUrl     String?           @db.Text
+  isImported           Boolean           @default(false)
   createdAt            DateTime          @default(now())
   doctorId             Int?
   prescriptions        Prescription[]
   patient              Patient           @relation(fields: [patientId], references: [id])
   doctor               User?             @relation("DoctorVisits", fields: [doctorId], references: [id])
   invoice              CustomerInvoice?
+  tasks                Task[]
 
   @@index([doctorId])
 }
@@ -601,3 +608,35 @@ model ContactInfo {
   updatedAt   DateTime @updatedAt
   updatedBy   String?
 }
+
+model Task {
+  id           Int      @id @default(autoincrement())
+  title        String
+  description  String?  @db.Text
+  type         String   @default("task")
+  status       String   @default("pending")
+  assignedTo   Int?
+  assignedBy   Int?
+  doctorId     Int?
+  acknowledged Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  completedAt  DateTime?
+  isSuggested  Boolean  @default(false)
+  expiresAt    DateTime?
+  visitId      Int?
+  attachmentUrl String? @db.Text
+
+  assignedToUser User? @relation("TasksAssignedTo", fields: [assignedTo], references: [id], onDelete: Cascade)
+  assignedByUser User? @relation("TasksAssignedBy", fields: [assignedBy], references: [id], onDelete: Cascade)
+  doctor         User? @relation("DoctorTasks", fields: [doctorId], references: [id], onDelete: Cascade)
+  visit          Visit? @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@index([assignedTo])
+  @@index([assignedBy])
+  @@index([status])
+  @@index([isSuggested])
+  @@index([visitId])
+  @@index([doctorId])
+}
+

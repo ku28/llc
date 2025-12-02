@@ -143,11 +143,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             visitNumber,
             followUpCount,
             reportsAttachments, // JSON string of report attachments
+            patientCopyPdfUrl, // Cloudinary URL for patient copy
+            officeCopyPdfUrl, // Cloudinary URL for office copy
             prescriptions, // optional array of { treatmentId, dosage, administration, quantity, taken, productId }
             autoGenerateInvoice // flag to automatically create customer invoice
         } = req.body
 
         const isUpdate = !!id
+        
+        // Get the doctor ID before the transaction
+        const doctorIdForTask = getDoctorIdForCreate(user, req.body.doctorId)
 
         try {
             // Create or update visit, prescriptions, update inventory, and optionally create invoice - all in one transaction
@@ -238,6 +243,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     visitNumber: visitNumber ? Number(visitNumber) : undefined,
                     followUpCount: followUpCount ? Number(followUpCount) : undefined,
                     reportsAttachments: reportsAttachments !== undefined ? reportsAttachments : undefined,
+                    patientCopyPdfUrl: patientCopyPdfUrl || undefined,
+                    officeCopyPdfUrl: officeCopyPdfUrl || undefined,
                     doctorId: getDoctorIdForCreate(user, req.body.doctorId)
                 }
                 
@@ -444,6 +451,68 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     where: { id: visit.id }, 
                     include: { prescriptions: true } 
                 })
+
+                // Create or update suggested task for receptionist with 1 hour expiry
+                if (createdPrescriptions.length > 0) {
+                    const patient = await tx.patient.findUnique({ where: { id: Number(patientId) } })
+                    const oneHourLater = new Date()
+                    oneHourLater.setHours(oneHourLater.getHours() + 1)
+
+                    // Build task description with attachments
+                    let taskDescription = `Visit OPD No: ${generatedOpdNo}\nPatient: ${patient?.firstName} ${patient?.lastName}\nPrescriptions: ${createdPrescriptions.length} item(s)`
+                    
+                    // Add reports attachments to description if provided
+                    if (reportsAttachments && typeof reportsAttachments === 'string') {
+                        try {
+                            const attachments = JSON.parse(reportsAttachments)
+                            if (Array.isArray(attachments) && attachments.length > 0) {
+                                taskDescription += `\n\nAttachments (${attachments.length}):`
+                                attachments.forEach((att: any, idx: number) => {
+                                    taskDescription += `\n${idx + 1}. ${att.name || 'File'}: ${att.url}`
+                                })
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse reportsAttachments for task:', e)
+                        }
+                    }
+
+                    // Check if a suggested task already exists for this visit
+                    const existingTask = await tx.task.findFirst({
+                        where: {
+                            visitId: visit.id,
+                            isSuggested: true,
+                            assignedTo: null // Only update if not yet assigned
+                        }
+                    })
+
+                    if (existingTask) {
+                        // Update existing task
+                        await tx.task.update({
+                            where: { id: existingTask.id },
+                            data: {
+                                title: `Process prescription for ${patient?.firstName} ${patient?.lastName}`,
+                                description: taskDescription,
+                                expiresAt: oneHourLater,
+                                attachmentUrl: officeCopyPdfUrl || null
+                            }
+                        })
+                    } else {
+                        // Create new suggested task with doctorId
+                        await tx.task.create({
+                            data: {
+                                title: `Process prescription for ${patient?.firstName} ${patient?.lastName}`,
+                                description: taskDescription,
+                                type: 'task',
+                                status: 'pending',
+                                isSuggested: true,
+                                expiresAt: oneHourLater,
+                                visitId: visit.id,
+                                doctorId: doctorIdForTask, // Link task to the doctor
+                                attachmentUrl: officeCopyPdfUrl || null
+                            }
+                        })
+                    }
+                }
 
                 return { visit: fullVisit, invoice }
             }, {

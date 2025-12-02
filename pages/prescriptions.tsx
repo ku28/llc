@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 import CustomSelect from '../components/CustomSelect'
 import DateInput from '../components/DateInput'
 import LoadingModal from '../components/LoadingModal'
@@ -1418,7 +1420,12 @@ export default function PrescriptionsPage() {
     async function performSubmit() {
         setLoading(true)
         try {
-            const payload = { ...form, prescriptions, autoGenerateInvoice: true }
+            // Prepare payload
+            const payload = { 
+                ...form, 
+                prescriptions, 
+                autoGenerateInvoice: true
+            }
 
             // Always add reports attachments as JSON string (even if empty to clear old data)
             payload.reportsAttachments = reportsAttachments.length > 0 

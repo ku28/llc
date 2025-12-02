@@ -74,6 +74,18 @@ export default function TokenSidebar({ isOpen, onClose }: TokenSidebarProps) {
         }
     }, [isOpen])
 
+    // Listen for token updates to refresh cache
+    useEffect(() => {
+        const handleTokenUpdate = () => {
+            if (isOpen) {
+                fetchTokens()
+            }
+        }
+
+        window.addEventListener('token-updated', handleTokenUpdate)
+        return () => window.removeEventListener('token-updated', handleTokenUpdate)
+    }, [isOpen])
+
     function openModal() {
         setIsModalOpen(true)
         setTimeout(() => setIsAnimating(true), 10)
@@ -170,6 +182,9 @@ export default function TokenSidebar({ isOpen, onClose }: TokenSidebarProps) {
             // Refresh tokens list
             await fetchTokens()
             
+            // Dispatch event to update cache in other components
+            window.dispatchEvent(new CustomEvent('token-updated'))
+            
             showSuccess(editingId ? 'Token updated successfully' : 'Token assigned successfully')
             
             // Send WhatsApp message if it's a new token assignment (not edit) and patient has phone
@@ -226,6 +241,8 @@ export default function TokenSidebar({ isOpen, onClose }: TokenSidebarProps) {
             })
             if (response.ok) {
                 await fetchTokens()
+                // Dispatch event to update cache in other components
+                window.dispatchEvent(new CustomEvent('token-updated'))
                 showSuccess('Token removed successfully')
                 closeConfirmModal()
             } else {

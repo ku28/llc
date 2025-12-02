@@ -941,6 +941,20 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   }
 }
 
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @keyframes scaleOut {
   from {
     opacity: 1;
@@ -962,6 +976,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .animate-scaleIn {
   animation: scaleIn 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 .animate-scaleOut {

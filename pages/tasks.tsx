@@ -1,11 +1,49 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import { useToast } from '../hooks/useToast'
+import { useDataCache } from '../contexts/DataCacheContext'
+
+interface Task {
+    id: number
+    title: string
+    description: string
+    type: 'task' | 'message'
+    status: 'pending' | 'completed'
+    assignedByName: string
+    createdAt: string
+    completedAt?: string
+    attachmentUrl?: string
+}
+
+// Cache configuration
+const TASKS_CACHE_KEY = 'tasks_list'
+const CACHE_DURATION = 30000 // 30 seconds
+const LAST_FETCH_KEY = 'tasks_last_fetch'
+const TASK_RETENTION_HOURS = 24 // Hours before completed tasks are deleted
+
+// Helper function to check if a completed task should be shown (not older than 24 hours)
+const shouldShowCompletedTask = (task: Task): boolean => {
+    if (task.status !== 'completed' || !task.completedAt) return true
+    const completedTime = new Date(task.completedAt).getTime()
+    const now = Date.now()
+    const hoursOld = (now - completedTime) / (1000 * 60 * 60)
+    return hoursOld < TASK_RETENTION_HOURS
+}
 
 export default function TasksPage() {
     const router = useRouter()
     const [user, setUser] = useState<any>(null)
     const [loading, setLoading] = useState(true)
-    const [tasks, setTasks] = useState<any[]>([])
+    const [tasks, setTasks] = useState<Task[]>([])
+    const [loadingTasks, setLoadingTasks] = useState(false)
+    const [activeTab, setActiveTab] = useState<'in-progress' | 'completed'>('in-progress')
+    const [pdfModalOpen, setPdfModalOpen] = useState(false)
+    const [selectedPdfUrl, setSelectedPdfUrl] = useState<string>('')
+    const [updatingTaskId, setUpdatingTaskId] = useState<number | null>(null)
+    const [viewingPdfTaskId, setViewingPdfTaskId] = useState<number | null>(null)
+    const [usingCache, setUsingCache] = useState(false)
+    const { showSuccess, showError } = useToast()
+    const { getCache, setCache, clearCache } = useDataCache()
 
     useEffect(() => {
         fetch('/api/auth/me')
@@ -17,6 +55,8 @@ export default function TasksPage() {
                 // Redirect if not receptionist
                 if (d.user?.role !== 'receptionist') {
                     router.push('/dashboard')
+                } else {
+                    fetchTasks()
                 }
             })
             .catch(() => {
@@ -24,6 +64,109 @@ export default function TasksPage() {
                 router.push('/login')
             })
     }, [])
+
+    // Listen for task updates to refresh cache
+    useEffect(() => {
+        const handleTaskUpdate = () => {
+            clearCache(TASKS_CACHE_KEY)
+            clearCache(LAST_FETCH_KEY)
+            fetchTasks(true)
+        }
+        window.addEventListener('task-updated', handleTaskUpdate)
+        return () => window.removeEventListener('task-updated', handleTaskUpdate)
+    }, [])
+
+    const fetchTasks = async (forceRefresh = false) => {
+        try {
+            // Check cache first if not forcing refresh
+            if (!forceRefresh) {
+                const cachedTasks = getCache<Task[]>(TASKS_CACHE_KEY)
+                const lastFetch = getCache<number>(LAST_FETCH_KEY)
+                const now = Date.now()
+                
+                // Use cache if it exists and is still valid
+                if (cachedTasks && lastFetch && (now - lastFetch) < CACHE_DURATION) {
+                    setTasks(cachedTasks)
+                    setUsingCache(true)
+                    return
+                }
+            }
+            
+            // Fetch from API
+            setUsingCache(false)
+            setLoadingTasks(true)
+            const res = await fetch('/api/tasks')
+            const data = await res.json()
+            if (res.ok) {
+                const fetchedTasks = (data.tasks || []).filter(shouldShowCompletedTask)
+                setTasks(fetchedTasks)
+                
+                // Update cache
+                setCache(TASKS_CACHE_KEY, fetchedTasks)
+                setCache(LAST_FETCH_KEY, Date.now())
+            }
+        } catch (error) {
+            console.error('Failed to fetch tasks:', error)
+            
+            // Try to use stale cache on error
+            const cachedTasks = getCache<Task[]>(TASKS_CACHE_KEY)
+            if (cachedTasks) {
+                setTasks(cachedTasks)
+                setUsingCache(true)
+                showError('Using cached data - network error')
+            }
+        } finally {
+            setLoadingTasks(false)
+        }
+    }
+
+    const markTaskDone = async (taskId: number, currentStatus: string) => {
+        setUpdatingTaskId(taskId)
+        try {
+            const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
+            
+            // If marking as completed, delete the PDF from Cloudinary
+            const task = tasks.find(t => t.id === taskId)
+            if (newStatus === 'completed' && task?.attachmentUrl) {
+                try {
+                    // Extract public_id from Cloudinary URL
+                    const urlParts = task.attachmentUrl.split('/')
+                    const fileWithExt = urlParts[urlParts.length - 1]
+                    const publicId = `llc-erp/prescriptions/${fileWithExt}`
+                    
+                    // Delete from Cloudinary
+                    await fetch('/api/cloudinary/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ publicId })
+                    })
+                } catch (err) {
+                    console.error('Failed to delete PDF from Cloudinary:', err)
+                    // Continue even if deletion fails
+                }
+            }
+            
+            const res = await fetch(`/api/tasks/${taskId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            })
+
+            if (res.ok) {
+                showSuccess(newStatus === 'completed' ? 'Task marked as done' : 'Task marked as pending')
+                // Clear cache and force refresh
+                clearCache(TASKS_CACHE_KEY)
+                clearCache(LAST_FETCH_KEY)
+                fetchTasks(true)
+            } else {
+                showError('Failed to update task')
+            }
+        } catch (error) {
+            showError('Failed to update task')
+        } finally {
+            setUpdatingTaskId(null)
+        }
+    }
 
     if (loading) {
         return (
@@ -39,118 +182,272 @@ export default function TasksPage() {
 
     return (
         <div>
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
-                    Tasks
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your daily tasks and to-dos</p>
+            <div className="mb-6 flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                        Tasks & Messages
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1">
+                        <p className="text-gray-600 dark:text-gray-400">Your assigned tasks and messages</p>
+                        {usingCache && (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 rounded-full">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                </svg>
+                                Cached
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <button
+                    onClick={() => {
+                        clearCache(TASKS_CACHE_KEY)
+                        clearCache(LAST_FETCH_KEY)
+                        fetchTasks(true)
+                    }}
+                    disabled={loadingTasks}
+                    className="p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all text-emerald-600 dark:text-emerald-400 disabled:opacity-50"
+                    title="Refresh tasks"
+                >
+                    <svg className={`w-5 h-5 ${loadingTasks ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="mb-4 flex border-b border-emerald-200/50 dark:border-emerald-700/50">
+                <button
+                    onClick={() => setActiveTab('in-progress')}
+                    className={`px-6 py-3 text-sm font-medium transition-all relative ${
+                        activeTab === 'in-progress'
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
+                >
+                    In Progress ({tasks.filter(t => t.status === 'pending').length})
+                    {activeTab === 'in-progress' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-green-600" />
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('completed')}
+                    className={`px-6 py-3 text-sm font-medium transition-all relative ${
+                        activeTab === 'completed'
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
+                >
+                    Completed ({tasks.filter(t => t.status === 'completed').length})
+                    {activeTab === 'completed' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-600 to-green-600" />
+                    )}
+                </button>
             </div>
 
             <div className="grid gap-4">
-                {/* Daily Checklist Card */}
-                <div className="rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
+                {/* Assigned Tasks Card */}
+                <div className="rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
                         <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        Daily Checklist
+                        {activeTab === 'in-progress' ? 'In Progress' : 'Completed'} Tasks & Messages
                     </h2>
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg">
-                            <input type="checkbox" id="task1" className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500" />
-                            <label htmlFor="task1" className="flex-1 text-gray-700 dark:text-gray-300 cursor-pointer">
-                                Review new patient registrations
-                            </label>
+                    {loadingTasks ? (
+                        <div className="text-center py-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent mx-auto"></div>
                         </div>
-                        <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg">
-                            <input type="checkbox" id="task2" className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500" />
-                            <label htmlFor="task2" className="flex-1 text-gray-700 dark:text-gray-300 cursor-pointer">
-                                Assign doctors to new patients
-                            </label>
+                    ) : tasks.filter(t => activeTab === 'in-progress' ? t.status === 'pending' : t.status === 'completed').length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                            No {activeTab === 'in-progress' ? 'in progress' : 'completed'} tasks or messages
                         </div>
-                        <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg">
-                            <input type="checkbox" id="task3" className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500" />
-                            <label htmlFor="task3" className="flex-1 text-gray-700 dark:text-gray-300 cursor-pointer">
-                                Update patient contact information
-                            </label>
-                        </div>
-                        <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg">
-                            <input type="checkbox" id="task4" className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500" />
-                            <label htmlFor="task4" className="flex-1 text-gray-700 dark:text-gray-300 cursor-pointer">
-                                Manage token queue
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Quick Actions Card */}
-                <div className="rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
-                        <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        Quick Actions
-                    </h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button
-                            onClick={() => router.push('/patients')}
-                            className="p-4 bg-white dark:bg-gray-800 rounded-lg hover:shadow-md transition-shadow text-left"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
+                    ) : (
+                        <div className="space-y-3">
+                            {tasks.filter(t => activeTab === 'in-progress' ? t.status === 'pending' : t.status === 'completed').map(task => (
+                                <div
+                                    key={task.id}
+                                    className={`p-4 rounded-lg border ${
+                                        task.status === 'completed'
+                                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className={`px-2 py-1 text-xs font-medium rounded ${
+                                                    task.type === 'task'
+                                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                                        : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                                                }`}>
+                                                    {task.type === 'task' ? 'Task' : 'Message'}
+                                                </span>
+                                                {task.status === 'completed' && (
+                                                    <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                        Completed
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                                                {task.title}
+                                            </h3>
+                                            {task.description && (
+                                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                                    {task.description}
+                                                </p>
+                                            )}
+                                            <div className="text-xs text-gray-500 dark:text-gray-500">
+                                                <span className="font-medium">Assigned by:</span> {task.assignedByName} • {new Date(task.createdAt).toLocaleDateString()} at {new Date(task.createdAt).toLocaleTimeString()}
+                                            </div>
+                                            {task.attachmentUrl && task.status !== 'completed' && (
+                                                <button
+                                                    onClick={() => {
+                                                        setViewingPdfTaskId(task.id)
+                                                        setSelectedPdfUrl(task.attachmentUrl!)
+                                                        setPdfModalOpen(true)
+                                                        // Clear loading state after modal opens
+                                                        setTimeout(() => setViewingPdfTaskId(null), 500)
+                                                    }}
+                                                    disabled={viewingPdfTaskId === task.id}
+                                                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 rounded-lg transition-colors disabled:opacity-50"
+                                                >
+                                                    {viewingPdfTaskId === task.id ? (
+                                                        <>
+                                                            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                            </svg>
+                                                            Loading...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                            </svg>
+                                                            View PDF
+                                                        </>
+                                                    )}
+                                                </button>
+                                            )}
+                                            {task.attachmentUrl && task.status === 'completed' && (
+                                                <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                                    </svg>
+                                                    PDF Deleted
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => markTaskDone(task.id, task.status)}
+                                            disabled={updatingTaskId === task.id}
+                                            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                                                task.status === 'completed'
+                                                    ? 'bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'
+                                                    : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                        >
+                                            {updatingTaskId === task.id ? (
+                                                <>
+                                                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    Processing...
+                                                </>
+                                            ) : (
+                                                task.status === 'completed' ? 'Undo' : 'Mark as Done'
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div className="font-semibold text-gray-900 dark:text-gray-100">Register Patient</div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">Add new patient</div>
-                                </div>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => router.push('/patients')}
-                            className="p-4 bg-white dark:bg-gray-800 rounded-lg hover:shadow-md transition-shadow text-left"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <div className="font-semibold text-gray-900 dark:text-gray-100">Find Patient</div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">Search records</div>
-                                </div>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Today's Summary Card */}
-                <div className="rounded-xl border border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-br from-white via-emerald-50 to-green-50 dark:from-gray-900 dark:via-emerald-950 dark:to-gray-900 shadow-lg shadow-emerald-500/10 p-6">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
-                        <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                        Today's Summary
-                    </h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg">
-                            <div className="text-3xl font-bold text-emerald-600 mb-1">0</div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">New Patients</div>
+                            ))}
                         </div>
-                        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg">
-                            <div className="text-3xl font-bold text-blue-600 mb-1">0</div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">Total Registrations</div>
-                        </div>
-                        <div className="p-4 bg-white dark:bg-gray-800 rounded-lg">
-                            <div className="text-3xl font-bold text-purple-600 mb-1">0</div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">Updated Records</div>
-                        </div>
-                    </div>
+                    )}
                 </div>
             </div>
+
+            {/* PDF Preview Modal */}
+            {pdfModalOpen && (
+                <>
+                    <div 
+                        className="fixed inset-0 bg-gradient-to-br from-emerald-900/50 via-green-900/50 to-teal-900/50 backdrop-blur-md z-[60]"
+                        onClick={() => setPdfModalOpen(false)}
+                    />
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 md:p-6">
+                        <div className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-emerald-500/30 w-[210mm] max-w-[95vw] h-[95vh] flex flex-col overflow-hidden">
+                            {/* Glowing border effect */}
+                            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-green-500/20 to-teal-500/20 blur-xl -z-10" />
+                            
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-gray-800/90 to-gray-900/90 border-b border-emerald-500/20 backdrop-blur-sm">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    <h3 className="text-lg font-bold bg-gradient-to-r from-emerald-400 to-green-400 bg-clip-text text-transparent">
+                                        Attachment Preview
+                                    </h3>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <a
+                                        href={selectedPdfUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="group relative px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-emerald-600 to-green-600 rounded-lg hover:from-emerald-500 hover:to-green-500 transition-all duration-300 shadow-lg hover:shadow-emerald-500/50"
+                                    >
+                                        <span className="relative z-10 flex items-center gap-2">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                            </svg>
+                                            Open in New Tab
+                                        </span>
+                                        <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-emerald-400 to-green-400 opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
+                                    </a>
+                                    <button
+                                        onClick={() => setPdfModalOpen(false)}
+                                        className="group relative p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition-all duration-300"
+                                    >
+                                        <svg className="w-5 h-5 text-red-400 group-hover:text-red-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* PDF Viewer - A4 aspect ratio */}
+                            <div className="flex-1 overflow-hidden relative bg-gray-950/50">
+                                {selectedPdfUrl ? (
+                                    <div className="w-full h-full flex items-center justify-center p-4">
+                                        <iframe
+                                            src={`https://docs.google.com/viewer?url=${encodeURIComponent(selectedPdfUrl)}&embedded=true`}
+                                            className="w-full h-full rounded-lg shadow-2xl"
+                                            title="Attachment PDF"
+                                            style={{ 
+                                                border: '1px solid rgba(6, 182, 212, 0.3)',
+                                                aspectRatio: '1 / 1.414' // A4 ratio
+                                            }}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                                        <div className="relative mb-6">
+                                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-green-500/20 rounded-full blur-2xl" />
+                                            <svg className="w-20 h-20 text-emerald-400/50 relative" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                        </div>
+                                        <h4 className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-green-400 bg-clip-text text-transparent mb-3">
+                                            PDF Not Available
+                                        </h4>
+                                        <p className="text-sm text-gray-400">The PDF hasn't been generated yet.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     )
 }

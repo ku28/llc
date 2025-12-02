@@ -37,6 +37,13 @@ export default function VisitDetail() {
                     setReportsAttachments([])
                 }
             }
+            
+            // Auto-generate and upload PDFs if not already done (skip imported visits)
+            if (visitData.prescriptions && visitData.prescriptions.length > 0 && !visitData.isImported) {
+                if (!visitData.patientCopyPdfUrl || !visitData.officeCopyPdfUrl) {
+                    setTimeout(() => generateAndUploadPdfs(visitData), 1500)
+                }
+            }
         })
 
         // Fetch products for medicine names
@@ -44,6 +51,157 @@ export default function VisitDetail() {
             setProducts(data)
         }).catch(err => console.error('Failed to fetch products:', err))
     }, [id])
+
+    const generateAndUploadPdfs = async (visitData: any) => {
+        if (!visitData || !prescriptionRef.current) {
+            console.log('Cannot generate PDFs: missing visitData or prescriptionRef')
+            return
+        }
+        
+        try {
+            console.log('Starting PDF generation for visit:', visitData.id)
+            console.log('prescriptionRef.current exists:', !!prescriptionRef.current)
+            
+            // Wait for the component to render
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            
+            // Store ref to avoid losing it during state changes
+            const refElement = prescriptionRef.current
+            
+            // Generate both PDFs without changing copyType between captures
+            console.log('Generating patient copy...')
+            const originalCopyType = copyType
+            setCopyType('PATIENT')
+            await new Promise(resolve => setTimeout(resolve, 800))
+            const patientCopyUrl = await uploadPdfToCloudinary('PATIENT', visitData, refElement)
+            console.log('Patient copy URL:', patientCopyUrl)
+            
+            console.log('Generating office copy...')
+            setCopyType('OFFICE')
+            await new Promise(resolve => setTimeout(resolve, 800))
+            const officeCopyUrl = await uploadPdfToCloudinary('OFFICE', visitData, refElement)
+            console.log('Office copy URL:', officeCopyUrl)
+            
+            // Reset to original copy type
+            setCopyType(originalCopyType)
+            
+            // Update visit with PDF URLs
+            if (patientCopyUrl && officeCopyUrl) {
+                console.log('Updating visit with PDF URLs...')
+                const updateResponse = await fetch('/api/visits', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: visitData.id,
+                        patientCopyPdfUrl: patientCopyUrl,
+                        officeCopyPdfUrl: officeCopyUrl,
+                        patientId: visitData.patientId,
+                        opdNo: visitData.opdNo
+                    })
+                })
+                
+                if (updateResponse.ok) {
+                    console.log('Visit updated successfully with PDF URLs')
+                    // Refresh visit data
+                    const updatedVisit = await fetch(`/api/visits?id=${id}`).then(r => r.json())
+                    setVisit(updatedVisit)
+                } else {
+                    console.error('Failed to update visit:', await updateResponse.text())
+                }
+            } else {
+                console.error('One or both PDF URLs are null')
+            }
+        } catch (error) {
+            console.error('Failed to generate/upload PDFs:', error)
+        }
+    }
+
+    const uploadPdfToCloudinary = async (type: 'PATIENT' | 'OFFICE', visitData?: any, refElement?: HTMLDivElement | null) => {
+        const currentVisit = visitData || visit
+        const elementToCapture = refElement || prescriptionRef.current
+        
+        if (!currentVisit || !elementToCapture) {
+            console.log('Cannot upload PDF: missing visit or prescriptionRef', {
+                hasVisit: !!currentVisit,
+                hasRef: !!elementToCapture
+            })
+            return null
+        }
+        
+        try {
+            console.log(`Capturing ${type} copy...`)
+            
+            // Capture as canvas
+            const canvas = await html2canvas(elementToCapture, {
+                scale: 1.5,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff',
+                windowWidth: elementToCapture.scrollWidth,
+                windowHeight: elementToCapture.scrollHeight,
+                imageTimeout: 15000
+            })
+            
+            console.log(`Canvas captured: ${canvas.width}x${canvas.height}`)
+            
+            // Convert canvas to PDF
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            })
+            
+            const imgData = canvas.toDataURL('image/jpeg', 0.85)
+            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height)
+            
+            // Get PDF as base64 data URI
+            const pdfDataUri = pdf.output('datauristring')
+            console.log(`PDF generated, data URI length: ${pdfDataUri.length} (${(pdfDataUri.length / 1024 / 1024).toFixed(2)} MB)`)
+            
+            // Upload to Cloudinary with timeout
+            console.log(`Uploading ${type} copy to Cloudinary...`)
+            
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+            
+            try {
+                const response = await fetch('/api/pdf/upload-cloudinary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pdfData: pdfDataUri,
+                        filename: `${currentVisit.opdNo.replace(/\s+/g, '-')}-${type.toLowerCase()}`
+                    }),
+                    signal: controller.signal
+                })
+                
+                clearTimeout(timeoutId)
+                clearTimeout(timeoutId)
+            
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+                    console.error(`Cloudinary upload failed:`, errorData)
+                    return null
+                }
+                
+                const result = await response.json()
+                console.log(`${type} copy uploaded successfully:`, result.url)
+                
+                return result.url
+            } catch (fetchError: any) {
+                clearTimeout(timeoutId)
+                if (fetchError.name === 'AbortError') {
+                    console.error(`Upload timeout after 60 seconds`)
+                } else {
+                    console.error(`Fetch error:`, fetchError)
+                }
+                return null
+            }
+        } catch (error) {
+            console.error(`Failed to upload ${type} copy to Cloudinary:`, error)
+            return null
+        }
+    }
 
     const generatePDF = async (pdfCopyType?: 'PATIENT' | 'OFFICE') => {
         if (!visit) return

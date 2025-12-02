@@ -4,6 +4,7 @@ import { useRouter } from 'next/router'
 import { canAccessRoute } from '../lib/permissions'
 import ImportNotifications from './ImportNotifications'
 import AppSwitcherModal from './AppSwitcherModal'
+import AccountSwitcherModal from './AccountSwitcherModal'
 import { useDoctor } from '../contexts/DoctorContext'
 
 interface HeaderProps {
@@ -18,6 +19,7 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
   const [appSwitcherModalOpen, setAppSwitcherModalOpen] = useState(false)
+  const [accountSwitcherModalOpen, setAccountSwitcherModalOpen] = useState(false)
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number } | null>(null)
   const navRef = useRef<HTMLDivElement>(null)
   const submenuNavRef = useRef<HTMLDivElement>(null)
@@ -196,6 +198,12 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
         onClose={() => setAppSwitcherModalOpen(false)}
         currentApp={currentApp}
         user={user}
+      />
+      
+      <AccountSwitcherModal
+        isOpen={accountSwitcherModalOpen}
+        onClose={() => setAccountSwitcherModalOpen(false)}
+        currentUser={user}
       />
       
       <header className={`border-b border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-white via-emerald-50/20 to-green-50/10 dark:from-gray-900 dark:via-emerald-950/10 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-md mb-8 sticky top-0 z-50 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]`}>
@@ -508,6 +516,20 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                       <span>View Profile</span>
                     </div>
                   </Link>
+                  <button
+                    onClick={() => {
+                      setUserDropdownOpen(false)
+                      setAccountSwitcherModalOpen(true)
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                      <span>Switch Account</span>
+                    </div>
+                  </button>
                   <hr className="my-1 border-gray-200 dark:border-gray-700" />
                   <button
                     onClick={handleLogout}

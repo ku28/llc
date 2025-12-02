@@ -4,7 +4,9 @@ import Header from './Header'
 import Footer from './Footer'
 import FloatingPrescriptionButton from './FloatingPrescriptionButton'
 import FloatingBookButton from './FloatingBookButton'
+import FloatingTaskButton from './FloatingTaskButton'
 import TokenSidebar from './TokenSidebar'
+import TaskNotificationSystem from './TaskNotificationSystem'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -50,6 +52,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Show FloatingPrescriptionButton for staff/admin/doctor but not reception */}
       {!isLanding && !isPatient && !isReception && <FloatingPrescriptionButton />}
       
+      {/* Show FloatingTaskButton for admin/doctor roles only */}
+      {!isLanding && <FloatingTaskButton userRole={user?.role} hasOtherFloatingButton={!isPatient && !isReception} />}
+      
       {/* Show FloatingBookButton for patients (user role) */}
       {!isLanding && isPatient && <FloatingBookButton />}
       
@@ -63,6 +68,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           onClose={() => setTokenSidebarOpen(false)} 
         />
       )}
+
+      {/* Task Notification System - Show for receptionists only */}
+      {!isLanding && <TaskNotificationSystem userRole={user?.role} />}
 
       {!isLanding && <Footer />}
     </div>
