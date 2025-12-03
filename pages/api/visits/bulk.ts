@@ -262,6 +262,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 patient: {
                                     connect: { id: patient.id }
                                 },
+                                doctor: doctorId ? {
+                                    connect: { id: doctorId }
+                                } : undefined,
                                 opdNo: opdNo,
                                 date: parseDate(date) || new Date(),
                                 isImported: true, // Mark as imported to skip PDF generation
@@ -289,7 +292,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 height: toNumber(visitFields.height),
                                 procedureAdopted: toString(procedureAdopted),
                                 discussion: toString(discussion),
-                                doctorId: doctorId,
                                 extra: (() => {
                                     const weightHistory = parseWeightHistory(visitFields.weight)
                                     if (weightHistory && weightHistory.includes('/')) {
