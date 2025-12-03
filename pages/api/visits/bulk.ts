@@ -204,6 +204,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             
             return age
         }
+        
+        // Helper to normalize phone numbers (remove spaces, dashes, parentheses, etc.)
+        const normalizePhone = (phone: any): string | null => {
+            if (!phone) return null
+            const phoneStr = String(phone).trim()
+            if (!phoneStr) return null
+            // Remove all non-digit characters
+            const normalized = phoneStr.replace(/\D/g, '')
+            return normalized.length > 0 ? normalized : null
+        }
 
         try {
             const BATCH_SIZE = 100 // Increased from 50 for better performance
@@ -214,40 +224,52 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             console.log('[Bulk Create Visits] Pre-fetching patients and products...')
             
             // Get all phones and names from visits data for batch lookup
-            const phones = [...new Set(visits.map((v: any) => v.phone).filter(Boolean))]
+            const phones = [...new Set(
+                visits.map((v: any) => normalizePhone(v.phone)).filter(Boolean)
+            )]
             const patientNames = [...new Set(visits.map((v: any) => v.patientName).filter(Boolean))]
             const productNames = [...new Set(
                 visits.flatMap((v: any) => (v.prescriptions || []).map((p: any) => p.productName).filter(Boolean))
             )]
             
-            // Fetch all existing patients by phone AND name in one query
+            // Fetch all existing patients by phone AND name in one query (for this doctor only)
+            // Note: We fetch all patients and match by normalized phone in-memory because 
+            // phone formats in DB may differ (spaces, dashes, etc.)
             const existingPatientsByPhone = await prisma.patient.findMany({
                 where: {
-                    OR: [
-                        { phone: { in: phones } },
-                        { 
-                            OR: patientNames.map(name => {
-                                const nameParts = name.trim().split(' ')
-                                return {
-                                    firstName: nameParts[0],
-                                    lastName: nameParts.slice(1).join(' ') || null
-                                }
-                            })
-                        }
-                    ]
+                    doctorId: doctorId
                 }
             })
-            const patientPhoneMap = new Map(existingPatientsByPhone.map((p: any) => [p.phone, p]))
-            const patientNameMap = new Map(existingPatientsByPhone.map((p: any) => 
-                [`${p.firstName} ${p.lastName || ''}`.trim().toLowerCase(), p]
-            ))
             
-            // Fetch all existing products in one query
+            console.log(`[Pre-fetch] Found ${existingPatientsByPhone.length} existing patients for doctor ${doctorId}`)
+            console.log(`[Pre-fetch] Patient phones in DB:`, existingPatientsByPhone.map(p => p.phone).filter(Boolean))
+            
+            // Build maps with normalized phone numbers
+            const patientPhoneMap = new Map(
+                existingPatientsByPhone
+                    .filter(p => p.phone)
+                    .map((p: any) => [normalizePhone(p.phone), p])
+            )
+            const patientNameMap = new Map(existingPatientsByPhone.map((p: any) => {
+                // Normalize the same way we do during lookup
+                const normalizedName = `${p.firstName} ${p.lastName || ''}`
+                    .trim()
+                    .toLowerCase()
+                    .replace(/\s+/g, ' ')
+                    .replace(/[^\w\s]/g, '')
+                return [normalizedName, p]
+            }))
+            
+            // Fetch all existing products in one query (for this doctor only)
             const existingProducts = await prisma.product.findMany({
                 where: {
+                    doctorId: doctorId,
                     name: { in: productNames }
                 }
             })
+            
+            console.log(`[Pre-fetch] Found ${existingProducts.length} existing products for doctor ${doctorId}`)
+            console.log(`[Pre-fetch] Product names in DB:`, existingProducts.map(p => p.name).slice(0, 10))
             const productNameMap = new Map(existingProducts.map((p: any) => [
                 p.name.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s]/g, ''), 
                 p
@@ -313,10 +335,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                         // Find or create patient using pre-fetched data
                         let patient = null
                         
+                        // Normalize phone for lookup
+                        const normalizedPhone = normalizePhone(phone)
+                        
                         // Try to find by phone first (most reliable)
-                        if (phone && patientPhoneMap.has(phone)) {
-                            patient = patientPhoneMap.get(phone)
-                            console.log(`[Visit ${opdNo}] Found existing patient by phone: ${phone}`)
+                        if (normalizedPhone && patientPhoneMap.has(normalizedPhone)) {
+                            patient = patientPhoneMap.get(normalizedPhone)
+                            console.log(`[Visit ${opdNo}] Found existing patient by phone: ${normalizedPhone} (original: ${phone})`)
                         }
                         
                         // If not found by phone, try by name (normalized)
@@ -370,9 +395,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                             })
                             
                             // Add to both maps for subsequent lookups in this batch
-                            if (phone) {
-                                patientPhoneMap.set(phone, patient)
-                                console.log(`[Visit ${opdNo}] Added patient to phone map: ${phone}`)
+                            if (normalizedPhone) {
+                                patientPhoneMap.set(normalizedPhone, patient)
+                                console.log(`[Visit ${opdNo}] Added patient to phone map: ${normalizedPhone} (original: ${phone})`)
                             }
                             
                             // Normalize name the same way for map storage
