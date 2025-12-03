@@ -24,13 +24,47 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             if (!dateStr) return null
             
             try {
-                const date = new Date(dateStr)
-                // Check if date is valid
-                if (isNaN(date.getTime())) {
+                let dateString = String(dateStr).trim()
+                
+                // Try date string patterns - DD-MM-YYYY format
+                let match = dateString.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+                if (match) {
+                    const [, day, month, year] = match
+                    const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                    if (!isNaN(parsedDate.getTime())) {
+                        return parsedDate
+                    }
+                }
+                
+                // If it's a pure number (Excel serial), return null
+                const numValue = parseFloat(dateString)
+                if (!isNaN(numValue) && !/[\/-]/.test(dateString)) {
                     return null
                 }
-                return date
-            } catch {
+                
+                // Pattern 2: MM/DD/YYYY
+                match = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+                if (match) {
+                    const [, month, day, year] = match
+                    console.log(`[parseDate] Matched MM/DD/YYYY: month=${month}, day=${day}, year=${year}`)
+                    const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                    if (!isNaN(parsedDate.getTime())) {
+                        console.log(`[parseDate] ✓ Successfully created date: ${parsedDate.toISOString()}`)
+                        return parsedDate
+                    }
+                }
+                
+                // Pattern 3: Try standard Date parsing as fallback
+                const date = new Date(dateString)
+                if (!isNaN(date.getTime())) {
+                    console.log(`[parseDate] ✓ Parsed using standard Date: ${date.toISOString()}`)
+                    return date
+                }
+                
+                console.log(`[parseDate] ✗ Failed to parse date: "${dateString}"`)
+                return null
+            } catch (error) {
+                console.log(`[parseDate] ✗ Error parsing date:`, error)
                 return null
             }
         }

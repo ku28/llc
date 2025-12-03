@@ -139,9 +139,17 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                 processData(Array.isArray(json) ? json : [json])
             } else {
                 const data = await file.arrayBuffer()
-                const workbook = XLSX.read(data, { sheetRows: 0 }) // Read all rows
+                const workbook = XLSX.read(data, { 
+                    type: 'array',
+                    cellDates: false,  // Don't parse dates automatically
+                    cellText: false,   // Don't use formatted text
+                    raw: true          // Keep raw values
+                })
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+                    defval: '',
+                    raw: false  // Use formatted string values instead of raw numbers
+                })
                 console.log(`[Import] Parsed ${jsonData.length} rows from Excel file`)
                 processData(jsonData)
             }
@@ -162,39 +170,66 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
         const parseDate = (dateStr: any): string | undefined => {
             if (!dateStr) return undefined
             
-            const str = String(dateStr).trim()
+            let str = String(dateStr).trim()
             if (!str) return undefined
-            
-            // Handle Excel serial date numbers (days since 1900-01-01)
-            if (/^\d+$/.test(str) && Number(str) > 40000 && Number(str) < 60000) {
-                const excelEpoch = new Date(1900, 0, 1)
-                const days = parseInt(str) - 2 // Excel has a leap year bug, subtract 2
-                const date = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000)
-                if (!isNaN(date.getTime())) {
-                    return date.toISOString().split('T')[0]
-                }
-            }
             
             // Try to parse DD-MM-YYYY format (e.g., "01-11-2025" or "04-11-2025")
             const ddmmyyyyMatch = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
             if (ddmmyyyyMatch) {
-                const [, day, month, year] = ddmmyyyyMatch
-                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+                const day = parseInt(ddmmyyyyMatch[1])
+                const month = parseInt(ddmmyyyyMatch[2])
+                const year = parseInt(ddmmyyyyMatch[3])
+                
+                // Create date directly in YYYY-MM-DD format
+                const result = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                
+                // Validate the date is real
+                const testDate = new Date(year, month - 1, day)
+                if (!isNaN(testDate.getTime()) && 
+                    testDate.getFullYear() === year && 
+                    testDate.getMonth() === month - 1 && 
+                    testDate.getDate() === day) {
+                    return result
+                }
+            }
+            
+            // If it's a pure number (Excel serial), return undefined to show as "-"
+            const numValue = parseFloat(str)
+            if (!isNaN(numValue) && !/[\/-]/.test(str)) {
+                return undefined
             }
             
             // Try to parse DD/MM/YYYY format
             const ddmmyyyySlashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
             if (ddmmyyyySlashMatch) {
-                const [, day, month, year] = ddmmyyyySlashMatch
-                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+                const day = parseInt(ddmmyyyySlashMatch[1])
+                const month = parseInt(ddmmyyyySlashMatch[2])
+                const year = parseInt(ddmmyyyySlashMatch[3])
+                console.log(`[parseDate Modal] Matched DD/MM/YYYY: day=${day}, month=${month}, year=${year}`)
+                
+                const result = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                console.log(`[parseDate Modal] Result: ${result}`)
+                
+                // Validate the date is real
+                const testDate = new Date(year, month - 1, day)
+                if (!isNaN(testDate.getTime()) && 
+                    testDate.getFullYear() === year && 
+                    testDate.getMonth() === month - 1 && 
+                    testDate.getDate() === day) {
+                    return result
+                }
+                console.log(`[parseDate Modal] Date validation failed`)
             }
             
             // Try to parse as ISO date or let Date constructor handle it
             const date = new Date(str)
             if (!isNaN(date.getTime())) {
-                return date.toISOString().split('T')[0]
+                const result = date.toISOString().split('T')[0]
+                console.log(`[parseDate Modal] Standard parse -> ${result}`)
+                return result
             }
             
+            console.log(`[parseDate Modal] Failed to parse: "${str}"`)
             return undefined
         }
 
