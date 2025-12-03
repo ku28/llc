@@ -242,12 +242,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             })
             
             console.log(`[Pre-fetch] Found ${existingPatientsByPhone.length} existing patients for doctor ${doctorId}`)
-            console.log(`[Pre-fetch] Patient phones in DB:`, existingPatientsByPhone.map(p => p.phone).filter(Boolean))
+            console.log(`[Pre-fetch] Patient phones in DB:`, existingPatientsByPhone.map((p: any) => p.phone).filter(Boolean))
             
             // Build maps with normalized phone numbers
             const patientPhoneMap = new Map(
                 existingPatientsByPhone
-                    .filter(p => p.phone)
+                    .filter((p: any) => p.phone)
                     .map((p: any) => [normalizePhone(p.phone), p])
             )
             const patientNameMap = new Map(existingPatientsByPhone.map((p: any) => {
@@ -269,7 +269,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             })
             
             console.log(`[Pre-fetch] Found ${existingProducts.length} existing products for doctor ${doctorId}`)
-            console.log(`[Pre-fetch] Product names in DB:`, existingProducts.map(p => p.name).slice(0, 10))
+            console.log(`[Pre-fetch] Product names in DB:`, existingProducts.map((p: any) => p.name).slice(0, 10))
             const productNameMap = new Map(existingProducts.map((p: any) => [
                 p.name.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s]/g, ''), 
                 p
