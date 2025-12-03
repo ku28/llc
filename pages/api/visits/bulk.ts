@@ -248,7 +248,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                     name: { in: productNames }
                 }
             })
-            const productNameMap = new Map(existingProducts.map((p: any) => [p.name.toLowerCase(), p]))
+            const productNameMap = new Map(existingProducts.map((p: any) => [
+                p.name.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s]/g, ''), 
+                p
+            ]))
             
             // Fetch all existing visits by opdNo in one query
             const opdNos = visits.map((v: any) => v.opdNo).filter(Boolean)
@@ -543,22 +546,35 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                             for (const prData of prescriptions) {
                                 if (!prData.productName) continue // Skip empty prescriptions
                                 
-                                // Try to find the product using pre-fetched map
-                                let product: any = productNameMap.get(prData.productName.toLowerCase())
+                                // Normalize product name: trim, lowercase, remove extra spaces and special chars
+                                const normalizedProductName = prData.productName
+                                    .trim()
+                                    .toLowerCase()
+                                    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+                                    .replace(/[^\w\s]/g, '') // Remove special characters
+                                
+                                // Try to find the product using pre-fetched map with normalized name
+                                let product: any = productNameMap.get(normalizedProductName)
                                 
                                 // If product not found, create it with "Imported" category and doctorId
                                 if (!product) {
+                                    console.log(`[Visit ${opdNo}] Creating new product: ${prData.productName} (normalized: ${normalizedProductName})`)
+                                    
                                     product = await prisma.product.create({
                                         data: {
-                                            name: prData.productName,
+                                            name: prData.productName.trim(), // Use original name but trimmed
                                             priceRupees: 0,
                                             quantity: 0,
                                             categoryId: importedCategory.id,
                                             doctorId: doctorId
                                         }
                                     })
-                                    // Add to map for subsequent lookups
-                                    productNameMap.set(prData.productName.toLowerCase(), product)
+                                    
+                                    // Add to map with normalized name for subsequent lookups
+                                    productNameMap.set(normalizedProductName, product)
+                                    console.log(`[Visit ${opdNo}] Added product to map: ${normalizedProductName}`)
+                                } else {
+                                    console.log(`[Visit ${opdNo}] Found existing product: ${normalizedProductName}`)
                                 }
                                 
                                 // Add to batch
