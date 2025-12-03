@@ -351,7 +351,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     fatherHusbandGuardianName: visitFields.fatherHusbandGuardianName || null,
                                     gender: visitFields.gender || null,
                                     dob: finalDob,
-                                    age: finalAge ? String(finalAge) : null,
+                                    age: finalAge,
                                     doctorId: doctorId
                                 }
                             })
