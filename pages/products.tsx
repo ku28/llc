@@ -53,6 +53,8 @@ function ProductsPage() {
     const [sendingEmail, setSendingEmail] = useState(false)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
     const [successMessage, setSuccessMessage] = useState('')
+    const [showLoadingModal, setShowLoadingModal] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
     const [isFilterCategoryOpen, setIsFilterCategoryOpen] = useState(false)
     const [isFilterStockOpen, setIsFilterStockOpen] = useState(false)
     const [isFilterPriceOpen, setIsFilterPriceOpen] = useState(false)
@@ -203,6 +205,8 @@ function ProductsPage() {
 
     async function create(e: any) {
         e.preventDefault()
+        setSubmitting(true)
+        setShowLoadingModal(true)
         try {
             // Find category ID by name from database categories
             const categoryIdValue = form.categoryId ? 
@@ -238,7 +242,8 @@ function ProductsPage() {
                 setItems(Array.isArray(updatedItems) ? updatedItems : [])
                 setCache('products', Array.isArray(updatedItems) ? updatedItems : [])
                 
-                // Show success modal
+                // Hide loading modal and show success modal
+                setShowLoadingModal(false)
                 setSuccessMessage('Product added successfully!')
                 setShowSuccessModal(true)
                 
@@ -249,16 +254,23 @@ function ProductsPage() {
             } else {
                 const error = await response.json()
                 showError('Failed to add product: ' + (error.error || 'Unknown error'))
+                setShowLoadingModal(false)
             }
         } catch (error) {
             console.error('Create error:', error)
             showError('Failed to add product: ' + error)
+            setShowLoadingModal(false)
+        } finally {
+            setSubmitting(false)
         }
     }
 
     async function updateProduct(e: any) {
         e.preventDefault()
         if (!editingId) return
+        
+        setSubmitting(true)
+        setShowLoadingModal(true)
         
         // Find category ID by name from database categories
         const categoryIdValue = form.categoryId ? 
@@ -295,7 +307,8 @@ function ProductsPage() {
                 setItems(updatedItems)
                 setCache('products', updatedItems)
                 
-                // Show success modal
+                // Hide loading modal and show success modal
+                setShowLoadingModal(false)
                 setSuccessMessage('Product updated successfully!')
                 setShowSuccessModal(true)
                 
@@ -306,10 +319,14 @@ function ProductsPage() {
             } else {
                 const error = await response.json()
                 showError('Failed to update product: ' + (error.error || 'Unknown error'))
+                setShowLoadingModal(false)
             }
         } catch (error) {
             console.error('Update error:', error)
             showError('Failed to update product')
+            setShowLoadingModal(false)
+        } finally {
+            setSubmitting(false)
         }
     }
 
@@ -1399,7 +1416,14 @@ function ProductsPage() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
-                        {showSuccessModal ? (
+                        {showLoadingModal ? (
+                            // Loading State
+                            <div className="relative p-12 text-center">
+                                <div className="w-20 h-20 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-6"></div>
+                                <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 mb-3">Processing...</h3>
+                                <p className="text-gray-600 dark:text-gray-400 text-lg">{editingId ? 'Updating product information' : 'Adding new product'}</p>
+                            </div>
+                        ) : showSuccessModal ? (
                             // Success State
                             <div className="relative p-12 text-center">
                                 <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce-in">
@@ -1553,11 +1577,11 @@ function ProductsPage() {
                                 </div>
 
                                 <div className="relative bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-gray-800 dark:to-gray-800 px-6 py-4 flex justify-end gap-3">
-                                    <button type="button" onClick={cancelEdit} className="px-6 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors font-medium">
+                                    <button type="button" onClick={cancelEdit} disabled={submitting} className="px-6 py-2.5 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors font-medium disabled:opacity-50">
                                         Cancel
                                     </button>
-                                    <button type="submit" disabled={!user} onClick={editingId ? updateProduct : create} className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-semibold transition-all shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:scale-105 disabled:opacity-50">
-                                        {!user ? 'Login to add products' : editingId ? 'Update Product' : 'Add Product'}
+                                    <button type="submit" disabled={!user || submitting} onClick={editingId ? updateProduct : create} className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-semibold transition-all shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:scale-105 disabled:opacity-50">
+                                        {submitting ? 'Processing...' : !user ? 'Login to add products' : editingId ? 'Update Product' : 'Add Product'}
                                     </button>
                                 </div>
                             </>

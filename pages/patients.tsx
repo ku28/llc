@@ -51,6 +51,7 @@ export default function PatientsPage() {
     const [currentPage, setCurrentPage] = useState(1)
     const [showSuccessModal, setShowSuccessModal] = useState(false)
     const [successMessage, setSuccessMessage] = useState('')
+    const [showLoadingModal, setShowLoadingModal] = useState(false)
     const [itemsPerPage] = useState(10)
     const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false)
     const [doctors, setDoctors] = useState<any[]>([])
@@ -232,12 +233,16 @@ export default function PatientsPage() {
         }
     }, [router.isReady, router.query])
 
-    function openModal() {
-        setForm({
-            ...emptyForm,
-            date: new Date().toISOString().split('T')[0],
-            doctorId: user?.role === 'doctor' ? user.id.toString() : ''
-        })
+    function openModal(prefillData?: any) {
+        if (prefillData) {
+            setForm(prefillData)
+        } else {
+            setForm({
+                ...emptyForm,
+                date: new Date().toISOString().split('T')[0],
+                doctorId: user?.role === 'doctor' ? user.id.toString() : ''
+            })
+        }
         setIsModalOpen(true)
         document.body.style.overflow = 'hidden'
         setTimeout(() => setIsAnimating(true), 10)
@@ -501,7 +506,7 @@ export default function PatientsPage() {
         const dobValue = patient.dob ? new Date(patient.dob).toISOString().slice(0, 10) : ''
         const ageValue = patient.age ? String(patient.age) : (dobValue ? calculateAge(dobValue) : '')
         
-        setForm({
+        const patientData = {
             firstName: patient.firstName || '',
             lastName: patient.lastName || '',
             phone: patient.phone || '',
@@ -514,9 +519,10 @@ export default function PatientsPage() {
             imageUrl: patient.imageUrl || '',
             fatherHusbandGuardianName: patient.fatherHusbandGuardianName || '',
             doctorId: patient.doctorId ? patient.doctorId.toString() : (user?.role === 'doctor' ? user.id.toString() : '')
-        })
+        }
+        
         setImagePreview(patient.imageUrl || '')
-        openModal()
+        openModal(patientData)
     }
 
     // Inline validation state
@@ -532,6 +538,7 @@ export default function PatientsPage() {
         if (Object.keys(errors).length > 0) return;
 
         setSubmitting(true);
+        setShowLoadingModal(true);
         try {
             const payload: any = { 
                 ...form,
@@ -595,7 +602,8 @@ export default function PatientsPage() {
             const list = await (await fetch('/api/patients')).json();
             setPatients(list);
             
-            // Show success modal instead of toast
+            // Hide loading modal and show success modal
+            setShowLoadingModal(false);
             setSuccessMessage(editingId ? 'Patient updated successfully!' : 'Patient registered successfully!');
             setShowSuccessModal(true);
             
@@ -612,6 +620,7 @@ export default function PatientsPage() {
         } catch (err: any) {
             console.error(err);
             showError(err?.message || 'Failed to save patient');
+            setShowLoadingModal(false);
         } finally {
             setSubmitting(false);
         }
