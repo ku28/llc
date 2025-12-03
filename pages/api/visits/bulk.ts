@@ -250,15 +250,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                     .filter((p: any) => p.phone)
                     .map((p: any) => [normalizePhone(p.phone), p])
             )
-            const patientNameMap = new Map(existingPatientsByPhone.map((p: any) => {
-                // Normalize the same way we do during lookup
-                const normalizedName = `${p.firstName} ${p.lastName || ''}`
+            
+            // Build name map: normalize full name consistently
+            const patientNameMap = new Map()
+            existingPatientsByPhone.forEach((p: any) => {
+                const fullName = `${p.firstName} ${p.lastName || ''}`
                     .trim()
                     .toLowerCase()
                     .replace(/\s+/g, ' ')
                     .replace(/[^\w\s]/g, '')
-                return [normalizedName, p]
-            }))
+                if (fullName) {
+                    patientNameMap.set(fullName, p)
+                }
+            })
             
             // Fetch all existing products in one query (for this doctor only)
             const existingProducts = await prisma.product.findMany({
@@ -400,15 +404,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 console.log(`[Visit ${opdNo}] Added patient to phone map: ${normalizedPhone} (original: ${phone})`)
                             }
                             
-                            // Normalize name the same way for map storage
-                            const normalizedName = `${firstName} ${lastName || ''}`
-                                .trim()
-                                .toLowerCase()
-                                .replace(/\s+/g, ' ')
-                                .replace(/[^\w\s]/g, '')
-                            
-                            patientNameMap.set(normalizedName, patient)
-                            console.log(`[Visit ${opdNo}] Added patient to name map: ${normalizedName}`)
+                            // Normalize the ORIGINAL patientName for map storage (not the split firstName/lastName)
+                            if (patientName) {
+                                const normalizedName = patientName
+                                    .trim()
+                                    .toLowerCase()
+                                    .replace(/\s+/g, ' ')
+                                    .replace(/[^\w\s]/g, '')
+                                
+                                patientNameMap.set(normalizedName, patient)
+                                console.log(`[Visit ${opdNo}] Added patient to name map: ${normalizedName}`)
+                            }
                         }
 
                         // Check if visit with this opdNo already exists using pre-fetched map
@@ -590,6 +596,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                             name: prData.productName.trim(), // Use original name but trimmed
                                             priceRupees: 0,
                                             quantity: 0,
+                                            purchaseQty: 100, // Default purchase quantity for imported products
                                             categoryId: importedCategory.id,
                                             doctorId: doctorId
                                         }
