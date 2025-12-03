@@ -37,17 +37,17 @@ export default function ConfirmModal({
   if (!isOpen) return null
 
   const variantColors = {
-    danger: 'from-red-500 to-red-600 hover:from-red-600 hover:to-red-700',
-    warning: 'from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700',
-    info: 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
+    danger: 'from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 shadow-red-500/30',
+    warning: 'from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600',
+    info: 'from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600'
   }
 
   return (
     <div className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" style={{ zIndex: 9999 }}>
       <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-md w-full animate-in fade-in zoom-in duration-200">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 via-transparent to-orange-500/5 pointer-events-none"></div>
         <div className="relative p-6">
-          <h3 className="text-xl font-bold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+          <h3 className="text-xl font-bold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-400 dark:to-orange-400">
             {title}
           </h3>
           <p className="text-gray-600 dark:text-gray-300 mb-6">

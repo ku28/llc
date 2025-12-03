@@ -4,7 +4,6 @@ import ToastNotification from '../components/ToastNotification'
 import CustomSelect from '../components/CustomSelect'
 import { useToast } from '../hooks/useToast'
 import { useDataCache } from '../contexts/DataCacheContext'
-import { useDoctor } from '../contexts/DoctorContext'
 import RefreshButton from '../components/RefreshButton'
 import * as XLSX from 'xlsx'
 
@@ -40,7 +39,6 @@ export default function SuppliersPage() {
     
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
     const { getCache, setCache } = useDataCache()
-    const { selectedDoctorId } = useDoctor()
 
     const emptyForm = {
         name: '',
@@ -61,14 +59,12 @@ export default function SuppliersPage() {
     const [user, setUser] = useState<any>(null)
 
     const fetchSuppliers = useCallback(async () => {
-        const params = new URLSearchParams()
-        if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
-        const response = await fetch(`/api/suppliers${params.toString() ? `?${params}` : ''}`)
+        const response = await fetch('/api/suppliers')
         const data = await response.json()
         const suppliersData = Array.isArray(data) ? data : []
         setSuppliers(suppliersData)
         setCache('suppliers', suppliersData)
-    }, [selectedDoctorId, setCache])
+    }, [setCache])
 
     const fetchInitialData = useCallback(async () => {
         setLoading(true)
@@ -97,17 +93,7 @@ export default function SuppliersPage() {
         return () => {
             setSuppliers([])
         }
-    }, [selectedDoctorId, fetchSuppliers, getCache, fetchInitialData])
-    
-    // Listen for doctor change events
-    useEffect(() => {
-        const handleDoctorChange = () => {
-            fetchSuppliers()
-        }
-        
-        window.addEventListener('doctor-changed', handleDoctorChange)
-        return () => window.removeEventListener('doctor-changed', handleDoctorChange)
-    }, [fetchSuppliers])
+    }, [getCache, fetchInitialData])
 
     async function handleSubmit(e: any) {
         e.preventDefault()
@@ -1058,14 +1044,15 @@ export default function SuppliersPage() {
 
             {/* Delete Progress Modal (for bulk deletes) */}
             {deleting && deleteProgress.total > 0 && !isDeleteMinimized && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl max-w-md w-full">
-                        <div className="p-6">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                    <div className="relative overflow-hidden rounded-2xl border border-red-200/30 dark:border-red-700/30 bg-gradient-to-br from-white via-red-50/30 to-orange-50/20 dark:from-gray-900 dark:via-red-950/20 dark:to-gray-900 shadow-2xl shadow-red-500/20 max-w-md w-full animate-in fade-in zoom-in duration-200">
+                        <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 via-transparent to-orange-500/5 pointer-events-none"></div>
+                        <div className="relative p-6">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Deleting Suppliers</h3>
+                                <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-400 dark:to-orange-400">Deleting Suppliers</h3>
                                 <button
                                     onClick={() => setIsDeleteMinimized(true)}
-                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                    className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -1074,12 +1061,14 @@ export default function SuppliersPage() {
                             </div>
                             
                             <div className="flex items-center justify-center mb-6">
-                                <svg className="w-16 h-16 mx-auto text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
+                                <div className="w-20 h-20 bg-gradient-to-br from-red-100 to-orange-100 dark:from-red-900/40 dark:to-orange-900/40 rounded-full flex items-center justify-center shadow-lg shadow-red-500/20 animate-pulse">
+                                    <svg className="w-10 h-10 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </div>
                             </div>
                             
-                            <div className="text-3xl font-bold text-red-600 dark:text-red-400 mb-2 text-center">
+                            <div className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-400 dark:to-orange-400 mb-2 text-center">
                                 {deleteProgress.current} / {deleteProgress.total}
                             </div>
                             
@@ -1088,12 +1077,12 @@ export default function SuppliersPage() {
                             </p>
                             
                             {/* Progress Bar */}
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+                            <div className="w-full bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-full h-5 overflow-hidden shadow-inner">
                                 <div 
-                                    className="bg-red-600 h-4 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-2"
+                                    className="h-full bg-gradient-to-r from-red-500 via-red-600 to-orange-600 rounded-full transition-all duration-300 ease-out flex items-center justify-end pr-3 shadow-lg shadow-red-500/50"
                                     style={{ width: `${(deleteProgress.current / deleteProgress.total) * 100}%` }}
                                 >
-                                    <span className="text-xs text-white font-medium">
+                                    <span className="text-xs font-bold text-white drop-shadow-lg">
                                         {deleteProgress.current > 0 && `${Math.round((deleteProgress.current / deleteProgress.total) * 100)}%`}
                                     </span>
                                 </div>

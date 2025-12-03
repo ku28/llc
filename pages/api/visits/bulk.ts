@@ -54,30 +54,121 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         // Helper function to safely parse numbers
         const toNumber = (value: any): number | null => {
-            if (value === null || value === undefined || value === '') return null
+            if (value === null || value === undefined || value === '' || value === 0) return null
             
             // Handle weight history format like "69/70/71" - take the last value
             if (typeof value === 'string' && value.includes('/')) {
-                const values = value.split('/').map(v => v.trim()).filter(v => v)
+                const values = value.split('/').map(v => v.trim()).filter(v => v && v !== '0')
                 if (values.length > 0) {
                     const lastValue = values[values.length - 1]
                     const num = Number(lastValue)
-                    return isNaN(num) ? null : num
+                    return isNaN(num) || num === 0 ? null : num
                 }
                 return null
             }
             
             const num = Number(value)
-            if (isNaN(num)) return null
+            if (isNaN(num) || num === 0) return null
             return num
+        }
+        
+        // Helper to parse weight with history (e.g., "95/94/94/94/95/94/92/93/91/94")
+        const parseWeight = (value: any): number | null => {
+            if (value === null || value === undefined || value === '' || value === 0) return null
+            
+            const str = String(value).trim()
+            if (!str || str === '0') return null
+            
+            // Handle weight history format like "95/94/94/94/95/94/92/93/91/94" - take the last value
+            if (str.includes('/')) {
+                const values = str.split('/').map(v => v.trim()).filter(v => v && v !== '0')
+                if (values.length > 0) {
+                    const lastValue = values[values.length - 1]
+                    const num = Number(lastValue)
+                    return isNaN(num) || num === 0 ? null : num
+                }
+                return null
+            }
+            
+            const num = Number(str)
+            return isNaN(num) || num === 0 ? null : num
         }
         
         // Helper to extract weight history as string
         const parseWeightHistory = (value: any): string | null => {
-            if (value === null || value === undefined || value === '') return null
+            if (value === null || value === undefined || value === '' || value === 0) return null
             const str = String(value).trim()
+            if (!str || str === '0') return null
             // If it contains "/" it's a history, otherwise just return the value
             return str || null
+        }
+        
+        // Helper to parse height in format like "3' 9"" or "5'10"" to inches
+        const parseHeight = (value: any): number | null => {
+            if (value === null || value === undefined || value === '' || value === 0) return null
+            
+            const str = String(value).trim()
+            if (!str || str === '0') return null
+            
+            // Try to parse format like "3' 9"" or "5'10""
+            const heightMatch = str.match(/(\d+)'?\s*(\d+)?/)
+            if (heightMatch) {
+                const feet = parseInt(heightMatch[1]) || 0
+                const inches = parseInt(heightMatch[2]) || 0
+                const totalInches = (feet * 12) + inches
+                return totalInches > 0 ? totalInches : null
+            }
+            
+            // Try direct number
+            const num = Number(str)
+            return isNaN(num) || num === 0 ? null : num
+        }
+        
+        // Helper to parse age from formats like "30 YR", "25YR", "5 MONTHS", etc.
+        const parseAge = (value: any): number | null => {
+            if (value === null || value === undefined || value === '' || value === 0) return null
+            
+            const str = String(value).trim().toUpperCase()
+            if (!str || str === '0' || str === 'YR' || str === 'YEARS' || str === 'Y') return null
+            
+            // Match patterns like "30 YR", "25YR", "5 MONTHS", "2 M", etc.
+            const ageMatch = str.match(/(\d+)\s*(YR|YEARS?|Y|M|MONTHS?)?/)
+            if (ageMatch) {
+                const num = parseInt(ageMatch[1])
+                const unit = ageMatch[2]
+                
+                // If unit is months or M, convert to years (but return null if less than 1 year for DOB calculation)
+                if (unit && (unit.startsWith('M') || unit === 'MONTHS')) {
+                    // Store months as decimal years for accuracy
+                    return num / 12
+                }
+                
+                return num > 0 ? num : null
+            }
+            
+            // Try direct number
+            const num = Number(str)
+            return isNaN(num) || num === 0 ? null : num
+        }
+        
+        // Helper to calculate DOB from age
+        const calculateDobFromAge = (age: number): Date => {
+            const today = new Date()
+            const birthYear = today.getFullYear() - Math.floor(age)
+            return new Date(birthYear, today.getMonth(), today.getDate())
+        }
+        
+        // Helper to calculate age from DOB
+        const calculateAgeFromDob = (dob: Date): number => {
+            const today = new Date()
+            let age = today.getFullYear() - dob.getFullYear()
+            const monthDiff = today.getMonth() - dob.getMonth()
+            
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+                age--
+            }
+            
+            return age
         }
 
         try {
@@ -90,15 +181,32 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             
             // Get all phones and names from visits data for batch lookup
             const phones = [...new Set(visits.map((v: any) => v.phone).filter(Boolean))]
+            const patientNames = [...new Set(visits.map((v: any) => v.patientName).filter(Boolean))]
             const productNames = [...new Set(
                 visits.flatMap((v: any) => (v.prescriptions || []).map((p: any) => p.productName).filter(Boolean))
             )]
             
-            // Fetch all existing patients by phone in one query
+            // Fetch all existing patients by phone AND name in one query
             const existingPatientsByPhone = await prisma.patient.findMany({
-                where: { phone: { in: phones } }
+                where: {
+                    OR: [
+                        { phone: { in: phones } },
+                        { 
+                            OR: patientNames.map(name => {
+                                const nameParts = name.trim().split(' ')
+                                return {
+                                    firstName: nameParts[0],
+                                    lastName: nameParts.slice(1).join(' ') || null
+                                }
+                            })
+                        }
+                    ]
+                }
             })
             const patientPhoneMap = new Map(existingPatientsByPhone.map((p: any) => [p.phone, p]))
+            const patientNameMap = new Map(existingPatientsByPhone.map((p: any) => 
+                [`${p.firstName} ${p.lastName || ''}`.trim().toLowerCase(), p]
+            ))
             
             // Fetch all existing products in one query
             const existingProducts = await prisma.product.findMany({
@@ -173,11 +281,32 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                             patient = patientPhoneMap.get(phone)
                         }
                         
+                        // If not found by phone, try by name
+                        if (!patient && patientName) {
+                            const normalizedName = patientName.trim().toLowerCase()
+                            if (patientNameMap.has(normalizedName)) {
+                                patient = patientNameMap.get(normalizedName)
+                            }
+                        }
+                        
                         // If still not found, create new patient
                         if (!patient) {
                             const nameParts = (patientName || 'Unknown Patient').trim().split(' ')
                             const firstName = nameParts[0]
                             const lastName = nameParts.slice(1).join(' ') || null
+                            
+                            // Parse DOB and age with priority: DOB first, then calculate age from it
+                            let finalDob: Date | null = parseDate(visitFields.dob)
+                            let finalAge: number | null = parseAge(visitFields.age)
+                            
+                            // If DOB is provided, prioritize it and calculate age from it
+                            if (finalDob) {
+                                finalAge = calculateAgeFromDob(finalDob)
+                            } 
+                            // If no DOB but age is provided, calculate DOB from age
+                            else if (finalAge && finalAge > 0) {
+                                finalDob = calculateDobFromAge(finalAge)
+                            }
                             
                             patient = await prisma.patient.create({
                                 data: {
@@ -187,13 +316,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     address: visitFields.address || null,
                                     fatherHusbandGuardianName: visitFields.fatherHusbandGuardianName || null,
                                     gender: visitFields.gender || null,
-                                    dob: parseDate(visitFields.dob),
-                                    age: visitFields.age || null,
+                                    dob: finalDob,
+                                    age: finalAge ? String(finalAge) : null,
                                     doctorId: doctorId
                                 }
                             })
-                            // Add to map for subsequent lookups
+                            // Add to both maps for subsequent lookups in this batch
                             if (phone) patientPhoneMap.set(phone, patient)
+                            const normalizedName = `${firstName} ${lastName || ''}`.trim().toLowerCase()
+                            patientNameMap.set(normalizedName, patient)
                         }
 
                         // Check if visit with this opdNo already exists using pre-fetched map
@@ -201,6 +332,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
                         let visit
                         if (existingVisit) {
+                            // Parse DOB and age with priority: DOB first, then calculate age from it
+                            let finalDob: Date | null = parseDate(visitFields.dob)
+                            let finalAge: number | null = parseAge(visitFields.age)
+                            
+                            if (finalDob) {
+                                finalAge = calculateAgeFromDob(finalDob)
+                            } else if (finalAge && finalAge > 0) {
+                                finalDob = calculateDobFromAge(finalAge)
+                            }
+                            
                             // Update existing visit
                             visit = await prisma.visit.update({
                                 where: { id: existingVisit.id },
@@ -228,10 +369,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     address: toString(visitFields.address),
                                     phone: toString(phone),
                                     gender: toString(visitFields.gender),
-                                    dob: parseDate(visitFields.dob),
-                                    age: toNumber(visitFields.age),
-                                    weight: toNumber(visitFields.weight),
-                                    height: toNumber(visitFields.height),
+                                    dob: finalDob,
+                                    age: finalAge,
+                                    weight: parseWeight(visitFields.weight),
+                                    height: parseHeight(visitFields.height),
                                     procedureAdopted: toString(procedureAdopted),
                                     discussion: toString(discussion),
                                     extra: (() => {
@@ -256,6 +397,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 where: { visitId: visit.id }
                             })
                         } else {
+                            // Parse DOB and age with priority: DOB first, then calculate age from it
+                            let finalDob: Date | null = parseDate(visitFields.dob)
+                            let finalAge: number | null = parseAge(visitFields.age)
+                            
+                            if (finalDob) {
+                                finalAge = calculateAgeFromDob(finalDob)
+                            } else if (finalAge && finalAge > 0) {
+                                finalDob = calculateDobFromAge(finalAge)
+                            }
+                            
                             // Create new visit
                             visit = await prisma.visit.create({
                                 data: {
@@ -286,10 +437,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 address: toString(visitFields.address),
                                 phone: toString(phone),
                                 gender: toString(visitFields.gender),
-                                dob: parseDate(visitFields.dob),
-                                age: toNumber(visitFields.age),
-                                weight: toNumber(visitFields.weight),
-                                height: toNumber(visitFields.height),
+                                dob: finalDob,
+                                age: finalAge,
+                                weight: parseWeight(visitFields.weight),
+                                height: parseHeight(visitFields.height),
                                 procedureAdopted: toString(procedureAdopted),
                                 discussion: toString(discussion),
                                 extra: (() => {
@@ -314,19 +465,40 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                         if (prescriptions && Array.isArray(prescriptions) && prescriptions.length > 0) {
                             const prescriptionData = []
                             
+                            // Get or create "Imported" category for auto-created products with matching doctorId
+                            let importedCategory = await prisma.category.findFirst({
+                                where: {
+                                    name: 'Imported',
+                                    doctorId: doctorId
+                                }
+                            })
+                            
+                            if (!importedCategory) {
+                                importedCategory = await prisma.category.create({
+                                    data: {
+                                        name: 'Imported',
+                                        code: 'IMPORTED',
+                                        reorderLevel: 0,
+                                        doctorId: doctorId
+                                    }
+                                })
+                            }
+                            
                             for (const prData of prescriptions) {
                                 if (!prData.productName) continue // Skip empty prescriptions
                                 
                                 // Try to find the product using pre-fetched map
                                 let product: any = productNameMap.get(prData.productName.toLowerCase())
                                 
-                                // If product not found, create it
+                                // If product not found, create it with "Imported" category and doctorId
                                 if (!product) {
                                     product = await prisma.product.create({
                                         data: {
                                             name: prData.productName,
                                             priceRupees: 0,
-                                            quantity: 0
+                                            quantity: 0,
+                                            categoryId: importedCategory.id,
+                                            doctorId: doctorId
                                         }
                                     })
                                     // Add to map for subsequent lookups
