@@ -1118,10 +1118,10 @@ export default function VisitsPage() {
                                                         {patient?.firstName} {patient?.lastName}
                                                     </h4>
                                                     {visits.some((v: any) => {
-                                                        if (!v.createdAt) return false
-                                                        const createdDate = new Date(v.createdAt).toDateString()
+                                                        if (!v.date) return false
+                                                        const visitDate = new Date(v.date).toDateString()
                                                         const today = new Date().toDateString()
-                                                        return createdDate === today
+                                                        return visitDate === today
                                                     }) && (
                                                         <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs rounded-full font-bold shadow-md">
                                                             NEW
@@ -1556,34 +1556,39 @@ export default function VisitsPage() {
 
             {/* Cancel Delete Confirmation Modal */}
             {showCancelDeleteConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-                        <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0 w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                                    Cancel Delete Operation
-                                </h3>
-                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                                    Are you sure you want to cancel this delete operation? Already deleted items cannot be recovered.
-                                </p>
-                                <div className="flex justify-end gap-3">
-                                    <button
-                                        onClick={() => setShowCancelDeleteConfirm(false)}
-                                        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                                    >
-                                        No, Continue
-                                    </button>
-                                    <button
-                                        onClick={confirmCancelDelete}
-                                        className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-                                    >
-                                        Yes, Cancel Delete
-                                    </button>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
+                    <div className="relative rounded-xl border border-red-200/30 dark:border-red-700/30 bg-gradient-to-br from-white via-red-50/30 to-orange-50/20 dark:from-gray-900 dark:via-red-950/20 dark:to-gray-900 shadow-2xl shadow-red-500/20 backdrop-blur-sm max-w-md w-full mx-4 overflow-hidden">
+                        {/* Animated gradient overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-red-400/5 via-transparent to-orange-500/5 pointer-events-none"></div>
+                        
+                        <div className="relative p-6">
+                            <div className="flex items-start gap-4">
+                                <div className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-red-500/20 to-orange-500/20 backdrop-blur-sm border border-red-300/30 dark:border-red-600/30">
+                                    <svg className="w-6 h-6 text-red-600 dark:text-red-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-400 dark:to-orange-400 mb-2">
+                                        Cancel Delete Operation
+                                    </h3>
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-6 leading-relaxed">
+                                        Are you sure you want to cancel this delete operation? Already deleted items cannot be recovered.
+                                    </p>
+                                    <div className="flex justify-end gap-3">
+                                        <button
+                                            onClick={() => setShowCancelDeleteConfirm(false)}
+                                            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-300 dark:border-gray-600"
+                                        >
+                                            No, Continue Deleting
+                                        </button>
+                                        <button
+                                            onClick={confirmCancelDelete}
+                                            className="px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 rounded-lg transition-all duration-200 shadow-lg shadow-red-500/30 hover:shadow-red-500/50 hover:scale-105"
+                                        >
+                                            Yes, Cancel Delete
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -310,24 +310,34 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                         // Find or create patient using pre-fetched data
                         let patient = null
                         
-                        // Try to find by phone first using map
+                        // Try to find by phone first (most reliable)
                         if (phone && patientPhoneMap.has(phone)) {
                             patient = patientPhoneMap.get(phone)
+                            console.log(`[Visit ${opdNo}] Found existing patient by phone: ${phone}`)
                         }
                         
-                        // If not found by phone, try by name
+                        // If not found by phone, try by name (normalized)
                         if (!patient && patientName) {
-                            const normalizedName = patientName.trim().toLowerCase()
+                            // Normalize: trim, lowercase, remove extra spaces, remove special chars
+                            const normalizedName = patientName
+                                .trim()
+                                .toLowerCase()
+                                .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+                                .replace(/[^\w\s]/g, '') // Remove special characters
+                            
                             if (patientNameMap.has(normalizedName)) {
                                 patient = patientNameMap.get(normalizedName)
+                                console.log(`[Visit ${opdNo}] Found existing patient by name: ${normalizedName}`)
                             }
                         }
                         
                         // If still not found, create new patient
                         if (!patient) {
-                            const nameParts = (patientName || 'Unknown Patient').trim().split(' ')
+                            const nameParts = (patientName || 'Unknown Patient').trim().split(/\s+/) // Split by any whitespace
                             const firstName = nameParts[0]
                             const lastName = nameParts.slice(1).join(' ') || null
+                            
+                            console.log(`[Visit ${opdNo}] Creating new patient: ${firstName} ${lastName || ''} (Phone: ${phone || 'N/A'})`)
                             
                             // Parse DOB and age with priority: DOB first, then calculate age from it
                             let finalDob: Date | null = parseDate(visitFields.dob)
@@ -355,10 +365,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     doctorId: doctorId
                                 }
                             })
+                            
                             // Add to both maps for subsequent lookups in this batch
-                            if (phone) patientPhoneMap.set(phone, patient)
-                            const normalizedName = `${firstName} ${lastName || ''}`.trim().toLowerCase()
+                            if (phone) {
+                                patientPhoneMap.set(phone, patient)
+                                console.log(`[Visit ${opdNo}] Added patient to phone map: ${phone}`)
+                            }
+                            
+                            // Normalize name the same way for map storage
+                            const normalizedName = `${firstName} ${lastName || ''}`
+                                .trim()
+                                .toLowerCase()
+                                .replace(/\s+/g, ' ')
+                                .replace(/[^\w\s]/g, '')
+                            
                             patientNameMap.set(normalizedName, patient)
+                            console.log(`[Visit ${opdNo}] Added patient to name map: ${normalizedName}`)
                         }
 
                         // Check if visit with this opdNo already exists using pre-fetched map
