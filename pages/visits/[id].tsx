@@ -37,7 +37,7 @@ export default function VisitDetail() {
                     setReportsAttachments([])
                 }
             }
-            
+
             // Auto-generate and upload PDFs if not already done (skip imported visits)
             if (visitData.prescriptions && visitData.prescriptions.length > 0 && !visitData.isImported) {
                 if (!visitData.patientCopyPdfUrl || !visitData.officeCopyPdfUrl) {
@@ -57,17 +57,17 @@ export default function VisitDetail() {
             console.log('Cannot generate PDFs: missing visitData or prescriptionRef')
             return
         }
-        
+
         try {
             console.log('Starting PDF generation for visit:', visitData.id)
             console.log('prescriptionRef.current exists:', !!prescriptionRef.current)
-            
+
             // Wait for the component to render
             await new Promise(resolve => setTimeout(resolve, 1000))
-            
+
             // Store ref to avoid losing it during state changes
             const refElement = prescriptionRef.current
-            
+
             // Generate both PDFs without changing copyType between captures
             console.log('Generating patient copy...')
             const originalCopyType = copyType
@@ -75,16 +75,16 @@ export default function VisitDetail() {
             await new Promise(resolve => setTimeout(resolve, 800))
             const patientCopyUrl = await uploadPdfToCloudinary('PATIENT', visitData, refElement)
             console.log('Patient copy URL:', patientCopyUrl)
-            
+
             console.log('Generating office copy...')
             setCopyType('OFFICE')
             await new Promise(resolve => setTimeout(resolve, 800))
             const officeCopyUrl = await uploadPdfToCloudinary('OFFICE', visitData, refElement)
             console.log('Office copy URL:', officeCopyUrl)
-            
+
             // Reset to original copy type
             setCopyType(originalCopyType)
-            
+
             // Update visit with PDF URLs
             if (patientCopyUrl && officeCopyUrl) {
                 console.log('Updating visit with PDF URLs...')
@@ -99,7 +99,7 @@ export default function VisitDetail() {
                         opdNo: visitData.opdNo
                     })
                 })
-                
+
                 if (updateResponse.ok) {
                     console.log('Visit updated successfully with PDF URLs')
                     // Refresh visit data
@@ -119,7 +119,7 @@ export default function VisitDetail() {
     const uploadPdfToCloudinary = async (type: 'PATIENT' | 'OFFICE', visitData?: any, refElement?: HTMLDivElement | null) => {
         const currentVisit = visitData || visit
         const elementToCapture = refElement || prescriptionRef.current
-        
+
         if (!currentVisit || !elementToCapture) {
             console.log('Cannot upload PDF: missing visit or prescriptionRef', {
                 hasVisit: !!currentVisit,
@@ -127,10 +127,10 @@ export default function VisitDetail() {
             })
             return null
         }
-        
+
         try {
             console.log(`Capturing ${type} copy...`)
-            
+
             // Capture as canvas
             const canvas = await html2canvas(elementToCapture, {
                 scale: 1.5,
@@ -141,29 +141,29 @@ export default function VisitDetail() {
                 windowHeight: elementToCapture.scrollHeight,
                 imageTimeout: 15000
             })
-            
+
             console.log(`Canvas captured: ${canvas.width}x${canvas.height}`)
-            
+
             // Convert canvas to PDF
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'px',
                 format: [canvas.width, canvas.height]
             })
-            
+
             const imgData = canvas.toDataURL('image/jpeg', 0.85)
             pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height)
-            
+
             // Get PDF as base64 data URI
             const pdfDataUri = pdf.output('datauristring')
             console.log(`PDF generated, data URI length: ${pdfDataUri.length} (${(pdfDataUri.length / 1024 / 1024).toFixed(2)} MB)`)
-            
+
             // Upload to Cloudinary with timeout
             console.log(`Uploading ${type} copy to Cloudinary...`)
-            
+
             const controller = new AbortController()
             const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
-            
+
             try {
                 const response = await fetch('/api/pdf/upload-cloudinary', {
                     method: 'POST',
@@ -174,19 +174,19 @@ export default function VisitDetail() {
                     }),
                     signal: controller.signal
                 })
-                
+
                 clearTimeout(timeoutId)
                 clearTimeout(timeoutId)
-            
+
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
                     console.error(`Cloudinary upload failed:`, errorData)
                     return null
                 }
-                
+
                 const result = await response.json()
                 console.log(`${type} copy uploaded successfully:`, result.url)
-                
+
                 return result.url
             } catch (fetchError: any) {
                 clearTimeout(timeoutId)
@@ -450,22 +450,22 @@ export default function VisitDetail() {
 
                     yPos += 5
 
-                // Column 1 - Row 3: History/Reports
-                doc.setFont('helvetica', 'bold')
-                doc.text('History/Reports:', medicalCol1X, yPos)
-                doc.setFont('courier', 'oblique')
-                doc.setTextColor(0, 0, 255)
-                const historyText = (visit.historyReports || 'N/A')
-                const historyLines = doc.splitTextToSize(historyText, 85)
-                let historyYPos = yPos
-                historyLines.forEach((line: string, idx: number) => {
-                    doc.text(line, medicalCol1X + 28, historyYPos)
-                    if (idx < historyLines.length - 1) historyYPos += 4
-                })
-                doc.setFont('helvetica', 'bold')
-                doc.setTextColor(0, 0, 0)
+                    // Column 1 - Row 3: History/Reports
+                    doc.setFont('helvetica', 'bold')
+                    doc.text('History/Reports:', medicalCol1X, yPos)
+                    doc.setFont('courier', 'oblique')
+                    doc.setTextColor(0, 0, 255)
+                    const historyText = (visit.historyReports || 'N/A')
+                    const historyLines = doc.splitTextToSize(historyText, 85)
+                    let historyYPos = yPos
+                    historyLines.forEach((line: string, idx: number) => {
+                        doc.text(line, medicalCol1X + 28, historyYPos)
+                        if (idx < historyLines.length - 1) historyYPos += 4
+                    })
+                    doc.setFont('helvetica', 'bold')
+                    doc.setTextColor(0, 0, 0)
 
-                yPos += Math.max(5, historyLines.length * 4)                    // Column 1 - Row 4: Major Complaints
+                    yPos += Math.max(5, historyLines.length * 4)                    // Column 1 - Row 4: Major Complaints
                     doc.setFont('helvetica', 'bold')
                     doc.text('Major Complaints:', medicalCol1X, yPos)
                     doc.setFont('courier', 'oblique')
@@ -688,22 +688,22 @@ export default function VisitDetail() {
                     doc.setTextColor(0, 0, 255)
                     doc.text(`${(visit.patient?.opdNo || visit.opdNo || '').toUpperCase()}`, row1Col1, currentY + 2)
 
-                doc.setFontSize(6)
-                doc.setTextColor(0, 0, 0)
-                doc.text('Patient Name:', row1Col2, currentY - 2)
-                doc.setFontSize(9)
-                doc.setTextColor(255, 0, 0)
-                const patientName = `${(visit.patient?.firstName || '').toUpperCase()} ${(visit.patient?.lastName || '').toUpperCase()}`
-                const patientNameLines = doc.splitTextToSize(patientName, 40)
-                doc.text(patientNameLines[0] || '', row1Col2, currentY + 2)
+                    doc.setFontSize(6)
+                    doc.setTextColor(0, 0, 0)
+                    doc.text('Patient Name:', row1Col2, currentY - 2)
+                    doc.setFontSize(9)
+                    doc.setTextColor(255, 0, 0)
+                    const patientName = `${(visit.patient?.firstName || '').toUpperCase()} ${(visit.patient?.lastName || '').toUpperCase()}`
+                    const patientNameLines = doc.splitTextToSize(patientName, 40)
+                    doc.text(patientNameLines[0] || '', row1Col2, currentY + 2)
 
-                doc.setFontSize(6)
-                doc.setTextColor(0, 0, 0)
-                doc.text('Visit No.:', row1Col3, currentY - 2)
-                doc.setFontSize(9)
-                doc.setTextColor(0, 128, 0)
-                const visitNum = visit.visitNumber || visit.visit_number || '1'
-                doc.text(`${visitNum.toString().toUpperCase()}`, row1Col3, currentY + 2)
+                    doc.setFontSize(6)
+                    doc.setTextColor(0, 0, 0)
+                    doc.text('Visit No.:', row1Col3, currentY - 2)
+                    doc.setFontSize(9)
+                    doc.setTextColor(0, 128, 0)
+                    const visitNum = visit.visitNumber || visit.visit_number || '1'
+                    doc.text(`${visitNum.toString().toUpperCase()}`, row1Col3, currentY + 2)
 
                     doc.setFontSize(6)
                     doc.setTextColor(0, 0, 0)
@@ -712,23 +712,23 @@ export default function VisitDetail() {
                     doc.setTextColor(128, 0, 128)
                     doc.text(`${(visit.patient?.phone || visit.phone || '').toUpperCase()}`, row1Col4, currentY + 2)
 
-                doc.setFontSize(6)
-                doc.setTextColor(0, 0, 0)
-                doc.text('Father:', row1Col5, currentY - 2)
-                doc.setFontSize(9)
-                doc.setTextColor(255, 140, 0)
-                const fatherName = (visit.patient?.fatherHusbandGuardianName || visit.fatherHusbandGuardianName || '').toUpperCase()
-                const fatherLines = doc.splitTextToSize(fatherName, 25)
-                doc.text(fatherLines[0] || '', row1Col5, currentY + 2)
+                    doc.setFontSize(6)
+                    doc.setTextColor(0, 0, 0)
+                    doc.text('Father:', row1Col5, currentY - 2)
+                    doc.setFontSize(9)
+                    doc.setTextColor(255, 140, 0)
+                    const fatherName = (visit.patient?.fatherHusbandGuardianName || visit.fatherHusbandGuardianName || '').toUpperCase()
+                    const fatherLines = doc.splitTextToSize(fatherName, 25)
+                    doc.text(fatherLines[0] || '', row1Col5, currentY + 2)
 
-                doc.setFontSize(6)
-                doc.setTextColor(0, 0, 0)
-                doc.text('Address:', row1Col6, currentY - 2)
-                doc.setFontSize(9)
-                doc.setTextColor(0, 0, 255)
-                const address = (visit.patient?.address || visit.address || '').toUpperCase()
-                const addressLines = doc.splitTextToSize(address, 25)
-                doc.text(addressLines[0] || '', row1Col6, currentY + 2)
+                    doc.setFontSize(6)
+                    doc.setTextColor(0, 0, 0)
+                    doc.text('Address:', row1Col6, currentY - 2)
+                    doc.setFontSize(9)
+                    doc.setTextColor(0, 0, 255)
+                    const address = (visit.patient?.address || visit.address || '').toUpperCase()
+                    const addressLines = doc.splitTextToSize(address, 25)
+                    doc.text(addressLines[0] || '', row1Col6, currentY + 2)
 
                     currentY += 7
 
@@ -738,14 +738,14 @@ export default function VisitDetail() {
                     const row2Col2 = 80
                     const row2Col3 = 145
 
-                doc.setFontSize(6)
-                doc.setTextColor(0, 0, 0)
-                doc.text('Temperament:', row2Col1, currentY - 2)
-                doc.setFontSize(9)
-                doc.setTextColor(128, 0, 128)
-                const temperament = (visit.temperament || '').toUpperCase()
-                const tempLines = doc.splitTextToSize(temperament, 60)
-                doc.text(tempLines[0] || '', row2Col1, currentY + 2)
+                    doc.setFontSize(6)
+                    doc.setTextColor(0, 0, 0)
+                    doc.text('Temperament:', row2Col1, currentY - 2)
+                    doc.setFontSize(9)
+                    doc.setTextColor(128, 0, 128)
+                    const temperament = (visit.temperament || '').toUpperCase()
+                    const tempLines = doc.splitTextToSize(temperament, 60)
+                    doc.text(tempLines[0] || '', row2Col1, currentY + 2)
 
                     doc.setFontSize(6)
                     doc.setTextColor(0, 0, 0)
@@ -759,14 +759,14 @@ export default function VisitDetail() {
 
                     // ===== ROW 3: 3 COLUMNS =====
                     // pulse diagnosis, date, history/report
-                doc.setFontSize(6)
-                doc.setTextColor(0, 0, 0)
-                doc.text('Pulse:', row2Col1, currentY - 2)
-                doc.setFontSize(9)
-                doc.setTextColor(0, 0, 255)
-                const pulse = (visit.pulseDiagnosis || '').toUpperCase()
-                const pulseLines = doc.splitTextToSize(pulse, 60)
-                doc.text(pulseLines[0] || '', row2Col1, currentY + 2)
+                    doc.setFontSize(6)
+                    doc.setTextColor(0, 0, 0)
+                    doc.text('Pulse:', row2Col1, currentY - 2)
+                    doc.setFontSize(9)
+                    doc.setTextColor(0, 0, 255)
+                    const pulse = (visit.pulseDiagnosis || '').toUpperCase()
+                    const pulseLines = doc.splitTextToSize(pulse, 60)
+                    doc.text(pulseLines[0] || '', row2Col1, currentY + 2)
 
                     doc.setFontSize(6)
                     doc.setTextColor(0, 0, 0)
@@ -776,14 +776,14 @@ export default function VisitDetail() {
                     const visitDate = new Date(visit.date).toLocaleDateString()
                     doc.text(`${visitDate.toUpperCase()}`, row2Col2, currentY + 2)
 
-                doc.setFontSize(6)
-                doc.setTextColor(0, 0, 0)
-                doc.text('History:', row2Col3, currentY - 2)
-                doc.setFontSize(9)
-                doc.setTextColor(0, 128, 0)
-                const history = (visit.historyReports || '').toUpperCase()
-                const histLines = doc.splitTextToSize(history, 45)
-                doc.text(histLines[0] || '', row2Col3, currentY + 2)
+                    doc.setFontSize(6)
+                    doc.setTextColor(0, 0, 0)
+                    doc.text('History:', row2Col3, currentY - 2)
+                    doc.setFontSize(9)
+                    doc.setTextColor(0, 128, 0)
+                    const history = (visit.historyReports || '').toUpperCase()
+                    const histLines = doc.splitTextToSize(history, 45)
+                    doc.text(histLines[0] || '', row2Col3, currentY + 2)
 
                     currentY += 7
 
@@ -804,37 +804,37 @@ export default function VisitDetail() {
                     const nextVisit = visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''
                     doc.text(`${nextVisit.toUpperCase()}`, row2Col2, currentY + 2)
 
-                doc.setFontSize(6)
-                doc.setTextColor(0, 0, 0)
-                doc.text('Complaints:', row2Col3, currentY - 2)
-                doc.setFontSize(9)
-                doc.setTextColor(0, 0, 255)
-                const complaints = (visit.majorComplaints || '').toUpperCase()
-                const complaintLines = doc.splitTextToSize(complaints, 45)
-                doc.text(complaintLines[0] || '', row2Col3, currentY + 2)
+                    doc.setFontSize(6)
+                    doc.setTextColor(0, 0, 0)
+                    doc.text('Complaints:', row2Col3, currentY - 2)
+                    doc.setFontSize(9)
+                    doc.setTextColor(0, 0, 255)
+                    const complaints = (visit.majorComplaints || '').toUpperCase()
+                    const complaintLines = doc.splitTextToSize(complaints, 45)
+                    doc.text(complaintLines[0] || '', row2Col3, currentY + 2)
 
                     currentY += 7
 
                     // ===== ROW 5: 2 COLUMNS =====
                     // improvements, provisional diagnosis
-                doc.setFontSize(6)
-                doc.setTextColor(0, 0, 0)
-                doc.text('Improvements:', row2Col1, currentY - 2)
-                doc.setFontSize(9)
-                doc.setTextColor(0, 128, 0)
-                const improvements = (visit.improvements || '').toUpperCase()
-                const improvLines = doc.splitTextToSize(improvements, 60)
-                doc.text(improvLines[0] || '', row2Col1, currentY + 2)
+                    doc.setFontSize(6)
+                    doc.setTextColor(0, 0, 0)
+                    doc.text('Improvements:', row2Col1, currentY - 2)
+                    doc.setFontSize(9)
+                    doc.setTextColor(0, 128, 0)
+                    const improvements = (visit.improvements || '').toUpperCase()
+                    const improvLines = doc.splitTextToSize(improvements, 60)
+                    doc.text(improvLines[0] || '', row2Col1, currentY + 2)
 
-                doc.setFontSize(6)
-                doc.setTextColor(0, 0, 0)
-                doc.text('Prov. Diagnosis:', row2Col2 + 30, currentY - 2)
-                doc.setFontSize(9)
-                doc.setTextColor(0, 0, 255)
-                const provDiag = (visit.provisionalDiagnosis || '').toUpperCase()
-                const provDiagLines = doc.splitTextToSize(provDiag, 60)
-                doc.text(provDiagLines[0] || '', row2Col2 + 30, currentY + 2)
-                doc.setTextColor(0, 0, 0)                    // Add patient image on the right side (parallel to all rows) - smaller size
+                    doc.setFontSize(6)
+                    doc.setTextColor(0, 0, 0)
+                    doc.text('Prov. Diagnosis:', row2Col2 + 30, currentY - 2)
+                    doc.setFontSize(9)
+                    doc.setTextColor(0, 0, 255)
+                    const provDiag = (visit.provisionalDiagnosis || '').toUpperCase()
+                    const provDiagLines = doc.splitTextToSize(provDiag, 60)
+                    doc.text(provDiagLines[0] || '', row2Col2 + 30, currentY + 2)
+                    doc.setTextColor(0, 0, 0)                    // Add patient image on the right side (parallel to all rows) - smaller size
                     const imgX = 185
                     const imgWidth = 12
                     const imgHeight = 16
@@ -1040,9 +1040,9 @@ export default function VisitDetail() {
 
     const downloadPreviewAsPDF = async (customFileName?: string, skipLoadingState?: boolean) => {
         if (!prescriptionRef.current || !visit) return
-        
+
         if (!skipLoadingState) setIsGeneratingPDF(true)
-        
+
         try {
             // Capture the prescription container as canvas with high quality
             const canvas = await html2canvas(prescriptionRef.current, {
@@ -1053,40 +1053,40 @@ export default function VisitDetail() {
                 windowWidth: prescriptionRef.current.scrollWidth,
                 windowHeight: prescriptionRef.current.scrollHeight
             })
-            
+
             const imgData = canvas.toDataURL('image/png')
-            
+
             // Create PDF with letter size
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
             })
-            
+
             const pageWidth = pdf.internal.pageSize.getWidth()
             const pageHeight = pdf.internal.pageSize.getHeight()
-            
+
             // Calculate dimensions to fit the page while maintaining aspect ratio
             const imgWidth = pageWidth
             const imgHeight = (canvas.height * pageWidth) / canvas.width
-            
+
             // If image is taller than page, scale it down
             let finalWidth = imgWidth
             let finalHeight = imgHeight
-            
+
             if (imgHeight > pageHeight) {
                 finalHeight = pageHeight
                 finalWidth = (canvas.width * pageHeight) / canvas.height
             }
-            
+
             // Add image to PDF with no margins - fill the page
             pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, finalHeight > pageHeight ? pageHeight : finalHeight)
-            
+
             // Save with patient name and OPD number
             const patientName = `${visit.patient?.firstName || ''} ${visit.patient?.lastName || ''}`.trim() || 'Patient'
             const opdNo = visit.opdNo || visit.id || 'Unknown'
             const fileName = customFileName || `${patientName} ${opdNo}.pdf`
-            
+
             pdf.save(fileName)
         } catch (error) {
             console.error('Error generating PDF from preview:', error)
@@ -1117,16 +1117,16 @@ export default function VisitDetail() {
     const downloadBothCopies = async () => {
         setShowDownloadDropdown(false)
         if (!prescriptionRef.current || !visit) return
-        
+
         setIsGeneratingPDF(true)
-        
+
         try {
             const originalCopyType = copyType
-            
+
             // Capture patient copy
             setCopyType('PATIENT')
             await new Promise(resolve => setTimeout(resolve, 100))
-            
+
             const canvas1 = await html2canvas(prescriptionRef.current, {
                 scale: 2,
                 useCORS: true,
@@ -1135,11 +1135,11 @@ export default function VisitDetail() {
                 windowWidth: prescriptionRef.current.scrollWidth,
                 windowHeight: prescriptionRef.current.scrollHeight
             })
-            
+
             // Capture office copy
             setCopyType('OFFICE')
             await new Promise(resolve => setTimeout(resolve, 100))
-            
+
             const canvas2 = await html2canvas(prescriptionRef.current, {
                 scale: 2,
                 useCORS: true,
@@ -1148,17 +1148,17 @@ export default function VisitDetail() {
                 windowWidth: prescriptionRef.current.scrollWidth,
                 windowHeight: prescriptionRef.current.scrollHeight
             })
-            
+
             // Create PDF with two pages
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
             })
-            
+
             const pageWidth = pdf.internal.pageSize.getWidth()
             const pageHeight = pdf.internal.pageSize.getHeight()
-            
+
             // Add patient copy (page 1)
             const imgData1 = canvas1.toDataURL('image/png')
             const imgHeight1 = (canvas1.height * pageWidth) / canvas1.width
@@ -1167,10 +1167,10 @@ export default function VisitDetail() {
                 finalHeight1 = pageHeight
             }
             pdf.addImage(imgData1, 'PNG', 0, 0, pageWidth, finalHeight1 > pageHeight ? pageHeight : finalHeight1)
-            
+
             // Add new page for office copy
             pdf.addPage()
-            
+
             // Add office copy (page 2)
             const imgData2 = canvas2.toDataURL('image/png')
             const imgHeight2 = (canvas2.height * pageWidth) / canvas2.width
@@ -1179,14 +1179,14 @@ export default function VisitDetail() {
                 finalHeight2 = pageHeight
             }
             pdf.addImage(imgData2, 'PNG', 0, 0, pageWidth, finalHeight2 > pageHeight ? pageHeight : finalHeight2)
-            
+
             // Save with patient name and OPD number
             const patientName = `${visit.patient?.firstName || ''} ${visit.patient?.lastName || ''}`.trim() || 'Patient'
             const opdNo = visit.opdNo || visit.id || 'Unknown'
             const fileName = `${patientName} ${opdNo} - Both Copies.pdf`
-            
+
             pdf.save(fileName)
-            
+
             setCopyType(originalCopyType)
         } catch (error) {
             console.error('Error generating PDF:', error)
@@ -1200,13 +1200,13 @@ export default function VisitDetail() {
         setShowPrintDropdown(false)
         setShowPrintSubmenu(null)
         if (!prescriptionRef.current) return
-        
+
         const originalCopyType = copyType
         if (copyTypeParam) {
             setCopyType(copyTypeParam)
             await new Promise(resolve => setTimeout(resolve, 100))
         }
-        
+
         try {
             // Add letterhead class to hide images
             prescriptionRef.current.classList.add('print-letterhead')
@@ -1285,7 +1285,7 @@ export default function VisitDetail() {
         setShowPrintDropdown(false)
         setShowPrintSubmenu(null)
         if (!prescriptionRef.current) return
-        
+
         const originalCopyType = copyType
         if (copyTypeParam) {
             setCopyType(copyTypeParam)
@@ -1362,19 +1362,19 @@ export default function VisitDetail() {
         setShowPrintDropdown(false)
         setShowPrintSubmenu(null)
         if (!prescriptionRef.current || !visit) return
-        
+
         const originalCopyType = copyType
-        
+
         try {
             // Capture patient copy
             setCopyType('PATIENT')
             await new Promise(resolve => setTimeout(resolve, 100))
-            
+
             if (paperType === 'letterhead') {
                 prescriptionRef.current.classList.add('print-letterhead')
                 await new Promise(resolve => setTimeout(resolve, 100))
             }
-            
+
             const canvas1 = await html2canvas(prescriptionRef.current, {
                 scale: 2,
                 useCORS: true,
@@ -1383,20 +1383,20 @@ export default function VisitDetail() {
                 width: prescriptionRef.current.scrollWidth,
                 height: prescriptionRef.current.scrollHeight
             })
-            
+
             if (paperType === 'letterhead') {
                 prescriptionRef.current.classList.remove('print-letterhead')
             }
-            
+
             // Capture office copy
             setCopyType('OFFICE')
             await new Promise(resolve => setTimeout(resolve, 100))
-            
+
             if (paperType === 'letterhead') {
                 prescriptionRef.current.classList.add('print-letterhead')
                 await new Promise(resolve => setTimeout(resolve, 100))
             }
-            
+
             const canvas2 = await html2canvas(prescriptionRef.current, {
                 scale: 2,
                 useCORS: true,
@@ -1405,15 +1405,15 @@ export default function VisitDetail() {
                 width: prescriptionRef.current.scrollWidth,
                 height: prescriptionRef.current.scrollHeight
             })
-            
+
             if (paperType === 'letterhead') {
                 prescriptionRef.current.classList.remove('print-letterhead')
             }
-            
+
             // Create two images in print window
             const imgData1 = canvas1.toDataURL('image/png')
             const imgData2 = canvas2.toDataURL('image/png')
-            
+
             const printWindow = window.open('', '_blank')
             if (printWindow) {
                 printWindow.document.write(`
@@ -1475,7 +1475,7 @@ export default function VisitDetail() {
                 `)
                 printWindow.document.close()
             }
-            
+
             setCopyType(originalCopyType)
         } catch (error) {
             console.error('Error printing:', error)
@@ -1487,7 +1487,8 @@ export default function VisitDetail() {
 
     return (
         <div className="bg-gray-50 min-h-screen py-6">
-            <style dangerouslySetInnerHTML={{__html: `
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 .prescription-container-wrapper {
                     width: 100%;
                     overflow-x: auto;
@@ -1553,8 +1554,8 @@ export default function VisitDetail() {
                             <button
                                 onClick={() => setCopyType('PATIENT')}
                                 className={`px-3 py-1.5 text-sm font-medium transition-all ${copyType === 'PATIENT'
-                                        ? 'bg-emerald-500 dark:bg-emerald-600 text-white'
-                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                    ? 'bg-emerald-500 dark:bg-emerald-600 text-white'
+                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                     }`}
                             >
                                 Patient
@@ -1562,8 +1563,8 @@ export default function VisitDetail() {
                             <button
                                 onClick={() => setCopyType('OFFICE')}
                                 className={`px-3 py-1.5 text-sm font-medium transition-all border-l border-gray-300 dark:border-gray-600 ${copyType === 'OFFICE'
-                                        ? 'bg-emerald-500 dark:bg-emerald-600 text-white'
-                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                    ? 'bg-emerald-500 dark:bg-emerald-600 text-white'
+                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                     }`}
                             >
                                 Office
@@ -1672,7 +1673,7 @@ export default function VisitDetail() {
                                             </div>
                                         )}
                                     </div>
-                                    
+
                                     {/* Office Copy with Submenu */}
                                     <div className="relative">
                                         <button
@@ -1699,7 +1700,7 @@ export default function VisitDetail() {
                                             </div>
                                         )}
                                     </div>
-                                    
+
                                     {/* Both Copies with Submenu */}
                                     <div className="relative">
                                         <button
@@ -1738,368 +1739,368 @@ export default function VisitDetail() {
                     {/* Prescription Sheet - Left Side */}
                     <div className="flex-1 w-full lg:w-auto overflow-hidden">
                         <div className="prescription-container-wrapper">
-                        <div ref={prescriptionRef} className="prescription-container" style={{ background: 'white', color: 'black', padding: '0', position: 'relative', width: '210mm', minHeight: '297mm', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    {/* Watermark - Only show in PATIENT copy */}
-                    {copyType === 'PATIENT' && (
-                        <div className="watermark-container" style={{ position: 'absolute', top: 'calc(50% - 30px)', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.25, zIndex: 0, pointerEvents: 'none' }}>
-                            <img src="/watermark.png" alt="Watermark" style={{ width: '400px', height: '400px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
-                        </div>
-                    )}
+                            <div ref={prescriptionRef} className="prescription-container" style={{ background: 'white', color: 'black', padding: '0', position: 'relative', width: '210mm', minHeight: '297mm', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                {/* Watermark - Only show in PATIENT copy */}
+                                {copyType === 'PATIENT' && (
+                                    <div className="watermark-container" style={{ position: 'absolute', top: 'calc(50% - 30px)', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.25, zIndex: 0, pointerEvents: 'none' }}>
+                                        <img src="/watermark.png" alt="Watermark" style={{ width: '400px', height: '400px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                                    </div>
+                                )}
 
-                    {/* Header Image - Full width, no margin - Only show in PATIENT copy */}
-                    {copyType === 'PATIENT' && (
-                        <div className="header-container" style={{ width: '100%', overflow: 'hidden', marginBottom: '1rem', position: 'relative', zIndex: 1 }}>
-                            <img src="/header.png" alt="Header" style={{ width: '100%', height: 'auto', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
-                        </div>
-                    )}
+                                {/* Header Image - Full width, no margin - Only show in PATIENT copy */}
+                                {copyType === 'PATIENT' && (
+                                    <div className="header-container" style={{ width: '100%', overflow: 'hidden', marginBottom: '1rem', position: 'relative', zIndex: 1 }}>
+                                        <img src="/header.png" alt="Header" style={{ width: '100%', height: 'auto', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                                    </div>
+                                )}
 
-                    {/* Patient Info and Prescription Section - Only show in PATIENT copy */}
-                    {copyType === 'PATIENT' && (
-                        <>
-                            <div style={{ padding: '0 1.5rem', position: 'relative', zIndex: 1, flex: '1 0 auto' }}>
-                                
-                                {/* Top Section: Particulars and Basic Info */}
-                                <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
-                                    
-                                    {/* Particulars Box (Left) */}
-                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Particulars</span>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '9px', gap: '1px' }}>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OPDN</span> <span style={{ color: 'blue', fontWeight: 'bold' }}>{visit.opdNo || 'N/A'}</span></div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>VISIT</span> {visit.visitNumber || '1'}</div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>SEX</span> {visit.gender || visit.patient?.gender || 'N/A'}</div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DOB</span> {visit.dob || visit.patient?.dob ? new Date(visit.dob || visit.patient?.dob).toLocaleDateString('en-GB') : ''}</div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>AGE</span> {visit.age || visit.patient?.age || 'N/A'}</div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>F UP</span> {visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : ''}</div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HT</span> {visit.height}</div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PHONE</span> {visit.phone || visit.patient?.phone}</div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>WT</span> {visit.weight}</div>
+                                {/* Patient Info and Prescription Section - Only show in PATIENT copy */}
+                                {copyType === 'PATIENT' && (
+                                    <>
+                                        <div style={{ padding: '0 1.5rem', position: 'relative', zIndex: 1, flex: '1 0 auto' }}>
+
+                                            {/* Top Section: Particulars and Basic Info */}
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+
+                                                {/* Particulars Box (Left) */}
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Particulars</span>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '9px', gap: '1px' }}>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OPDN</span> <span style={{ color: 'blue', fontWeight: 'bold' }}>{visit.opdNo || 'N/A'}</span></div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>VISIT</span> {visit.visitNumber || '1'}</div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>SEX</span> {visit.gender || visit.patient?.gender || 'N/A'}</div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DOB</span> {visit.dob || visit.patient?.dob ? new Date(visit.dob || visit.patient?.dob).toLocaleDateString('en-GB') : ''}</div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>AGE</span> {visit.age || visit.patient?.age || 'N/A'}</div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>F UP</span> {visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : ''}</div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HT</span> {visit.height}</div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PHONE</span> {visit.phone || visit.patient?.phone}</div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>WT</span> {visit.weight}</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Basic Info Box (Right) */}
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Basic Info</span>
+                                                    <div style={{ fontSize: '9px' }}>
+                                                        <div style={{ width: '30px', height: '15px', background: 'red', marginBottom: '3px', border: '1px solid #000' }}></div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>NAME</span> {visit.patient?.firstName} {visit.patient?.lastName}</div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>F/H/G</span> {visit.patient?.fatherHusbandGuardianName}</div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>ADD</span> {visit.address || visit.patient?.address}</div>
+                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OCC</span> {visit.occupation || visit.patient?.occupation}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* EH Parameters Row */}
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
+                                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>TEMP</span> {visit.temperament}</div>
+                                                </div>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
+                                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-1</span> {visit.pulseDiagnosis}</div>
+                                                </div>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
+                                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-2</span> {visit.pulseDiagnosis2}</div>
+                                                </div>
+                                            </div>
+
+                                            {/* History & Reports */}
+                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '60px' }}>
+                                                <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Prev Info</span>
+                                                <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HISTORY & REPORTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.historyReports}</span></div>
+                                            </div>
+
+                                            {/* Chief Complaints */}
+                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '40px' }}>
+                                                <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Sign & Symptoms</span>
+                                                <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>CHIEF COMPLAINTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.majorComplaints}</span></div>
+                                            </div>
+
+                                            {/* Investigations & Prov Diagnosis */}
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', minHeight: '30px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Investigations Order</span>
+                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.investigations}</div>
+                                                </div>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', minHeight: '30px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Prov Diagnosis</span>
+                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.provisionalDiagnosis || visit.diagnoses}</div>
+                                                </div>
+                                            </div>
+
+                                            {/* Improvements */}
+                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
+                                                <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Cure</span>
+                                                <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>IMPROVEMENTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.improvements}</span></div>
+                                            </div>
+
+                                            {/* Discuss */}
+                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
+                                                <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Discuss</span>
+                                                <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.investigations}</span></div>
+                                            </div>
+
+                                            {/* Prescription Table */}
+                                            <div className="mb-3">
+                                                {(() => {
+                                                    const hasSpy4 = visit.prescriptions?.some((p: any) => p.spy4) || false
+                                                    const hasSpy6 = visit.prescriptions?.some((p: any) => p.spy6) || false
+
+                                                    return (
+                                                        <table className="w-full" style={{ fontSize: '0.7rem', borderCollapse: 'collapse' }}>
+                                                            <tbody>
+                                                                {!visit.prescriptions || visit.prescriptions.length === 0 ? (
+                                                                    <tr>
+                                                                        <td colSpan={13} style={{ textAlign: 'center', padding: '1rem', color: '#999' }}>No medications prescribed</td>
+                                                                    </tr>
+                                                                ) : (
+                                                                    visit.prescriptions.map((p: any, index: number) => {
+                                                                        const product = products.find((prod) => prod.id === p.productId)
+                                                                        const medicineName = (product?.name || p.product?.name || p.treatment?.treatmentPlan || '').toUpperCase()
+                                                                        const rowStyle = p.patientHasMedicine ? { textDecoration: 'line-through', opacity: 0.5 } : {}
+
+                                                                        return (
+                                                                            <tr key={p.id} style={rowStyle}>
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '3%', fontWeight: 'bold' }}>{index + 1}</td>
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'left', color: '#0000FF', width: '15%', fontWeight: 'bold' }}>{medicineName}</td>
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
+                                                                                {hasSpy4 && <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>}
+                                                                                {hasSpy6 && <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>}
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', color: '#C80000', textTransform: 'uppercase', width: '8%', fontWeight: 'bold' }}>{p.timing || ''}</td>
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#800080', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.dosage || ''}</td>
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.additions || ''}</td>
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '8%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.presentation || ''}</td>
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#FF8C00', fontWeight: 'bold' }}>{(p.droppersToday?.toString() || '').toUpperCase()}</td>
+                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '5%', fontWeight: 'bold' }}>{p.quantity || ''}</td>
+                                                                            </tr>
+                                                                        )
+                                                                    })
+                                                                )}
+                                                            </tbody>
+                                                        </table>
+                                                    )
+                                                })()}
+                                            </div>
+
+                                            {/* Orange Separator after table */}
+                                            <div style={{ borderBottom: '2px solid #FF8C00', marginBottom: '1rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
                                         </div>
-                                    </div>
 
-                                    {/* Basic Info Box (Right) */}
-                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Basic Info</span>
-                                        <div style={{ fontSize: '9px' }}>
-                                            <div style={{ width: '30px', height: '15px', background: 'red', marginBottom: '3px', border: '1px solid #000' }}></div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>NAME</span> {visit.patient?.firstName} {visit.patient?.lastName}</div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>F/H/G</span> {visit.patient?.fatherHusbandGuardianName}</div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>ADD</span> {visit.address || visit.patient?.address}</div>
-                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OCC</span> {visit.occupation || visit.patient?.occupation}</div>
+                                        {/* Footer Image */}
+                                        <div style={{ marginTop: 'auto', width: '100%', flexShrink: 0 }}>
+                                            <img src="/footer.png" alt="Footer" style={{ width: '100%', height: 'auto', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
                                         </div>
-                                    </div>
-                                </div>
+                                    </>
+                                )}
 
-                                {/* EH Parameters Row */}
-                                <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
-                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
-                                        <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>TEMP</span> {visit.temperament}</div>
-                                    </div>
-                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
-                                        <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-1</span> {visit.pulseDiagnosis}</div>
-                                    </div>
-                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
-                                        <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-2</span> {visit.pulseDiagnosis2}</div>
-                                    </div>
-                                </div>
+                                {/* Blue Separator Line and everything after it - Only show in OFFICE copy */}
+                                {copyType === 'OFFICE' && (
+                                    <>
+                                        <div style={{ padding: '0 1.5rem' }}>
+                                            {/* Blue Separator Line - Full Width */}
+                                            <div style={{ borderBottom: '2px solid #0000FF', marginBottom: '1rem', marginLeft: '-1.5rem', marginRight: '-1.5rem' }}></div>
 
-                                {/* History & Reports */}
-                                <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '60px' }}>
-                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Prev Info</span>
-                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HISTORY & REPORTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.historyReports}</span></div>
-                                </div>
+                                            {/* Section with rows and patient image */}
+                                            <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem' }}>
+                                                <div style={{ flex: 1 }}>
+                                                    {/* Row 1: 6 columns - opdn, patient name, visit no, phone, father's name, location */}
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000', backgroundColor: '#90EE90', display: 'inline-block', padding: '0.1rem 0.25rem', borderRadius: '4px' }}>OPDN:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.patient?.opdNo || visit.opdNo || ''}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Patient Name:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#FF0000', textTransform: 'uppercase' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Visit No.:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Phone:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#800080', textTransform: 'uppercase' }}>{visit.patient?.phone || visit.phone || ''}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Father:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#FF8C00', textTransform: 'uppercase' }}>{visit.patient?.fatherHusbandGuardianName || ''}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Address:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.patient?.address || visit.address || ''}</div>
+                                                        </div>
+                                                    </div>
 
-                                {/* Chief Complaints */}
-                                <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '40px' }}>
-                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Sign & Symptoms</span>
-                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>CHIEF COMPLAINTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.majorComplaints}</span></div>
-                                </div>
+                                                    {/* Row 2: 3 columns - temperament, age/dob, disc */}
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Temperament:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#800080', textTransform: 'uppercase' }}>{visit.temperament || ''}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>DOB:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.patient?.dob || visit.dob ? new Date(visit.patient?.dob || visit.dob).toLocaleDateString() : ''}</div>
+                                                        </div>
+                                                        <div></div>
+                                                    </div>
 
-                                {/* Investigations & Prov Diagnosis */}
-                                <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
-                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', minHeight: '30px' }}>
-                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Investigations Order</span>
-                                        <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.investigations}</div>
-                                    </div>
-                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', minHeight: '30px' }}>
-                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Prov Diagnosis</span>
-                                        <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.provisionalDiagnosis || visit.diagnoses}</div>
-                                    </div>
-                                </div>
+                                                    {/* Row 3: 3 columns - pulse diagnosis, date, history/report */}
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Pulse:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.pulseDiagnosis || ''}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Date:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#C80000', textTransform: 'uppercase' }}>{new Date(visit.date).toLocaleDateString()}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>History:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.historyReports || ''}</div>
+                                                        </div>
+                                                    </div>
 
-                                {/* Improvements */}
-                                <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
-                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Cure</span>
-                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>IMPROVEMENTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.improvements}</span></div>
-                                </div>
+                                                    {/* Row 4: 3 columns - gender, next visit, major complaints */}
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Gender:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#FF8C00', textTransform: 'uppercase' }}>{visit.patient?.gender || visit.gender || ''}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Next Visit:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#C80000', textTransform: 'uppercase' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Complaints:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.majorComplaints || ''}</div>
+                                                        </div>
+                                                    </div>
 
-                                {/* Discuss */}
-                                <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
-                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Discuss</span>
-                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.investigations}</span></div>
-                                </div>
+                                                    {/* Row 5: 2 columns - improvements, provisional diagnosis */}
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Improvements:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.improvements || ''}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Prov. Diagnosis:</div>
+                                                            <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.provisionalDiagnosis || ''}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
 
-                                {/* Prescription Table */}
-                                <div className="mb-3">
-                                    {(() => {
-                                        const hasSpy4 = visit.prescriptions?.some((p: any) => p.spy4) || false
-                                        const hasSpy6 = visit.prescriptions?.some((p: any) => p.spy6) || false
-
-                                        return (
-                                            <table className="w-full" style={{ fontSize: '0.7rem', borderCollapse: 'collapse' }}>
-                                                <tbody>
-                                                    {!visit.prescriptions || visit.prescriptions.length === 0 ? (
-                                                        <tr>
-                                                            <td colSpan={13} style={{ textAlign: 'center', padding: '1rem', color: '#999' }}>No medications prescribed</td>
-                                                        </tr>
+                                                {/* Patient Image - Right Side */}
+                                                <div style={{ width: '80px', height: '100px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0 }}>
+                                                    {visit.patient?.imageUrl ? (
+                                                        <img
+                                                            src={visit.patient.imageUrl}
+                                                            alt="Patient"
+                                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                            onError={(e) => {
+                                                                e.currentTarget.src = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'
+                                                            }}
+                                                        />
                                                     ) : (
-                                                        visit.prescriptions.map((p: any, index: number) => {
-                                                            const product = products.find((prod) => prod.id === p.productId)
-                                                            const medicineName = (product?.name || p.product?.name || p.treatment?.treatmentPlan || '').toUpperCase()
-                                                            const rowStyle = p.patientHasMedicine ? { textDecoration: 'line-through', opacity: 0.5 } : {}
-
-                                                            return (
-                                                                <tr key={p.id} style={rowStyle}>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '3%', fontWeight: 'bold' }}>{index + 1}</td>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'left', color: '#0000FF', width: '15%', fontWeight: 'bold' }}>{medicineName}</td>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
-                                                                    {hasSpy4 && <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>}
-                                                                    {hasSpy6 && <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>}
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', color: '#C80000', textTransform: 'uppercase', width: '8%', fontWeight: 'bold' }}>{p.timing || ''}</td>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#800080', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.dosage || ''}</td>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.additions || ''}</td>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '8%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.presentation || ''}</td>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#FF8C00', fontWeight: 'bold' }}>{(p.droppersToday?.toString() || '').toUpperCase()}</td>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '5%', fontWeight: 'bold' }}>{p.quantity || ''}</td>
-                                                                </tr>
-                                                            )
-                                                        })
+                                                        <img
+                                                            src={process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'}
+                                                            alt="Patient"
+                                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                            onError={(e) => {
+                                                                const target = e.currentTarget as HTMLImageElement
+                                                                target.style.display = 'none'
+                                                                const parent = target.parentElement
+                                                                if (parent) {
+                                                                    parent.style.backgroundColor = '#f0f0f0'
+                                                                    parent.style.display = 'flex'
+                                                                    parent.style.alignItems = 'center'
+                                                                    parent.style.justifyContent = 'center'
+                                                                    parent.innerHTML = '<div style="font-size: 0.6rem; color: #999;">No Image</div>'
+                                                                }
+                                                            }}
+                                                        />
                                                     )}
-                                                </tbody>
-                                            </table>
-                                        )
-                                    })()}
-                                </div>
+                                                </div>
+                                            </div>
 
-                                {/* Orange Separator after table */}
-                                <div style={{ borderBottom: '2px solid #FF8C00', marginBottom: '1rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
+                                            {/* Orange Separator with margins */}
+                                            <div style={{ borderBottom: '2px solid #FFA500', marginBottom: '1rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
+
+                                            {/* Second Medicine Table with UNITS column */}
+                                            <div style={{ marginBottom: '1rem' }}>
+                                                {(() => {
+                                                    const hasSpy4 = visit.prescriptions?.some((p: any) => p.spy4)
+                                                    const hasSpy6 = visit.prescriptions?.some((p: any) => p.spy6)
+
+                                                    return (
+                                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem' }}>
+                                                            <tbody>
+                                                                {visit.prescriptions?.map((prescription: any, index: number) => {
+                                                                    const product = products.find((p: any) => p.id === prescription.productId)
+                                                                    const availableUnits = product?.units || 0
+                                                                    const isLowStock = availableUnits <= 0
+                                                                    const rowStyle = prescription.patientHasMedicine ? { textDecoration: 'line-through', opacity: 0.5 } : {}
+                                                                    return (
+                                                                        <tr key={index} style={rowStyle}>
+                                                                            <td style={{ padding: '0.25rem', textAlign: 'center', width: '50px', fontWeight: 'bold', color: isLowStock ? '#FF0000' : '#000' }}>{availableUnits}</td>
+                                                                            <td style={{ padding: '0.25rem', textAlign: 'center', width: '30px', fontWeight: 'bold' }}>{index + 1}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '120px', color: '#0000FF', fontWeight: 'bold' }}>{product?.name?.toUpperCase() || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy1 || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy2 || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy3 || ''}</td>
+                                                                            {hasSpy4 && <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy4 || ''}</td>}
+                                                                            {hasSpy6 && <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy6 || ''}</td>}
+                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#C80000', textTransform: 'uppercase', fontWeight: 'bold' }}>{prescription.timing || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#800080', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.dosage || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.additions || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.procedure || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.presentation || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#FF8C00', fontWeight: 'bold' }}>{(prescription.droppersToday?.toString() || '').toUpperCase()}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold' }}>{prescription.quantity || ''}</td>
+                                                                        </tr>
+                                                                    )
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    )
+                                                })()}
+                                            </div>
+
+                                            {/* Summary Row matching table columns */}
+                                            <div style={{ display: 'flex', marginBottom: '1rem', marginTop: '1.5rem', fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: '#90EE90', padding: '0.5rem', borderRadius: '4px' }}>
+                                                {(() => {
+                                                    const totalUnits = visit.prescriptions?.reduce((sum: number, p: any) => {
+                                                        const product = products.find((prod: any) => prod.id === p.productId)
+                                                        return sum + (product?.units || 0)
+                                                    }, 0) || 0
+                                                    const totalMedicines = visit.prescriptions?.length || 0
+                                                    const daysDiff = visit.nextVisit && visit.date
+                                                        ? Math.ceil((new Date(visit.nextVisit).getTime() - new Date(visit.date).getTime()) / (1000 * 60 * 60 * 24))
+                                                        : 0
+                                                    const finalAmount = (visit.amount || 0) - (visit.discount || 0)
+
+                                                    return (
+                                                        <>
+                                                            <div style={{ width: '50px', textAlign: 'center' }}>{totalUnits}</div>
+                                                            <div style={{ width: '30px', textAlign: 'center' }}>{totalMedicines}</div>
+                                                            <div style={{ width: '120px', paddingLeft: '0.5rem' }}>{daysDiff} DAYS</div>
+                                                            <div style={{ flex: 1 }}></div>
+                                                            <div style={{ width: '60px', textAlign: 'right' }}>₹{finalAmount.toFixed(2)}</div>
+                                                        </>
+                                                    )
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
                             </div>
-
-                            {/* Footer Image */}
-                            <div style={{ marginTop: 'auto', width: '100%', flexShrink: 0 }}>
-                                <img src="/footer.png" alt="Footer" style={{ width: '100%', height: 'auto', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
-                            </div>
-                        </>
-                    )}
-
-                    {/* Blue Separator Line and everything after it - Only show in OFFICE copy */}
-                    {copyType === 'OFFICE' && (
-                        <>
-                            <div style={{ padding: '0 1.5rem' }}>
-                                {/* Blue Separator Line - Full Width */}
-                                <div style={{ borderBottom: '2px solid #0000FF', marginBottom: '1rem', marginLeft: '-1.5rem', marginRight: '-1.5rem' }}></div>
-
-                                {/* Section with rows and patient image */}
-                                <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem' }}>
-                                    <div style={{ flex: 1 }}>
-                                        {/* Row 1: 6 columns - opdn, patient name, visit no, phone, father's name, location */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000', backgroundColor: '#90EE90', display: 'inline-block', padding: '0.1rem 0.25rem', borderRadius: '4px' }}>OPDN:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.patient?.opdNo || visit.opdNo || ''}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Patient Name:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#FF0000', textTransform: 'uppercase' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Visit No.:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Phone:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#800080', textTransform: 'uppercase' }}>{visit.patient?.phone || visit.phone || ''}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Father:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#FF8C00', textTransform: 'uppercase' }}>{visit.patient?.fatherHusbandGuardianName || ''}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Address:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.patient?.address || visit.address || ''}</div>
-                                            </div>
-                                        </div>
-
-                                        {/* Row 2: 3 columns - temperament, age/dob, disc */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Temperament:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#800080', textTransform: 'uppercase' }}>{visit.temperament || ''}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>DOB:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.patient?.dob || visit.dob ? new Date(visit.patient?.dob || visit.dob).toLocaleDateString() : ''}</div>
-                                            </div>
-                                            <div></div>
-                                        </div>
-
-                                        {/* Row 3: 3 columns - pulse diagnosis, date, history/report */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Pulse:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.pulseDiagnosis || ''}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Date:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#C80000', textTransform: 'uppercase' }}>{new Date(visit.date).toLocaleDateString()}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>History:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.historyReports || ''}</div>
-                                            </div>
-                                        </div>
-
-                                        {/* Row 4: 3 columns - gender, next visit, major complaints */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Gender:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#FF8C00', textTransform: 'uppercase' }}>{visit.patient?.gender || visit.gender || ''}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Next Visit:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#C80000', textTransform: 'uppercase' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Complaints:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.majorComplaints || ''}</div>
-                                            </div>
-                                        </div>
-
-                                        {/* Row 5: 2 columns - improvements, provisional diagnosis */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Improvements:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.improvements || ''}</div>
-                                            </div>
-                                            <div>
-                                                <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Prov. Diagnosis:</div>
-                                                <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.provisionalDiagnosis || ''}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Patient Image - Right Side */}
-                                    <div style={{ width: '80px', height: '100px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0 }}>
-                                        {visit.patient?.imageUrl ? (
-                                            <img
-                                                src={visit.patient.imageUrl}
-                                                alt="Patient"
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                onError={(e) => {
-                                                    e.currentTarget.src = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'
-                                                }}
-                                            />
-                                        ) : (
-                                            <img
-                                                src={process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'}
-                                                alt="Patient"
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                onError={(e) => {
-                                                    const target = e.currentTarget as HTMLImageElement
-                                                    target.style.display = 'none'
-                                                    const parent = target.parentElement
-                                                    if (parent) {
-                                                        parent.style.backgroundColor = '#f0f0f0'
-                                                        parent.style.display = 'flex'
-                                                        parent.style.alignItems = 'center'
-                                                        parent.style.justifyContent = 'center'
-                                                        parent.innerHTML = '<div style="font-size: 0.6rem; color: #999;">No Image</div>'
-                                                    }
-                                                }}
-                                            />
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Orange Separator with margins */}
-                                <div style={{ borderBottom: '2px solid #FFA500', marginBottom: '1rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
-
-                                {/* Second Medicine Table with UNITS column */}
-                                <div style={{ marginBottom: '1rem' }}>
-                                    {(() => {
-                                        const hasSpy4 = visit.prescriptions?.some((p: any) => p.spy4)
-                                        const hasSpy6 = visit.prescriptions?.some((p: any) => p.spy6)
-
-                                        return (
-                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem' }}>
-                                                <tbody>
-                                                    {visit.prescriptions?.map((prescription: any, index: number) => {
-                                                        const product = products.find((p: any) => p.id === prescription.productId)
-                                                        const availableUnits = product?.units || 0
-                                                        const isLowStock = availableUnits <= 0
-                                                        const rowStyle = prescription.patientHasMedicine ? { textDecoration: 'line-through', opacity: 0.5 } : {}
-                                                        return (
-                                                            <tr key={index} style={rowStyle}>
-                                                                <td style={{ padding: '0.25rem', textAlign: 'center', width: '50px', fontWeight: 'bold', color: isLowStock ? '#FF0000' : '#000' }}>{availableUnits}</td>
-                                                                <td style={{ padding: '0.25rem', textAlign: 'center', width: '30px', fontWeight: 'bold' }}>{index + 1}</td>
-                                                                <td style={{ padding: '0.25rem', width: '120px', color: '#0000FF', fontWeight: 'bold' }}>{product?.name?.toUpperCase() || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy1 || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy2 || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy3 || ''}</td>
-                                                                {hasSpy4 && <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy4 || ''}</td>}
-                                                                {hasSpy6 && <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy6 || ''}</td>}
-                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#C80000', textTransform: 'uppercase', fontWeight: 'bold' }}>{prescription.timing || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#800080', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.dosage || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.additions || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.procedure || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.presentation || ''}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', color: '#FF8C00', fontWeight: 'bold' }}>{(prescription.droppersToday?.toString() || '').toUpperCase()}</td>
-                                                                <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold' }}>{prescription.quantity || ''}</td>
-                                                            </tr>
-                                                        )
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        )
-                                    })()}
-                                </div>
-
-                                {/* Summary Row matching table columns */}
-                                <div style={{ display: 'flex', marginBottom: '1rem', marginTop: '1.5rem', fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: '#90EE90', padding: '0.5rem', borderRadius: '4px' }}>
-                                    {(() => {
-                                        const totalUnits = visit.prescriptions?.reduce((sum: number, p: any) => {
-                                            const product = products.find((prod: any) => prod.id === p.productId)
-                                            return sum + (product?.units || 0)
-                                        }, 0) || 0
-                                        const totalMedicines = visit.prescriptions?.length || 0
-                                        const daysDiff = visit.nextVisit && visit.date
-                                            ? Math.ceil((new Date(visit.nextVisit).getTime() - new Date(visit.date).getTime()) / (1000 * 60 * 60 * 24))
-                                            : 0
-                                        const finalAmount = (visit.amount || 0) - (visit.discount || 0)
-
-                                        return (
-                                            <>
-                                                <div style={{ width: '50px', textAlign: 'center' }}>{totalUnits}</div>
-                                                <div style={{ width: '30px', textAlign: 'center' }}>{totalMedicines}</div>
-                                                <div style={{ width: '120px', paddingLeft: '0.5rem' }}>{daysDiff} DAYS</div>
-                                                <div style={{ flex: 1 }}></div>
-                                                <div style={{ width: '60px', textAlign: 'right' }}>₹{finalAmount.toFixed(2)}</div>
-                                            </>
-                                        )
-                                    })()}
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                </div>
-            </div>
-            </div>
+                        </div>
+                    </div>
 
                     {/* Reports Sidebar - Right Side */}
                     <div className="w-full lg:w-80 flex-shrink-0">
@@ -2110,7 +2111,7 @@ export default function VisitDetail() {
                                 </svg>
                                 Reports
                             </h2>
-                            
+
                             {/* Reports Description */}
                             {visit.reports && (
                                 <div className="mb-4 p-3 bg-emerald-50/50 dark:bg-emerald-900/20 backdrop-blur-sm rounded-md border border-emerald-200 dark:border-emerald-700">
@@ -2119,12 +2120,12 @@ export default function VisitDetail() {
                                     </p>
                                 </div>
                             )}
-                            
+
                             {/* Reports List */}
                             {reportsAttachments.length > 0 ? (
                                 <div className="space-y-3">
                                     {reportsAttachments.map((attachment, index) => (
-                                        <div 
+                                        <div
                                             key={index}
                                             onClick={() => {
                                                 setSelectedReportUrl(attachment.url)
@@ -2169,14 +2170,14 @@ export default function VisitDetail() {
 
                 {/* PDF Viewer Modal */}
                 {selectedReportUrl && (
-                    <div 
+                    <div
                         className="fixed inset-0 bg-emerald-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
                         onClick={() => {
                             setSelectedReportUrl(null)
                             setSelectedReportName('')
                         }}
                     >
-                        <div 
+                        <div
                             className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col border border-emerald-200 dark:border-emerald-700"
                             onClick={(e) => e.stopPropagation()}
                         >
@@ -2219,7 +2220,7 @@ export default function VisitDetail() {
                                     </button>
                                 </div>
                             </div>
-                            
+
                             {/* PDF Viewer */}
                             <div className="flex-1 overflow-hidden">
                                 <iframe
@@ -2234,7 +2235,8 @@ export default function VisitDetail() {
             </div>
 
             {/* Print and Animation Styles */}
-            <style dangerouslySetInnerHTML={{__html: `
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 @keyframes fadeIn {
                     from {
                         opacity: 0;

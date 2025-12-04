@@ -57,6 +57,7 @@ model Patient {
   id                        Int               @id @default(autoincrement())
   firstName                 String
   lastName                  String?
+  fullName                  String?
   phone                     String?
   email                     String?           @unique
   date                      DateTime?         @default(now())
@@ -64,6 +65,8 @@ model Patient {
   age                       Int?
   address                   String?
   gender                    String?
+  weight                    Float?
+  height                    Float?
   nextVisit                 DateTime?
   fatherHusbandGuardianName String?
   createdAt                 DateTime          @default(now())
