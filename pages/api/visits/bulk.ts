@@ -7,7 +7,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'POST') {
         const user = await requireAuth(req, res)
         if (!user) return
-        
+
         const { visits, doctorId: requestDoctorId } = req.body
 
         if (!Array.isArray(visits) || visits.length === 0) {
@@ -22,10 +22,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         // Helper function to safely parse dates
         const parseDate = (dateStr: any): Date | null => {
             if (!dateStr) return null
-            
+
             try {
                 let dateString = String(dateStr).trim()
-                
+
                 // Try date string patterns - DD-MM-YYYY format
                 let match = dateString.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
                 if (match) {
@@ -35,36 +35,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                         return parsedDate
                     }
                 }
-                
+
                 // If it's a pure number (Excel serial), return null
                 const numValue = parseFloat(dateString)
                 if (!isNaN(numValue) && !/[\/-]/.test(dateString)) {
                     return null
                 }
-                
+
                 // Pattern 2: MM/DD/YYYY
                 match = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
                 if (match) {
                     const [, month, day, year] = match
-                    console.log(`[parseDate] Matched MM/DD/YYYY: month=${month}, day=${day}, year=${year}`)
                     const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
                     if (!isNaN(parsedDate.getTime())) {
-                        console.log(`[parseDate] ✓ Successfully created date: ${parsedDate.toISOString()}`)
                         return parsedDate
                     }
                 }
-                
+
                 // Pattern 3: Try standard Date parsing as fallback
                 const date = new Date(dateString)
                 if (!isNaN(date.getTime())) {
-                    console.log(`[parseDate] ✓ Parsed using standard Date: ${date.toISOString()}`)
                     return date
                 }
-                
-                console.log(`[parseDate] ✗ Failed to parse date: "${dateString}"`)
+
                 return null
             } catch (error) {
-                console.log(`[parseDate] ✗ Error parsing date:`, error)
                 return null
             }
         }
@@ -72,10 +67,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         // Helper function to safely convert to string or null
         const toString = (value: any): string | null => {
             if (value === null || value === undefined || value === '') return null
-            if (typeof value === 'string') return value
+            if (typeof value === 'string') {
+                const trimmed = value.trim()
+                // Treat "0" as empty
+                if (trimmed === '0' || trimmed === '') return null
+                return trimmed
+            }
             // If it's a number or other type, try to convert but if it looks invalid, return null
             try {
-                const str = String(value)
+                const str = String(value).trim()
+                // Treat "0" as empty
+                if (str === '0' || str === '') return null
                 // Check if it looks like a malformed number (e.g., Excel date serial)
                 if (typeof value === 'number' && (value > 1000000 || value < -1000000)) {
                     return null
@@ -89,7 +91,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         // Helper function to safely parse numbers
         const toNumber = (value: any): number | null => {
             if (value === null || value === undefined || value === '' || value === 0) return null
-            
+
             // Handle weight history format like "69/70/71" - take the last value
             if (typeof value === 'string' && value.includes('/')) {
                 const values = value.split('/').map(v => v.trim()).filter(v => v && v !== '0')
@@ -100,19 +102,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 }
                 return null
             }
-            
+
             const num = Number(value)
             if (isNaN(num) || num === 0) return null
             return num
         }
-        
+
         // Helper to parse weight with history (e.g., "95/94/94/94/95/94/92/93/91/94")
         const parseWeight = (value: any): number | null => {
             if (value === null || value === undefined || value === '' || value === 0) return null
-            
+
             const str = String(value).trim()
             if (!str || str === '0') return null
-            
+
             // Handle weight history format like "95/94/94/94/95/94/92/93/91/94" - take the last value
             if (str.includes('/')) {
                 const values = str.split('/').map(v => v.trim()).filter(v => v && v !== '0')
@@ -123,11 +125,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 }
                 return null
             }
-            
+
             const num = Number(str)
             return isNaN(num) || num === 0 ? null : num
         }
-        
+
         // Helper to extract weight history as string
         const parseWeightHistory = (value: any): string | null => {
             if (value === null || value === undefined || value === '' || value === 0) return null
@@ -136,14 +138,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             // If it contains "/" it's a history, otherwise just return the value
             return str || null
         }
-        
+
         // Helper to parse height in format like "3' 9"" or "5'10"" to inches
         const parseHeight = (value: any): number | null => {
             if (value === null || value === undefined || value === '' || value === 0) return null
-            
+
             const str = String(value).trim()
             if (!str || str === '0') return null
-            
+
             // Try to parse format like "3' 9"" or "5'10""
             const heightMatch = str.match(/(\d+)'?\s*(\d+)?/)
             if (heightMatch) {
@@ -152,59 +154,59 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 const totalInches = (feet * 12) + inches
                 return totalInches > 0 ? totalInches : null
             }
-            
+
             // Try direct number
             const num = Number(str)
             return isNaN(num) || num === 0 ? null : num
         }
-        
+
         // Helper to parse age from formats like "30 YR", "25YR", "5 MONTHS", etc.
         const parseAge = (value: any): number | null => {
             if (value === null || value === undefined || value === '' || value === 0) return null
-            
+
             const str = String(value).trim().toUpperCase()
             if (!str || str === '0' || str === 'YR' || str === 'YEARS' || str === 'Y') return null
-            
+
             // Match patterns like "30 YR", "25YR", "5 MONTHS", "2 M", etc.
             const ageMatch = str.match(/(\d+)\s*(YR|YEARS?|Y|M|MONTHS?)?/)
             if (ageMatch) {
                 const num = parseInt(ageMatch[1])
                 const unit = ageMatch[2]
-                
+
                 // If unit is months or M, convert to years (but return null if less than 1 year for DOB calculation)
                 if (unit && (unit.startsWith('M') || unit === 'MONTHS')) {
                     // Store months as decimal years for accuracy
                     return num / 12
                 }
-                
+
                 return num > 0 ? num : null
             }
-            
+
             // Try direct number
             const num = Number(str)
             return isNaN(num) || num === 0 ? null : num
         }
-        
+
         // Helper to calculate DOB from age
         const calculateDobFromAge = (age: number): Date => {
             const today = new Date()
             const birthYear = today.getFullYear() - Math.floor(age)
             return new Date(birthYear, today.getMonth(), today.getDate())
         }
-        
+
         // Helper to calculate age from DOB
         const calculateAgeFromDob = (dob: Date): number => {
             const today = new Date()
             let age = today.getFullYear() - dob.getFullYear()
             const monthDiff = today.getMonth() - dob.getMonth()
-            
+
             if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
                 age--
             }
-            
+
             return age
         }
-        
+
         // Helper to normalize phone numbers (remove spaces, dashes, parentheses, etc.)
         const normalizePhone = (phone: any): string | null => {
             if (!phone) return null
@@ -219,38 +221,64 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             const BATCH_SIZE = 100 // Increased from 50 for better performance
             const results: any[] = []
             const errors: any[] = []
-            
-            // ============ PERFORMANCE OPTIMIZATION: Pre-fetch all data ============
-            console.log('[Bulk Create Visits] Pre-fetching patients and products...')
-            
-            // Get all phones and names from visits data for batch lookup
-            const phones = [...new Set(
-                visits.map((v: any) => normalizePhone(v.phone)).filter(Boolean)
-            )]
-            const patientNames = [...new Set(visits.map((v: any) => v.patientName).filter(Boolean))]
+
+            // ============ STEP 1: Sort all visits by visit number globally ============
+            // Sort ALL visits by visit number to ensure visit #1 comes first
+            visits.sort((a: any, b: any) => {
+                const aNum = toNumber(a.visitNumber) || 999
+                const bNum = toNumber(b.visitNumber) || 999
+                return aNum - bNum
+            })
+
+            // ============ STEP 2: Group visits by patient ============
+
+            // Normalize patient name for consistent matching
+            const normalizePatientName = (name: string): string => {
+                return name
+                    .trim()
+                    .toLowerCase()
+                    .replace(/\s+/g, ' ')
+                    .replace(/[^\w\s]/g, '')
+            }
+
+            // Group visits by normalized patient identifier (phone or name)
+            const patientGroups = new Map<string, any[]>()
+
+            visits.forEach((visit: any) => {
+                const normalizedPhone = normalizePhone(visit.phone)
+                const normalizedName = visit.patientName ? normalizePatientName(visit.patientName) : null
+
+                // Use phone as primary key, fallback to name
+                const patientKey = normalizedPhone || normalizedName || `unknown_${visit.opdNo}`
+
+                if (!patientGroups.has(patientKey)) {
+                    patientGroups.set(patientKey, [])
+                }
+                patientGroups.get(patientKey)!.push(visit)
+            })
+
+            console.log(`[Bulk Import] Processing ${visits.length} visits in ${patientGroups.size} patient groups`)
+
+            // ============ STEP 3: Pre-fetch all data ============
+
             const productNames = [...new Set(
                 visits.flatMap((v: any) => (v.prescriptions || []).map((p: any) => p.productName).filter(Boolean))
             )]
-            
-            // Fetch all existing patients by phone AND name in one query (for this doctor only)
-            // Note: We fetch all patients and match by normalized phone in-memory because 
-            // phone formats in DB may differ (spaces, dashes, etc.)
+
+            // Fetch all existing patients (for this doctor only)
             const existingPatientsByPhone = await prisma.patient.findMany({
                 where: {
                     doctorId: doctorId
                 }
             })
-            
-            console.log(`[Pre-fetch] Found ${existingPatientsByPhone.length} existing patients for doctor ${doctorId}`)
-            console.log(`[Pre-fetch] Patient phones in DB:`, existingPatientsByPhone.map((p: any) => p.phone).filter(Boolean))
-            
+
             // Build maps with normalized phone numbers
             const patientPhoneMap = new Map(
                 existingPatientsByPhone
                     .filter((p: any) => p.phone)
                     .map((p: any) => [normalizePhone(p.phone), p])
             )
-            
+
             // Build name map: normalize full name consistently
             const patientNameMap = new Map()
             existingPatientsByPhone.forEach((p: any) => {
@@ -263,7 +291,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                     patientNameMap.set(fullName, p)
                 }
             })
-            
+
             // Fetch all existing products in one query (for this doctor only)
             const existingProducts = await prisma.product.findMany({
                 where: {
@@ -271,23 +299,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                     name: { in: productNames }
                 }
             })
-            
-            console.log(`[Pre-fetch] Found ${existingProducts.length} existing products for doctor ${doctorId}`)
-            console.log(`[Pre-fetch] Product names in DB:`, existingProducts.map((p: any) => p.name).slice(0, 10))
+
             const productNameMap = new Map(existingProducts.map((p: any) => [
-                p.name.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s]/g, ''), 
+                p.name.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s]/g, ''),
                 p
             ]))
-            
+
             // Fetch all existing visits by opdNo in one query
             const opdNos = visits.map((v: any) => v.opdNo).filter(Boolean)
             const existingVisits = await prisma.visit.findMany({
                 where: { opdNo: { in: opdNos } }
             })
             const visitOpdMap = new Map(existingVisits.map((v: any) => [v.opdNo, v]))
-            
-            console.log(`[Bulk Create Visits] Found ${existingPatientsByPhone.length} existing patients, ${existingProducts.length} products, ${existingVisits.length} visits`)
-            
+
             // Find or create dummy treatment once for all imports
             let dummyTreatment = await prisma.treatment.findFirst({
                 where: {
@@ -295,7 +319,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                     planNumber: '00'
                 }
             })
-            
+
             if (!dummyTreatment) {
                 dummyTreatment = await prisma.treatment.create({
                     data: {
@@ -306,129 +330,100 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                     }
                 })
             }
-            
-            // ============ END PRE-FETCH ============
-            
-            const chunks = []
-            for (let i = 0; i < visits.length; i += BATCH_SIZE) {
-                chunks.push(visits.slice(i, i + BATCH_SIZE))
-            }
 
-            console.log(`[Bulk Create Visits] Processing ${visits.length} visits in ${chunks.length} batches of up to ${BATCH_SIZE}`)
+            // ============ STEP 3: Process each patient group ============
+            // Process groups in batches to avoid overwhelming the system
+            const patientGroupArray = Array.from(patientGroups.entries())
 
-            for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-                const chunk = chunks[chunkIndex]
-                console.log(`[Bulk Create Visits] Batch ${chunkIndex + 1}/${chunks.length}: Processing ${chunk.length} visits`)
-                
-                const chunkPromises = chunk.map(async (visitData: any) => {
+            for (const [patientKey, visitsForPatient] of patientGroupArray) {
+                // Find or create patient from visit #1
+                let patient = null
+                const firstVisit = visitsForPatient[0] // Already sorted by visit number
+                const firstVisitNumber = toNumber(firstVisit.visitNumber) || 1
+
+                const normalizedPhone = normalizePhone(firstVisit.phone)
+                const normalizedName = firstVisit.patientName ? normalizePatientName(firstVisit.patientName) : null
+
+                // Try to find existing patient
+                if (normalizedPhone && patientPhoneMap.has(normalizedPhone)) {
+                    patient = patientPhoneMap.get(normalizedPhone)
+                } else if (normalizedName && patientNameMap.has(normalizedName)) {
+                    patient = patientNameMap.get(normalizedName)
+                }
+
+                // If patient doesn't exist, we need to find visit #1 to create them
+                if (!patient) {
+                    const visit1 = visitsForPatient.find((v: any) => (toNumber(v.visitNumber) || 1) === 1)
+
+                    if (!visit1) {
+                        // No visit #1 found - skip this patient group
+                        visitsForPatient.forEach((v: any) => {
+                            errors.push({
+                                opdNo: v.opdNo,
+                                error: `Visit #1 required to create patient "${v.patientName}". Please include visit #1 in the import file.`
+                            })
+                        })
+                        continue // Skip this patient group
+                    }
+
+                    // Create patient from visit #1 data
+                    const nameParts = (visit1.patientName || 'Unknown Patient').trim().split(/\s+/)
+                    const firstName = nameParts[0]
+                    const lastName = nameParts.slice(1).join(' ') || null
+
+                    let finalDob: Date | null = parseDate(visit1.dob)
+                    let finalAge: number | null = parseAge(visit1.age)
+
+                    if (finalDob) {
+                        finalAge = calculateAgeFromDob(finalDob)
+                    } else if (finalAge && finalAge > 0) {
+                        finalDob = calculateDobFromAge(finalAge)
+                    }
+
+                    const visitDate = parseDate(visit1.date) || new Date()
+
+                    patient = await prisma.patient.create({
+                        data: {
+                            firstName: firstName,
+                            lastName: lastName,
+                            phone: visit1.phone || null,
+                            address: visit1.address || null,
+                            fatherHusbandGuardianName: visit1.fatherHusbandGuardianName || null,
+                            gender: visit1.gender || null,
+                            dob: finalDob,
+                            age: finalAge,
+                            doctorId: doctorId,
+                            date: visitDate
+                        }
+                    })
+
+                    // Add to maps for future lookups
+                    if (normalizedPhone) {
+                        patientPhoneMap.set(normalizedPhone, patient)
+                    }
+                    if (normalizedName) {
+                        patientNameMap.set(normalizedName, patient)
+                    }
+                }
+
+                // Now process all visits for this patient
+                for (const visitData of visitsForPatient) {
                     try {
-                        const { 
-                            opdNo, 
-                            patientName, 
+                        const {
+                            opdNo,
+                            patientName,
                             phone,
-                            date, 
+                            date,
                             prescriptions,
                             discount,
                             payment,
                             procedureAdopted,
                             discussion,
                             extra,
-                            ...visitFields 
+                            ...visitFields
                         } = visitData
 
-                        // Find or create patient using pre-fetched data
-                        let patient = null
-                        
-                        // Normalize phone for lookup
-                        const normalizedPhone = normalizePhone(phone)
-                        
-                        // Normalize patient name for consistent matching
-                        const normalizePatientName = (name: string): string => {
-                            return name
-                                .trim()
-                                .toLowerCase()
-                                .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-                                .replace(/[^\w\s]/g, '') // Remove special characters
-                        }
-                        
-                        const normalizedImportName = patientName ? normalizePatientName(patientName) : null
-                        const visitNumber = toNumber(visitFields.visitNumber) || 1
-                        
-                        // Try to find by phone first (most reliable)
-                        if (normalizedPhone && patientPhoneMap.has(normalizedPhone)) {
-                            patient = patientPhoneMap.get(normalizedPhone)
-                            console.log(`[Visit ${opdNo}] Found existing patient by phone: ${normalizedPhone} (original: ${phone})`)
-                        }
-                        
-                        // If not found by phone, try by normalized name
-                        if (!patient && normalizedImportName && patientNameMap.has(normalizedImportName)) {
-                            patient = patientNameMap.get(normalizedImportName)
-                            console.log(`[Visit ${opdNo}] Found existing patient by name: ${normalizedImportName}`)
-                        }
-                        
-                        // If still not found AND this is visit number 1, create new patient
-                        if (!patient && visitNumber === 1) {
-                            const nameParts = (patientName || 'Unknown Patient').trim().split(/\s+/) // Split by any whitespace
-                            const firstName = nameParts[0]
-                            const lastName = nameParts.slice(1).join(' ') || null
-                            
-                            console.log(`[Visit ${opdNo}] Creating new patient (Visit #1): ${firstName} ${lastName || ''} (Phone: ${phone || 'N/A'})`)
-                            
-                            // Parse DOB and age with priority: DOB first, then calculate age from it
-                            let finalDob: Date | null = parseDate(visitFields.dob)
-                            let finalAge: number | null = parseAge(visitFields.age)
-                            
-                            // If DOB is provided, prioritize it and calculate age from it
-                            if (finalDob) {
-                                finalAge = calculateAgeFromDob(finalDob)
-                            } 
-                            // If no DOB but age is provided, calculate DOB from age
-                            else if (finalAge && finalAge > 0) {
-                                finalDob = calculateDobFromAge(finalAge)
-                            }
-                            
-                            // Use the visit date as the patient creation date
-                            const visitDate = parseDate(date) || new Date()
-                            
-                            patient = await prisma.patient.create({
-                                data: {
-                                    firstName: firstName,
-                                    lastName: lastName,
-                                    phone: phone || null,
-                                    address: visitFields.address || null,
-                                    fatherHusbandGuardianName: visitFields.fatherHusbandGuardianName || null,
-                                    gender: visitFields.gender || null,
-                                    dob: finalDob,
-                                    age: finalAge,
-                                    doctorId: doctorId,
-                                    date: visitDate // Set patient registration date to visit date
-                                }
-                            })
-                            
-                            // Add to both maps for subsequent lookups in this batch
-                            if (normalizedPhone) {
-                                patientPhoneMap.set(normalizedPhone, patient)
-                                console.log(`[Visit ${opdNo}] Added patient to phone map: ${normalizedPhone} (original: ${phone})`)
-                            }
-                            
-                            // Add to name map using the same normalization as lookup
-                            if (normalizedImportName) {
-                                patientNameMap.set(normalizedImportName, patient)
-                                console.log(`[Visit ${opdNo}] Added patient to name map: ${normalizedImportName}`)
-                            }
-                        } else if (!patient && visitNumber > 1) {
-                            // Skip this visit if patient not found and visit number > 1
-                            console.log(`[Visit ${opdNo}] ⚠️ Skipping visit #${visitNumber} - Patient "${patientName}" not found (must import visit #1 first)`)
-                            return { success: false, opdNo, error: `Patient not found for visit #${visitNumber}. Visit #1 must be imported first.` }
-                        }
-                        
-                        // If we still don't have a patient at this point, something went wrong
-                        if (!patient) {
-                            console.log(`[Visit ${opdNo}] ⚠️ No patient available for this visit`)
-                            return { success: false, opdNo, error: 'Patient not available' }
-                        }
-
-                        // Check if visit with this opdNo already exists using pre-fetched map
+                        // Check if visit with this opdNo already exists
                         const existingVisit: any = visitOpdMap.get(opdNo)
 
                         let visit
@@ -436,13 +431,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                             // Parse DOB and age with priority: DOB first, then calculate age from it
                             let finalDob: Date | null = parseDate(visitFields.dob)
                             let finalAge: number | null = parseAge(visitFields.age)
-                            
+
                             if (finalDob) {
                                 finalAge = calculateAgeFromDob(finalDob)
                             } else if (finalAge && finalAge > 0) {
                                 finalDob = calculateDobFromAge(finalAge)
                             }
-                            
+
                             // Update existing visit
                             visit = await prisma.visit.update({
                                 where: { id: existingVisit.id },
@@ -492,7 +487,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     })()
                                 }
                             })
-                            
+
                             // Delete existing prescriptions for this visit before creating new ones
                             await prisma.prescription.deleteMany({
                                 where: { visitId: visit.id }
@@ -501,71 +496,71 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                             // Parse DOB and age with priority: DOB first, then calculate age from it
                             let finalDob: Date | null = parseDate(visitFields.dob)
                             let finalAge: number | null = parseAge(visitFields.age)
-                            
+
                             if (finalDob) {
                                 finalAge = calculateAgeFromDob(finalDob)
                             } else if (finalAge && finalAge > 0) {
                                 finalDob = calculateDobFromAge(finalAge)
                             }
-                            
+
                             // Create new visit
                             visit = await prisma.visit.create({
                                 data: {
-                                patient: {
-                                    connect: { id: patient.id }
-                                },
-                                doctor: doctorId ? {
-                                    connect: { id: doctorId }
-                                } : undefined,
-                                opdNo: opdNo,
-                                date: parseDate(date) || new Date(),
-                                isImported: true, // Mark as imported to skip PDF generation
-                                visitNumber: toNumber(visitFields.visitNumber),
-                                provisionalDiagnosis: toString(visitFields.provDiagnosis),
-                                temperament: toString(visitFields.temperament),
-                                pulseDiagnosis: toString(visitFields.pulseDiagnosis),
-                                pulseDiagnosis2: toString(visitFields.pulseDiagnosis2),
-                                majorComplaints: toString(visitFields.majorComplaints),
-                                historyReports: toString(visitFields.historyReports),
-                                investigations: toString(visitFields.investigations),
-                                improvements: toString(visitFields.improvements),
-                                nextVisit: parseDate(visitFields.nextVisit),
-                                amount: toNumber(visitFields.amount),
-                                discount: toNumber(discount),
-                                payment: toNumber(payment),
-                                balance: toNumber(visitFields.balance),
-                                followUpCount: toNumber(visitFields.followUpCount),
-                                address: toString(visitFields.address),
-                                phone: toString(phone),
-                                gender: toString(visitFields.gender),
-                                dob: finalDob,
-                                age: finalAge,
-                                weight: parseWeight(visitFields.weight),
-                                height: parseHeight(visitFields.height),
-                                procedureAdopted: toString(procedureAdopted),
-                                discussion: toString(discussion),
-                                extra: (() => {
-                                    const weightHistory = parseWeightHistory(visitFields.weight)
-                                    if (weightHistory && weightHistory.includes('/')) {
-                                        // Store weight history in extra as JSON
-                                        try {
-                                            const existingExtra = extra ? JSON.parse(extra) : {}
-                                            existingExtra.weightHistory = weightHistory
-                                            return JSON.stringify(existingExtra)
-                                        } catch {
-                                            return JSON.stringify({ weightHistory })
+                                    patient: {
+                                        connect: { id: patient.id }
+                                    },
+                                    doctor: doctorId ? {
+                                        connect: { id: doctorId }
+                                    } : undefined,
+                                    opdNo: opdNo,
+                                    date: parseDate(date) || new Date(),
+                                    isImported: true, // Mark as imported to skip PDF generation
+                                    visitNumber: toNumber(visitFields.visitNumber),
+                                    provisionalDiagnosis: toString(visitFields.provDiagnosis),
+                                    temperament: toString(visitFields.temperament),
+                                    pulseDiagnosis: toString(visitFields.pulseDiagnosis),
+                                    pulseDiagnosis2: toString(visitFields.pulseDiagnosis2),
+                                    majorComplaints: toString(visitFields.majorComplaints),
+                                    historyReports: toString(visitFields.historyReports),
+                                    investigations: toString(visitFields.investigations),
+                                    improvements: toString(visitFields.improvements),
+                                    nextVisit: parseDate(visitFields.nextVisit),
+                                    amount: toNumber(visitFields.amount),
+                                    discount: toNumber(discount),
+                                    payment: toNumber(payment),
+                                    balance: toNumber(visitFields.balance),
+                                    followUpCount: toNumber(visitFields.followUpCount),
+                                    address: toString(visitFields.address),
+                                    phone: toString(phone),
+                                    gender: toString(visitFields.gender),
+                                    dob: finalDob,
+                                    age: finalAge,
+                                    weight: parseWeight(visitFields.weight),
+                                    height: parseHeight(visitFields.height),
+                                    procedureAdopted: toString(procedureAdopted),
+                                    discussion: toString(discussion),
+                                    extra: (() => {
+                                        const weightHistory = parseWeightHistory(visitFields.weight)
+                                        if (weightHistory && weightHistory.includes('/')) {
+                                            // Store weight history in extra as JSON
+                                            try {
+                                                const existingExtra = extra ? JSON.parse(extra) : {}
+                                                existingExtra.weightHistory = weightHistory
+                                                return JSON.stringify(existingExtra)
+                                            } catch {
+                                                return JSON.stringify({ weightHistory })
+                                            }
                                         }
-                                    }
-                                    return toString(extra)
-                                })()
-                            }
-                        })
+                                        return toString(extra)
+                                    })()
+                                }
+                            })
                         }
 
                         // Create prescriptions if provided - use batch creation for better performance
                         if (prescriptions && Array.isArray(prescriptions) && prescriptions.length > 0) {
                             const prescriptionData = []
-                            
+
                             // Get or create "Imported" category for auto-created products with matching doctorId
                             let importedCategory = await prisma.category.findFirst({
                                 where: {
@@ -573,7 +568,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     doctorId: doctorId
                                 }
                             })
-                            
+
                             if (!importedCategory) {
                                 importedCategory = await prisma.category.create({
                                     data: {
@@ -584,42 +579,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     }
                                 })
                             }
-                            
+
                             for (const prData of prescriptions) {
                                 if (!prData.productName) continue // Skip empty prescriptions
-                                
+
                                 // Normalize product name: trim, lowercase, remove extra spaces and special chars
                                 const normalizedProductName = prData.productName
                                     .trim()
                                     .toLowerCase()
                                     .replace(/\s+/g, ' ') // Replace multiple spaces with single space
                                     .replace(/[^\w\s]/g, '') // Remove special characters
-                                
+
                                 // Try to find the product using pre-fetched map with normalized name
                                 let product: any = productNameMap.get(normalizedProductName)
-                                
+
                                 // If product not found, create it with "Imported" category and doctorId
                                 if (!product) {
-                                    console.log(`[Visit ${opdNo}] Creating new product: ${prData.productName} (normalized: ${normalizedProductName})`)
-                                    
                                     product = await prisma.product.create({
                                         data: {
                                             name: prData.productName.trim(), // Use original name but trimmed
                                             priceRupees: 0,
                                             quantity: 0,
-                                            purchaseQty: 100, // Default purchase quantity for imported products
+                                            totalPurchased: 100, // Default total purchased for imported products
                                             categoryId: importedCategory.id,
                                             doctorId: doctorId
                                         }
                                     })
-                                    
+
                                     // Add to map with normalized name for subsequent lookups
                                     productNameMap.set(normalizedProductName, product)
-                                    console.log(`[Visit ${opdNo}] Added product to map: ${normalizedProductName}`)
-                                } else {
-                                    console.log(`[Visit ${opdNo}] Found existing product: ${normalizedProductName}`)
                                 }
-                                
+
                                 // Add to batch
                                 prescriptionData.push({
                                     visitId: visit.id,
@@ -635,11 +625,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     addition2: toString(prData.addition2),
                                     addition3: toString(prData.addition3),
                                     procedure: toString(prData.procedure),
-                                    presentation: toString(prData.presentation),
-                                    droppersToday: toNumber(prData.droppersToday)
+                                    presentation: toString(prData.presentation)
                                 })
                             }
-                            
+
                             // Batch create all prescriptions at once
                             if (prescriptionData.length > 0) {
                                 await prisma.prescription.createMany({
@@ -648,29 +637,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                             }
                         }
 
-                        return visit
+                        results.push({ success: true, opdNo, visitId: visit.id })
                     } catch (err: any) {
-                        console.error(`[Bulk Create Visits] Failed:`, err.message)
+                        console.error(`[Visit ${visitData.opdNo}] Failed:`, err.message)
                         errors.push({
                             opdNo: visitData.opdNo,
                             error: err.message
                         })
-                        return null
                     }
-                })
-
-                const chunkResults = await Promise.all(chunkPromises)
-                results.push(...chunkResults.filter(r => r !== null))
+                }
             }
 
-            console.log(`[Bulk Create Visits] Completed: ${results.length} successful, ${errors.length} errors`)
+            console.log(`[Bulk Import] Completed: ${results.length} successful, ${errors.length} errors`)
 
-            return res.status(201).json({ 
-                success: true, 
+            return res.status(201).json({
+                success: true,
                 count: results.length,
                 errors: errors.length > 0 ? errors : undefined,
-                message: errors.length > 0 
-                    ? `Imported ${results.length} visits with ${errors.length} errors` 
+                message: errors.length > 0
+                    ? `Imported ${results.length} visits with ${errors.length} errors`
                     : `Successfully imported ${results.length} visits`
             })
         } catch (error: any) {

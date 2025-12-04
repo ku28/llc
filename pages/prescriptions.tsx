@@ -2437,18 +2437,27 @@ export default function PrescriptionsPage() {
                                                                                         {product && (
                                                                                             <div className="space-y-1">
                                                                                                 <div className="text-[10px] text-gray-500">Stock: {product.quantity}</div>
-                                                                                                <div className="mt-2">
-                                                                                                    <CustomSelect
-                                                                                                        value={pr.bottleSize || ''}
-                                                                                                        onChange={(val) => !isDeleted && updatePrescription(i, { bottleSize: val })}
-                                                                                                        options={bottlePricing.map(bp => ({
-                                                                                                            value: bp.value,
-                                                                                                            label: bp.label
-                                                                                                        }))}
-                                                                                                        placeholder="Bottle Size"
-                                                                                                        className="text-xs h-8"
-                                                                                                    />
-                                                                                                </div>
+                                                                                                {(() => {
+                                                                                                    const categoryName = (typeof product.category === 'string' ? product.category : product.category?.name || '').toLowerCase()
+                                                                                                    const showBottleSize = ['drops', 'eco drops', 'dilutions', 'misc', 'new sp drops', 'special drops'].includes(categoryName)
+                                                                                                    if (showBottleSize) {
+                                                                                                        return (
+                                                                                                            <div className="mt-2">
+                                                                                                                <CustomSelect
+                                                                                                                    value={pr.bottleSize || ''}
+                                                                                                                    onChange={(val) => !isDeleted && updatePrescription(i, { bottleSize: val })}
+                                                                                                                    options={bottlePricing.map(bp => ({
+                                                                                                                        value: bp.value,
+                                                                                                                        label: bp.label
+                                                                                                                    }))}
+                                                                                                                    placeholder="Bottle Size"
+                                                                                                                    className="text-xs h-8"
+                                                                                                                />
+                                                                                                            </div>
+                                                                                                        )
+                                                                                                    }
+                                                                                                    return null
+                                                                                                })()}
                                                                                             </div>
                                                                                         )}
                                                                                     </div>
@@ -2483,11 +2492,18 @@ export default function PrescriptionsPage() {
                                                         </div>
 
                                                         {/* RIGHT: SPY Grid + Additions */}
+                                                        {(() => {
+                                                            const product = products.find(p => String(p.id) === String(pr.productId))
+                                                            const categoryName = product ? (typeof product.category === 'string' ? product.category : product.category?.name || '').toLowerCase() : ''
+                                                            const showSpyFields = ['drops', 'eco drops', 'dilutions', 'misc', 'new sp drops', 'special drops'].includes(categoryName)
+                                                            
+                                                            if (!showSpyFields) return null
+                                                            
+                                                            return (
                                                         <div className={`flex-1 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
                                                             <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Spagyric Components</label>
                                                             {/* Row 1: SPY 1-3 */}
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3">
-                                                                {[1, 2, 3].map(num => {
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3">{[1, 2, 3].map(num => {
                                                                     const spyKey = `spy${num}` as keyof typeof pr
                                                                     const spyValue = pr[spyKey] as string || ''
                                                                     return (
@@ -2615,6 +2631,8 @@ export default function PrescriptionsPage() {
                                                                 </div>
                                                             )}
                                                         </div>
+                                                            )
+                                                        })()}
                                                     </div>
 
                                                     {/* Row 2: Remaining Fields in ONE LINE */}
