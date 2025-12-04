@@ -7,10 +7,14 @@ import { requireDoctorOrAdmin } from '../../lib/withAuth'
 import components from '../../data/components.json'
 import timing from '../../data/timing.json'
 import dosage from '../../data/dosage.json'
+import doseQuantity from '../../data/doseQuantity.json'
+import doseTiming from '../../data/doseTiming.json'
+import dilution from '../../data/dilution.json'
 import additions from '../../data/additions.json'
 import procedure from '../../data/procedure.json'
 import presentation from '../../data/presentation.json'
 import administration from '../../data/administration.json'
+import bottlePricing from '../../data/bottlePricing.json'
 import organ from '../../data/organ.json'
 import speciality from '../../data/speciality.json'
 import diseaseAction from '../../data/diseaseAction.json'
@@ -32,6 +36,30 @@ function EditTreatmentPage() {
     const [isOrganOpen, setIsOrganOpen] = useState(false)
     const [isSpecialityOpen, setIsSpecialityOpen] = useState(false)
     const [isDiseaseActionOpen, setIsDiseaseActionOpen] = useState(false)
+    const [collapsedSections, setCollapsedSections] = useState<{[key: number]: {spy46: boolean, additions: boolean}}>({})
+    
+    // Helper functions for parsing component and dosage formats
+    function parseComponent(compValue: string): { name: string; volume: string } {
+        if (!compValue) return { name: '', volume: '' }
+        const parts = compValue.split('|')
+        return { name: parts[0] || '', volume: parts[1] || '' }
+    }
+
+    function formatComponent(name: string, volume: string): string {
+        if (!name && !volume) return ''
+        return `${name}|${volume}`
+    }
+
+    function parseDosage(dosageValue: string): { quantity: string; timing: string; dilution: string } {
+        if (!dosageValue) return { quantity: '', timing: '', dilution: '' }
+        const parts = dosageValue.split('|')
+        return { quantity: parts[0] || '', timing: parts[1] || '', dilution: parts[2] || '' }
+    }
+
+    function formatDosage(quantity: string, timing: string, dilution: string): string {
+        if (!quantity && !timing && !dilution) return ''
+        return `${quantity}|${timing}|${dilution}`
+    }
     
     const emptyForm = {
         speciality: '',
@@ -168,14 +196,14 @@ function EditTreatmentPage() {
         const newMedicines = selectedMedicines.map(productId => ({
             productId: productId,
             spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
-            quantity: 0,
+            quantity: 10,
+            bottleSize: '15ml',
             timing: '',
-            dosage: '',
+            dosage: '10|TDS|WTR',
             addition1: '', addition2: '', addition3: '',
             procedure: '',
             presentation: '',
-            droppersToday: '',
-            medicineQuantity: ''
+            administration: ''
         }))
         setMedicines([...medicines, ...newMedicines])
         setSelectedMedicines([])
@@ -188,14 +216,14 @@ function EditTreatmentPage() {
         setMedicines([...medicines, {
             productId: productId,
             spy1: '', spy2: '', spy3: '', spy4: '', spy5: '', spy6: '',
-            quantity: 1,
+            quantity: 10,
+            bottleSize: '15ml',
             timing: '',
-            dosage: '',
+            dosage: '10|TDS|WTR',
             addition1: '', addition2: '', addition3: '',
             procedure: '',
             presentation: '',
-            droppersToday: '',
-            medicineQuantity: ''
+            administration: ''
         }])
         
         // Clear selection
@@ -394,6 +422,16 @@ function EditTreatmentPage() {
                             />
                         </div>
                     </div>
+                    <div className="mt-3">
+                        <label className="block text-sm font-medium mb-1.5">Additional Notes</label>
+                        <textarea 
+                            rows={2} 
+                            placeholder="ADDITIONAL NOTES" 
+                            value={form.notes} 
+                            onChange={e => setForm({ ...form, notes: e.target.value.toUpperCase() })}
+                            className="p-2 border rounded-lg w-full text-sm uppercase" 
+                        />
+                    </div>
                 </div>
                 
                 {/* Treatment Plan Section (Single Plan - Edit Mode) */}
@@ -429,16 +467,6 @@ function EditTreatmentPage() {
                                     placeholder="Select administration"
                                     allowCustom={true}
                                     className="w-full"
-                                />
-                            </div>
-                            <div className="sm:col-span-2">
-                                <label className="block text-sm font-medium mb-1.5">Notes</label>
-                                <textarea 
-                                    rows={2} 
-                                    placeholder="ADDITIONAL NOTES" 
-                                    value={form.notes} 
-                                    onChange={e => setForm({ ...form, notes: e.target.value.toUpperCase() })}
-                                    className="p-2 border rounded-lg w-full text-sm uppercase" 
                                 />
                             </div>
                         </div>
@@ -538,226 +566,447 @@ function EditTreatmentPage() {
                                     {medicines.map((medicine: any, medicineIndex: number) => {
                                         const product = products.find(p => String(p.id) === String(medicine.productId))
                                         return (
-                                        <div key={medicineIndex} className="border border-emerald-200/50 dark:border-emerald-700/50 rounded-lg p-3 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/30 dark:from-gray-800 dark:via-emerald-950/30 dark:to-gray-800 shadow-md shadow-emerald-500/10 backdrop-blur-sm">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1">Medicine</label>
-                                                    {medicine.productId && product ? (
-                                                        <div className="p-2 text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2 flex-wrap">
-                                                            <span className="px-2 py-1 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-xs font-bold">{medicineIndex + 1}</span>
-                                                            <span>{product.name}</span>
-                                                            {product.category && (() => {
-                                                                const categoryName = typeof product.category === 'string' ? product.category : product.category.name
-                                                                if (product.unit) {
-                                                                    const unitParts = String(product.unit).trim().split(/\s+/)
-                                                                    const unitType = unitParts.length >= 2 ? unitParts[1] : ''
+                                        <div key={medicineIndex} className="relative group transition-all duration-300 border border-emerald-200/40 dark:border-emerald-700/40 bg-gradient-to-br from-white via-emerald-50/20 to-transparent dark:from-gray-900/80 dark:via-emerald-950/10 dark:to-gray-900/80 rounded-2xl hover:border-emerald-400/60 dark:hover:border-emerald-600/60 hover:shadow-xl hover:shadow-emerald-500/10">
+                                            {/* Futuristic glow effect on hover */}
+                                            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-400/0 via-green-400/0 to-emerald-500/0 group-hover:from-emerald-400/5 group-hover:via-green-400/5 group-hover:to-emerald-500/5 transition-all duration-500 pointer-events-none"></div>
+                                            <div className="relative p-4">
+                                                {/* Row 1: Medicine Name (Left) + SPY Grid (Right) */}
+                                                <div className="flex flex-col lg:flex-row gap-4 mb-3">
+                                                    {/* LEFT: Medicine Info */}
+                                                    <div className="w-full lg:w-64 lg:flex-shrink-0">
+                                                        <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Medicine</label>
+                                                        <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Medicine</label>
+                                                        {medicine.productId && product ? (
+                                                            <div className="relative p-3 text-xs text-gray-700 dark:text-gray-300 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-lg border border-gray-200 dark:border-gray-700">
+                                                                {/* Edit Icon */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => updateMedicine(medicineIndex, 'productId', '')}
+                                                                    className="absolute top-2 right-2 p-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded transition-colors"
+                                                                    title="Edit medicine"
+                                                                >
+                                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                    </svg>
+                                                                </button>
+                                                                {(() => {
                                                                     return (
-                                                                        <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full text-xs font-semibold">
-                                                                            {categoryName} {unitType ? `(${unitType})` : ''}
-                                                                        </span>
+                                                                        <div className="space-y-2.5">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="px-2 py-1 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-[10px] font-bold">{medicineIndex + 1}</span>
+                                                                                <span className="font-semibold leading-tight">{product.name}</span>
+                                                                            </div>
+                                                                            {product.category && (
+                                                                                <div className="space-y-1.5">
+                                                                                    <div className="flex items-center gap-1 text-[10px]">
+                                                                                        {(() => {
+                                                                                            const categoryName = typeof product.category === 'string' ? product.category : product.category.name
+                                                                                            if (product.unit) {
+                                                                                                const unitParts = String(product.unit).trim().split(/\s+/)
+                                                                                                const unitType = unitParts.length >= 2 ? unitParts[1] : ''
+                                                                                                return (
+                                                                                                    <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full">
+                                                                                                        {categoryName} {unitType ? `(${unitType})` : ''}
+                                                                                                    </span>
+                                                                                                )
+                                                                                            }
+                                                                                            return (
+                                                                                                <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full">
+                                                                                                    {categoryName}
+                                                                                                </span>
+                                                                                            )
+                                                                                        })()}
+                                                                                    </div>
+                                                                                    {product && (
+                                                                                    <div className="space-y-1">
+                                                                                        <div className="text-[10px] text-gray-500">Stock: {product.quantity}</div>
+                                                                                        <div className="mt-2">
+                                                                                            <CustomSelect
+                                                                                                value={medicine.bottleSize || ''}
+                                                                                                onChange={(val) => updateMedicine(medicineIndex, 'bottleSize', val)}
+                                                                                                options={bottlePricing.map(bp => ({
+                                                                                                    value: bp.value,
+                                                                                                    label: bp.label
+                                                                                                }))}
+                                                                                                placeholder="Bottle Size"
+                                                                                                className="text-xs h-8"
+                                                                                            />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
+                                                                        </div>
                                                                     )
-                                                                }
-                                                                return (
-                                                                    <span className="px-2 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full text-xs font-semibold">
-                                                                        {categoryName}
-                                                                    </span>
-                                                                )
-                                                            })()}
-                                                            <span className="text-gray-500">· Stock: {product.quantity}</span>
+                                                                })()}
+                                                            </div>
+                                                        ) : (
+                                                            <CustomSelect
+                                                                value={medicine.productId}
+                                                                onChange={(value) => updateMedicine(medicineIndex, 'productId', value)}
+                                                                options={[
+                                                                    { value: '', label: '-- select medicine --' },
+                                                                    ...products.map(p => ({
+                                                                        value: String(p.id),
+                                                                        label: `${p.name} · Stock: ${p.quantity}`
+                                                                    }))
+                                                                ]}
+                                                                placeholder="-- select medicine --"
+                                                                className="text-xs h-9"
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    {/* RIGHT: SPY Grid + Additions */}
+                                                    <div className="flex-1">
+                                                        <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Spagyric Components</label>
+                                                        {/* Row 1: SPY 1-3 with Component + Volume */}
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+                                                            {/* SPY 1 */}
+                                                            <div className="flex gap-1">
+                                                                <CustomSelect
+                                                                    value={parseComponent(medicine.spy1 || '').name}
+                                                                    onChange={(val) => {
+                                                                        const parsed = parseComponent(medicine.spy1 || '')
+                                                                        updateMedicine(medicineIndex, 'spy1', formatComponent(val.toUpperCase(), parsed.volume))
+                                                                    }}
+                                                                    options={components}
+                                                                    placeholder="SPY 1"
+                                                                    allowCustom={true}
+                                                                    className="flex-1 text-xs h-8"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Vol"
+                                                                    value={parseComponent(medicine.spy1 || '').volume}
+                                                                    onChange={(e) => {
+                                                                        const parsed = parseComponent(medicine.spy1 || '')
+                                                                        updateMedicine(medicineIndex, 'spy1', formatComponent(parsed.name, e.target.value))
+                                                                    }}
+                                                                    className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                />
+                                                            </div>
+                                                            {/* SPY 2 */}
+                                                            <div className="flex gap-1">
+                                                                <CustomSelect
+                                                                    value={parseComponent(medicine.spy2 || '').name}
+                                                                    onChange={(val) => {
+                                                                        const parsed = parseComponent(medicine.spy2 || '')
+                                                                        updateMedicine(medicineIndex, 'spy2', formatComponent(val.toUpperCase(), parsed.volume))
+                                                                    }}
+                                                                    options={components}
+                                                                    placeholder="SPY 2"
+                                                                    allowCustom={true}
+                                                                    className="flex-1 text-xs h-8"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Vol"
+                                                                    value={parseComponent(medicine.spy2 || '').volume}
+                                                                    onChange={(e) => {
+                                                                        const parsed = parseComponent(medicine.spy2 || '')
+                                                                        updateMedicine(medicineIndex, 'spy2', formatComponent(parsed.name, e.target.value))
+                                                                    }}
+                                                                    className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                />
+                                                            </div>
+                                                            {/* SPY 3 */}
+                                                            <div className="flex gap-1">
+                                                                <CustomSelect
+                                                                    value={parseComponent(medicine.spy3 || '').name}
+                                                                    onChange={(val) => {
+                                                                        const parsed = parseComponent(medicine.spy3 || '')
+                                                                        updateMedicine(medicineIndex, 'spy3', formatComponent(val.toUpperCase(), parsed.volume))
+                                                                    }}
+                                                                    options={components}
+                                                                    placeholder="SPY 3"
+                                                                    allowCustom={true}
+                                                                    className="flex-1 text-xs h-8"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Vol"
+                                                                    value={parseComponent(medicine.spy3 || '').volume}
+                                                                    onChange={(e) => {
+                                                                        const parsed = parseComponent(medicine.spy3 || '')
+                                                                        updateMedicine(medicineIndex, 'spy3', formatComponent(parsed.name, e.target.value))
+                                                                    }}
+                                                                    className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                />
+                                                            </div>
                                                         </div>
-                                                    ) : (
-                                                    <CustomSelect
-                                                        value={medicine.productId}
-                                                        onChange={(value) => updateMedicine(medicineIndex, 'productId', value)}
-                                                        options={[
-                                                            { value: '', label: '-- select medicine --' },
-                                                            ...products.map(p => ({
-                                                                value: String(p.id),
-                                                                label: `${p.name} · Stock: ${p.quantity}`
-                                                            }))
-                                                        ]}
-                                                        placeholder="-- select medicine --"
-                                                        className="w-full"
-                                                    />
-                                                    )}
-                                                </div>
-                                                
-                                                {/* SPY Components - 3x3 Grid */}
-                                                <div className="sm:col-span-2 lg:col-span-3">
-                                                    <label className="block text-xs font-medium mb-2 text-emerald-700 dark:text-emerald-400">Spagyric</label>
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        <CustomSelect
-                                                            value={medicine.spy1 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy1', val.toUpperCase())}
-                                                            options={components}
-                                                            placeholder="SPY 1"
-                                                            allowCustom={true}
-                                                        />
-                                                        <CustomSelect
-                                                            value={medicine.spy2 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy2', val.toUpperCase())}
-                                                            options={components}
-                                                            placeholder="SPY 2"
-                                                            allowCustom={true}
-                                                        />
-                                                        <CustomSelect
-                                                            value={medicine.spy3 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy3', val.toUpperCase())}
-                                                            options={components}
-                                                            placeholder="SPY 3"
-                                                            allowCustom={true}
-                                                        />
-                                                        <CustomSelect
-                                                            value={medicine.spy4 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy4', val.toUpperCase())}
-                                                            options={components}
-                                                            placeholder="SPY 4"
-                                                            allowCustom={true}
-                                                        />
-                                                        <CustomSelect
-                                                            value={medicine.spy5 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy5', val.toUpperCase())}
-                                                            options={components}
-                                                            placeholder="SPY 5"
-                                                            allowCustom={true}
-                                                        />
-                                                        <CustomSelect
-                                                            value={medicine.spy6 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'spy6', val.toUpperCase())}
-                                                            options={components}
-                                                            placeholder="SPY 6"
-                                                            allowCustom={true}
-                                                        />
+
+                                                        {/* Collapsible SPY 4-6 Section */}
+                                                        <div className="mb-3">
+                                                            <label 
+                                                                className="flex items-center gap-1 text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400 cursor-pointer hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                                                                onClick={() => {
+                                                                    setCollapsedSections(prev => ({
+                                                                        ...prev,
+                                                                        [medicineIndex]: {
+                                                                            ...prev[medicineIndex],
+                                                                            spy46: !prev[medicineIndex]?.spy46
+                                                                        }
+                                                                    }))
+                                                                }}
+                                                            >
+                                                                <svg className={`w-3 h-3 transition-transform ${(collapsedSections[medicineIndex]?.spy46 ?? !(medicine.spy4 || medicine.spy5 || medicine.spy6)) ? '-rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                                </svg>
+                                                                SPY 4-6
+                                                            </label>
+                                                            {!(collapsedSections[medicineIndex]?.spy46 ?? !(medicine.spy4 || medicine.spy5 || medicine.spy6)) && (
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                                    {/* SPY 4 */}
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(medicine.spy4 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(medicine.spy4 || '')
+                                                                                updateMedicine(medicineIndex, 'spy4', formatComponent(val.toUpperCase(), parsed.volume))
+                                                                            }}
+                                                                            options={components}
+                                                                            placeholder="SPY 4"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Vol"
+                                                                            value={parseComponent(medicine.spy4 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(medicine.spy4 || '')
+                                                                                updateMedicine(medicineIndex, 'spy4', formatComponent(parsed.name, e.target.value))
+                                                                            }}
+                                                                            className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                        />
+                                                                    </div>
+                                                                    {/* SPY 5 */}
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(medicine.spy5 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(medicine.spy5 || '')
+                                                                                updateMedicine(medicineIndex, 'spy5', formatComponent(val.toUpperCase(), parsed.volume))
+                                                                            }}
+                                                                            options={components}
+                                                                            placeholder="SPY 5"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Vol"
+                                                                            value={parseComponent(medicine.spy5 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(medicine.spy5 || '')
+                                                                                updateMedicine(medicineIndex, 'spy5', formatComponent(parsed.name, e.target.value))
+                                                                            }}
+                                                                            className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                        />
+                                                                    </div>
+                                                                    {/* SPY 6 */}
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(medicine.spy6 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(medicine.spy6 || '')
+                                                                                updateMedicine(medicineIndex, 'spy6', formatComponent(val.toUpperCase(), parsed.volume))
+                                                                            }}
+                                                                            options={components}
+                                                                            placeholder="SPY 6"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Vol"
+                                                                            value={parseComponent(medicine.spy6 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(medicine.spy6 || '')
+                                                                                updateMedicine(medicineIndex, 'spy6', formatComponent(parsed.name, e.target.value))
+                                                                            }}
+                                                                            className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Collapsible Additions Section */}
+                                                        <div>
+                                                            <label 
+                                                                className="flex items-center gap-1 text-xs font-semibold mb-2 text-blue-600 dark:text-blue-400 cursor-pointer hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                                                                onClick={() => {
+                                                                    setCollapsedSections(prev => ({
+                                                                        ...prev,
+                                                                        [medicineIndex]: {
+                                                                            ...prev[medicineIndex],
+                                                                            additions: !prev[medicineIndex]?.additions
+                                                                        }
+                                                                    }))
+                                                                }}
+                                                            >
+                                                                <svg className={`w-3 h-3 transition-transform ${(collapsedSections[medicineIndex]?.additions ?? !(medicine.addition1 || medicine.addition2 || medicine.addition3)) ? '-rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                                </svg>
+                                                                Additions
+                                                            </label>
+                                                            {!(collapsedSections[medicineIndex]?.additions ?? !(medicine.addition1 || medicine.addition2 || medicine.addition3)) && (
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                                                    {/* Addition 1 */}
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(medicine.addition1 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(medicine.addition1 || '')
+                                                                                updateMedicine(medicineIndex, 'addition1', formatComponent(val.toUpperCase(), parsed.volume))
+                                                                            }}
+                                                                            options={additions}
+                                                                            placeholder="Add 1"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Vol"
+                                                                            value={parseComponent(medicine.addition1 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(medicine.addition1 || '')
+                                                                                updateMedicine(medicineIndex, 'addition1', formatComponent(parsed.name, e.target.value))
+                                                                            }}
+                                                                            className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                        />
+                                                                    </div>
+                                                                    {/* Addition 2 */}
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(medicine.addition2 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(medicine.addition2 || '')
+                                                                                updateMedicine(medicineIndex, 'addition2', formatComponent(val.toUpperCase(), parsed.volume))
+                                                                            }}
+                                                                            options={additions}
+                                                                            placeholder="Add 2"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Vol"
+                                                                            value={parseComponent(medicine.addition2 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(medicine.addition2 || '')
+                                                                                updateMedicine(medicineIndex, 'addition2', formatComponent(parsed.name, e.target.value))
+                                                                            }}
+                                                                            className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                        />
+                                                                    </div>
+                                                                    {/* Addition 3 */}
+                                                                    <div className="flex gap-1">
+                                                                        <CustomSelect
+                                                                            value={parseComponent(medicine.addition3 || '').name}
+                                                                            onChange={(val) => {
+                                                                                const parsed = parseComponent(medicine.addition3 || '')
+                                                                                updateMedicine(medicineIndex, 'addition3', formatComponent(val.toUpperCase(), parsed.volume))
+                                                                            }}
+                                                                            options={additions}
+                                                                            placeholder="Add 3"
+                                                                            allowCustom={true}
+                                                                            className="flex-1 text-xs h-8"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="Vol"
+                                                                            value={parseComponent(medicine.addition3 || '').volume}
+                                                                            onChange={(e) => {
+                                                                                const parsed = parseComponent(medicine.addition3 || '')
+                                                                                updateMedicine(medicineIndex, 'addition3', formatComponent(parsed.name, e.target.value))
+                                                                            }}
+                                                                            className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Addition Components */}
-                                                <div className="sm:col-span-2 lg:col-span-3">
-                                                    <label className="block text-xs font-medium mb-2 text-blue-700 dark:text-blue-400">Addition Components</label>
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        <CustomSelect
-                                                            value={medicine.addition1 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'addition1', val.toUpperCase())}
-                                                            options={additions}
-                                                            placeholder="Addition 1"
-                                                            allowCustom={true}
-                                                        />
-                                                        <CustomSelect
-                                                            value={medicine.addition2 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'addition2', val.toUpperCase())}
-                                                            options={additions}
-                                                            placeholder="Addition 2"
-                                                            allowCustom={true}
-                                                        />
-                                                        <CustomSelect
-                                                            value={medicine.addition3 || ''}
-                                                            onChange={(val) => updateMedicine(medicineIndex, 'addition3', val.toUpperCase())}
-                                                            options={additions}
-                                                            placeholder="Addition 3"
-                                                            allowCustom={true}
-                                                        />
+                                                {/* Row 2: Remaining Fields in ONE LINE */}
+                                                <div className="mt-4">
+                                                    <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Dosage & Administration Details</label>
+                                                    <div className="flex flex-wrap gap-3 items-end w-full">
+                                                        <div className="flex-1 min-w-[56px]">
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Qty</label>
+                                                            <input type="number" placeholder="0" value={medicine.quantity || ''} onChange={e => updateMedicine(medicineIndex, 'quantity', parseInt(e.target.value))} className="w-full p-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-[96px]">
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Timing</label>
+                                                            <CustomSelect value={medicine.timing || ''} onChange={(val) => updateMedicine(medicineIndex, 'timing', val)} options={timing} placeholder="Time" allowCustom={true} className="text-xs h-8" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-[80px]">
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dose Qty</label>
+                                                            <CustomSelect 
+                                                                value={parseDosage(medicine.dosage || '').quantity} 
+                                                                onChange={(val) => {
+                                                                    const parsed = parseDosage(medicine.dosage || '')
+                                                                    updateMedicine(medicineIndex, 'dosage', formatDosage(val, parsed.timing, parsed.dilution))
+                                                                }} 
+                                                                options={doseQuantity} 
+                                                                placeholder="Qty" 
+                                                                allowCustom={true} 
+                                                                className="text-xs h-8" 
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 min-w-[80px]">
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dose Time</label>
+                                                            <CustomSelect 
+                                                                value={parseDosage(medicine.dosage || '').timing} 
+                                                                onChange={(val) => {
+                                                                    const parsed = parseDosage(medicine.dosage || '')
+                                                                    updateMedicine(medicineIndex, 'dosage', formatDosage(parsed.quantity, val, parsed.dilution))
+                                                                }} 
+                                                                options={doseTiming} 
+                                                                placeholder="Time" 
+                                                                allowCustom={true} 
+                                                                className="text-xs h-8" 
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 min-w-[80px]">
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dilution</label>
+                                                            <CustomSelect 
+                                                                value={parseDosage(medicine.dosage || '').dilution} 
+                                                                onChange={(val) => {
+                                                                    const parsed = parseDosage(medicine.dosage || '')
+                                                                    updateMedicine(medicineIndex, 'dosage', formatDosage(parsed.quantity, parsed.timing, val.toUpperCase()))
+                                                                }} 
+                                                                options={dilution} 
+                                                                placeholder="Dil" 
+                                                                allowCustom={true} 
+                                                                className="text-xs h-8" 
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 min-w-[112px]">
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Procedure</label>
+                                                            <CustomSelect value={medicine.procedure || ''} onChange={(val) => updateMedicine(medicineIndex, 'procedure', val.toUpperCase())} options={procedure} placeholder="Proc" allowCustom={true} className="text-xs h-8" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-[112px]">
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Presentation</label>
+                                                            <CustomSelect value={medicine.presentation || ''} onChange={(val) => updateMedicine(medicineIndex, 'presentation', val.toUpperCase())} options={presentation} placeholder="Pres" allowCustom={true} className="text-xs h-8" />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Remove Button */}
+                                                    <div className="flex justify-end pt-3 border-t border-emerald-200/30 dark:border-emerald-700/30 mt-3">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeMedicine(medicineIndex)}
+                                                            className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-600 border border-red-300 dark:border-red-700 rounded-lg transition-all duration-200 hover:shadow-md"
+                                                        >
+                                                            Remove
+                                                        </button>
                                                     </div>
                                                 </div>
-                                            </div>
-
-                                            {/* Additional Fields */}
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mt-2">
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1">Qty (Drops)</label>
-                                                    <input 
-                                                        type="number" 
-                                                        min="1"
-                                                        placeholder="0"
-                                                        value={medicine.quantity} 
-                                                        onChange={e => updateMedicine(medicineIndex, 'quantity', parseInt(e.target.value))}
-                                                        className="p-1.5 border rounded w-full text-xs"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1">Timing</label>
-                                                    <CustomSelect
-                                                        value={medicine.timing}
-                                                        onChange={(val) => updateMedicine(medicineIndex, 'timing', val)}
-                                                        options={timing}
-                                                        placeholder="Select timing"
-                                                        allowCustom={true}
-                                                        className="w-full"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1">Dosage</label>
-                                                    <CustomSelect
-                                                        value={medicine.dosage}
-                                                        onChange={(val) => updateMedicine(medicineIndex, 'dosage', val.toUpperCase())}
-                                                        options={dosage}
-                                                        placeholder="Select dosage"
-                                                        allowCustom={true}
-                                                        className="w-full"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1">Additions</label>
-                                                    <CustomSelect
-                                                        value={medicine.additions}
-                                                        onChange={(val) => updateMedicine(medicineIndex, 'additions', val.toUpperCase())}
-                                                        options={additions}
-                                                        placeholder="Select addition"
-                                                        allowCustom={true}
-                                                        className="w-full"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1">Procedure</label>
-                                                    <CustomSelect
-                                                        value={medicine.procedure}
-                                                        onChange={(val) => updateMedicine(medicineIndex, 'procedure', val.toUpperCase())}
-                                                        options={procedure}
-                                                        placeholder="Select procedure"
-                                                        allowCustom={true}
-                                                        className="w-full"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1">Presentation</label>
-                                                    <CustomSelect
-                                                        value={medicine.presentation}
-                                                        onChange={(val) => updateMedicine(medicineIndex, 'presentation', val.toUpperCase())}
-                                                        options={presentation}
-                                                        placeholder="Select presentation"
-                                                        allowCustom={true}
-                                                        className="w-full"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1">Droppers Today</label>
-                                                    <input 
-                                                        type="number"
-                                                        placeholder="0"
-                                                        value={medicine.droppersToday} 
-                                                        onChange={e => updateMedicine(medicineIndex, 'droppersToday', e.target.value)}
-                                                        className="p-1.5 border rounded w-full text-xs"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-medium mb-1">Medicine Quantity</label>
-                                                    <input 
-                                                        type="number"
-                                                        placeholder="0"
-                                                        value={medicine.medicineQuantity} 
-                                                        onChange={e => updateMedicine(medicineIndex, 'medicineQuantity', e.target.value)}
-                                                        className="p-1.5 border rounded w-full text-xs"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="flex justify-end mt-2">
-                                                <button 
-                                                    type="button" 
-                                                    onClick={() => removeMedicine(medicineIndex)}
-                                                    className="btn btn-danger text-xs"
-                                                >
-                                                    × Remove
-                                                </button>
                                             </div>
                                         </div>
                                     )})}

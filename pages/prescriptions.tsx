@@ -58,7 +58,7 @@ export default function PrescriptionsPage() {
     const [form, setForm] = useState<any>({
         patientId: '', opdNo: '', date: new Date().toISOString().split('T')[0], temperament: '', pulseDiagnosis: '', pulseDiagnosis2: '',
         majorComplaints: '', historyReports: '', investigations: '', reports: '', provisionalDiagnosis: '',
-        improvements: '', specialNote: '', dob: '', age: '', address: '', gender: '', phone: '',
+        improvements: '', specialNote: '', discussion: '', dob: '', age: '', address: '', gender: '', phone: '',
         nextVisitDate: '', nextVisitTime: '', occupation: '', pendingPaymentCents: '',
         height: '', heightFeet: '', heightInches: '', weight: '', fatherHusbandGuardianName: '', imageUrl: '',
         // New financial fields - ensure they're strings not undefined
@@ -549,6 +549,7 @@ export default function PrescriptionsPage() {
                         provisionalDiagnosis: visit.provisionalDiagnosis || '',
                         improvements: visit.improvements || '',
                         specialNote: visit.specialNote || '',
+                        discussion: visit.discussion || visit.investigations || '',
                         dob: formatDateForInput(visit.patient?.dob),
                         age: visit.patient?.age ?? '',
                         address: visit.patient?.address || '',
@@ -1938,7 +1939,7 @@ export default function PrescriptionsPage() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Investigation Ordered</label>
-                                    <input placeholder="Blood test, X-ray" value={form.investigations} onChange={e => setForm({ ...form, investigations: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
+                                    <input placeholder="Blood test, X-ray" value={form.investigations} onChange={e => setForm({ ...form, investigations: e.target.value.toUpperCase(), discussion: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Provisional Diagnosis</label>
@@ -2410,7 +2411,7 @@ export default function PrescriptionsPage() {
                                                                             <div className="space-y-2.5">
                                                                                 <div className="flex items-center gap-2">
                                                                                     <span className="px-2 py-1 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-[10px] font-bold">{i + 1}</span>
-                                                                                    <span className="font-semibold leading-tight">{product ? product.name : `Product #${pr.productId}`}</span>
+                                                                                    <span className={`font-semibold leading-tight ${pr.patientHasMedicine ? 'line-through text-gray-400' : ''}`}>{product ? product.name : `Product #${pr.productId}`}</span>
                                                                                 </div>
                                                                                 {product?.category && (
                                                                                     <div className="space-y-1.5">
@@ -2458,8 +2459,16 @@ export default function PrescriptionsPage() {
                                                                 </div>
                                                             ) : (
                                                                 <CustomSelect
+                                                                    key={`medicine-select-${i}-${Date.now()}`}
                                                                     value={pr.productId}
-                                                                    onChange={(val) => !isDeleted && !pr.productId && updatePrescription(i, { productId: val })}
+                                                                    onChange={(val) => {
+                                                                        if (!isDeleted) {
+                                                                            // Only update if it's a valid product ID (exists in products list)
+                                                                            if (val === '' || products.some(p => String(p.id) === val)) {
+                                                                                updatePrescription(i, { productId: val })
+                                                                            }
+                                                                        }
+                                                                    }}
                                                                     options={[
                                                                         { value: '', label: '-- select medicine --' },
                                                                         ...products.map(p => ({
@@ -2502,7 +2511,7 @@ export default function PrescriptionsPage() {
                                                                                     updatePrescription(i, { [spyKey]: formatComponent(parsed.name, e.target.value) })
                                                                                 }}
                                                                                 placeholder="Vol"
-                                                                                className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                                className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
                                                                             />
                                                                         </div>
                                                                     )
@@ -2520,13 +2529,13 @@ export default function PrescriptionsPage() {
                                                                     }))
                                                                 }}
                                                             >
-                                                                <svg className={`w-3 h-3 transition-transform ${collapsedSections[i]?.spy46 ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <svg className={`w-3 h-3 transition-transform ${(collapsedSections[i]?.spy46 ?? !(pr.spy4 || pr.spy5 || pr.spy6)) ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                                                 </svg>
                                                                 SPY 4-6
                                                             </label>
                                                             {/* Row 2: SPY 4-6 */}
-                                                            {!collapsedSections[i]?.spy46 && (
+                                                            {!(collapsedSections[i]?.spy46 ?? !(pr.spy4 || pr.spy5 || pr.spy6)) && (
                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3">
                                                                     {[4, 5, 6].map(num => {
                                                                         const spyKey = `spy${num}` as keyof typeof pr
@@ -2552,7 +2561,7 @@ export default function PrescriptionsPage() {
                                                                                         updatePrescription(i, { [spyKey]: formatComponent(parsed.name, e.target.value) })
                                                                                     }}
                                                                                     placeholder="Vol"
-                                                                                    className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                                    className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
                                                                                 />
                                                                             </div>
                                                                         )
@@ -2571,26 +2580,38 @@ export default function PrescriptionsPage() {
                                                                     }))
                                                                 }}
                                                             >
-                                                                <svg className={`w-3 h-3 transition-transform ${collapsedSections[i]?.additions ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <svg className={`w-3 h-3 transition-transform ${(collapsedSections[i]?.additions ?? !(pr.addition1 || pr.addition2 || pr.addition3)) ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                                                 </svg>
                                                                 Additions
                                                             </label>
                                                             {/* Row 3: Add 1-3 */}
-                                                            {!collapsedSections[i]?.additions && (
+                                                            {!(collapsedSections[i]?.additions ?? !(pr.addition1 || pr.addition2 || pr.addition3)) && (
                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                                                    {[1, 2, 3].map(num => (
-                                                                        <div key={num}>
-                                                                            <CustomSelect
-                                                                                value={pr[`addition${num}` as keyof typeof pr] as string || ''}
-                                                                                onChange={(val) => updatePrescription(i, { [`addition${num}`]: val.toUpperCase() })}
-                                                                                options={additions}
-                                                                                placeholder={`Add ${num}`}
-                                                                                allowCustom={true}
-                                                                                className="text-xs h-8"
-                                                                            />
-                                                                        </div>
-                                                                    ))}
+                                                                    {[1, 2, 3].map(num => {
+                                                                        const additionKey = `addition${num}` as keyof typeof pr
+                                                                        const additionValue = pr[additionKey] as string || ''
+                                                                        const parsed = parseComponent(additionValue)
+                                                                        return (
+                                                                            <div key={num} className="flex gap-1">
+                                                                                <CustomSelect
+                                                                                    value={parsed.name}
+                                                                                    onChange={(val) => updatePrescription(i, { [additionKey]: formatComponent(val.toUpperCase(), parsed.volume) })}
+                                                                                    options={additions}
+                                                                                    placeholder={`Add ${num}`}
+                                                                                    allowCustom={true}
+                                                                                    className="flex-1 text-xs h-8"
+                                                                                />
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={parsed.volume}
+                                                                                    onChange={(e) => updatePrescription(i, { [additionKey]: formatComponent(parsed.name, e.target.value) })}
+                                                                                    placeholder="Vol"
+                                                                                    className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
+                                                                                />
+                                                                            </div>
+                                                                        )
+                                                                    })}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -2653,7 +2674,7 @@ export default function PrescriptionsPage() {
                                                                         </svg>
                                                                     </div>
                                                                 </div>
-                                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover/check:text-emerald-600 dark:group-hover/check:text-emerald-400 transition-colors">Taken</span>
+                                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover/check:text-emerald-600 dark:group-hover/check:text-emerald-400 transition-colors">Not Taken</span>
                                                             </label>
 
                                                             {!isDeleted && (

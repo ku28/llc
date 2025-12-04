@@ -75,7 +75,7 @@ export default function VisitsPage() {
     const fetchVisits = useCallback(async () => {
         setLoading(true)
         try {
-            const params = new URLSearchParams({ limit: '1000', includePrescriptions: 'false' })
+            const params = new URLSearchParams({ limit: '10000', includePrescriptions: 'false' })
             if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
             
             const [visitsResponse, patientsData] = await Promise.all([
@@ -163,14 +163,14 @@ export default function VisitsPage() {
         const response = await fetch('/api/visits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
         if (response.ok) {
             const newVisit = await response.json()
-            const params = new URLSearchParams({ limit: '1000', includePrescriptions: 'false' })
+            const params = new URLSearchParams({ limit: '10000', includePrescriptions: 'false' })
             if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
             const allVisitsResponse = await (await fetch(`/api/visits?${params}`)).json()
             const allVisits = Array.isArray(allVisitsResponse.data) ? allVisitsResponse.data : 
                               Array.isArray(allVisitsResponse) ? allVisitsResponse : []
             setVisits(allVisits)
         } else {
-            const params = new URLSearchParams({ limit: '1000', includePrescriptions: 'false' })
+            const params = new URLSearchParams({ limit: '10000', includePrescriptions: 'false' })
             if (selectedDoctorId) params.append('doctorId', selectedDoctorId.toString())
             const visitsResponse = await (await fetch(`/api/visits?${params}`)).json()
             const visitsArray = Array.isArray(visitsResponse.data) ? visitsResponse.data : 

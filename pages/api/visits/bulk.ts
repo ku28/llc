@@ -342,34 +342,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                         // Normalize phone for lookup
                         const normalizedPhone = normalizePhone(phone)
                         
+                        // Normalize patient name for consistent matching
+                        const normalizePatientName = (name: string): string => {
+                            return name
+                                .trim()
+                                .toLowerCase()
+                                .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+                                .replace(/[^\w\s]/g, '') // Remove special characters
+                        }
+                        
+                        const normalizedImportName = patientName ? normalizePatientName(patientName) : null
+                        const visitNumber = toNumber(visitFields.visitNumber) || 1
+                        
                         // Try to find by phone first (most reliable)
                         if (normalizedPhone && patientPhoneMap.has(normalizedPhone)) {
                             patient = patientPhoneMap.get(normalizedPhone)
                             console.log(`[Visit ${opdNo}] Found existing patient by phone: ${normalizedPhone} (original: ${phone})`)
                         }
                         
-                        // If not found by phone, try by name (normalized)
-                        if (!patient && patientName) {
-                            // Normalize: trim, lowercase, remove extra spaces, remove special chars
-                            const normalizedName = patientName
-                                .trim()
-                                .toLowerCase()
-                                .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-                                .replace(/[^\w\s]/g, '') // Remove special characters
-                            
-                            if (patientNameMap.has(normalizedName)) {
-                                patient = patientNameMap.get(normalizedName)
-                                console.log(`[Visit ${opdNo}] Found existing patient by name: ${normalizedName}`)
-                            }
+                        // If not found by phone, try by normalized name
+                        if (!patient && normalizedImportName && patientNameMap.has(normalizedImportName)) {
+                            patient = patientNameMap.get(normalizedImportName)
+                            console.log(`[Visit ${opdNo}] Found existing patient by name: ${normalizedImportName}`)
                         }
                         
-                        // If still not found, create new patient
-                        if (!patient) {
+                        // If still not found AND this is visit number 1, create new patient
+                        if (!patient && visitNumber === 1) {
                             const nameParts = (patientName || 'Unknown Patient').trim().split(/\s+/) // Split by any whitespace
                             const firstName = nameParts[0]
                             const lastName = nameParts.slice(1).join(' ') || null
                             
-                            console.log(`[Visit ${opdNo}] Creating new patient: ${firstName} ${lastName || ''} (Phone: ${phone || 'N/A'})`)
+                            console.log(`[Visit ${opdNo}] Creating new patient (Visit #1): ${firstName} ${lastName || ''} (Phone: ${phone || 'N/A'})`)
                             
                             // Parse DOB and age with priority: DOB first, then calculate age from it
                             let finalDob: Date | null = parseDate(visitFields.dob)
@@ -384,6 +387,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 finalDob = calculateDobFromAge(finalAge)
                             }
                             
+                            // Use the visit date as the patient creation date
+                            const visitDate = parseDate(date) || new Date()
+                            
                             patient = await prisma.patient.create({
                                 data: {
                                     firstName: firstName,
@@ -394,7 +400,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     gender: visitFields.gender || null,
                                     dob: finalDob,
                                     age: finalAge,
-                                    doctorId: doctorId
+                                    doctorId: doctorId,
+                                    date: visitDate // Set patient registration date to visit date
                                 }
                             })
                             
@@ -404,17 +411,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 console.log(`[Visit ${opdNo}] Added patient to phone map: ${normalizedPhone} (original: ${phone})`)
                             }
                             
-                            // Normalize the ORIGINAL patientName for map storage (not the split firstName/lastName)
-                            if (patientName) {
-                                const normalizedName = patientName
-                                    .trim()
-                                    .toLowerCase()
-                                    .replace(/\s+/g, ' ')
-                                    .replace(/[^\w\s]/g, '')
-                                
-                                patientNameMap.set(normalizedName, patient)
-                                console.log(`[Visit ${opdNo}] Added patient to name map: ${normalizedName}`)
+                            // Add to name map using the same normalization as lookup
+                            if (normalizedImportName) {
+                                patientNameMap.set(normalizedImportName, patient)
+                                console.log(`[Visit ${opdNo}] Added patient to name map: ${normalizedImportName}`)
                             }
+                        } else if (!patient && visitNumber > 1) {
+                            // Skip this visit if patient not found and visit number > 1
+                            console.log(`[Visit ${opdNo}] ⚠️ Skipping visit #${visitNumber} - Patient "${patientName}" not found (must import visit #1 first)`)
+                            return { success: false, opdNo, error: `Patient not found for visit #${visitNumber}. Visit #1 must be imported first.` }
+                        }
+                        
+                        // If we still don't have a patient at this point, something went wrong
+                        if (!patient) {
+                            console.log(`[Visit ${opdNo}] ⚠️ No patient available for this visit`)
+                            return { success: false, opdNo, error: 'Patient not available' }
                         }
 
                         // Check if visit with this opdNo already exists using pre-fetched map

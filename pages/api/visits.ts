@@ -57,7 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
             
             // Otherwise fetch all visits with pagination and minimal data
-            const limitNum = limit ? Math.min(Number(limit), 1000) : 100 // Default 100, max 1000
+            const limitNum = limit ? Math.min(Number(limit), 10000) : 100 // Default 100, max 10000
             const offsetNum = offset ? Number(offset) : 0
             
             const items = await prisma.visit.findMany({ 
@@ -117,15 +117,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             id, // If provided, this is an update operation
             patientId,
             opdNo,
+            date,
             diagnoses,
             temperament,
             pulseDiagnosis,
+            pulseDiagnosis2,
             majorComplaints,
             historyReports,
             investigations,
             provisionalDiagnosis,
             improvements,
             specialNote,
+            discussion,
             dob,
             age,
             address,
@@ -217,15 +220,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const visitData = {
                     patientId: Number(patientId),
                     opdNo: generatedOpdNo || '',
+                    date: date ? new Date(date) : undefined,
                     diagnoses,
                     temperament,
                     pulseDiagnosis,
+                    pulseDiagnosis2,
                     majorComplaints,
                     historyReports,
                     investigations,
                     provisionalDiagnosis,
                     improvements,
                     specialNote,
+                    discussion,
                     dob: dob ? new Date(dob) : undefined,
                     age: age ? Number(age) : undefined,
                     address,
@@ -255,6 +261,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         where: { id: Number(id) },
                         data: visitData
                     })
+                    
+                    // Before deleting prescriptions, restore inventory from old prescriptions
+                    const oldPrescriptions = await tx.prescription.findMany({
+                        where: { visitId: visit.id }
+                    })
+                    
+                    // Restore inventory for each old prescription
+                    for (const oldPr of oldPrescriptions) {
+                        if (oldPr.productId) {
+                            const prod = await tx.product.findUnique({ where: { id: oldPr.productId } })
+                            if (prod) {
+                                await tx.product.update({
+                                    where: { id: oldPr.productId },
+                                    data: {
+                                        quantity: prod.quantity + oldPr.quantity,
+                                        totalSales: Math.max(0, prod.totalSales - oldPr.quantity)
+                                    }
+                                })
+                                
+                                // Create stock transaction for audit trail
+                                await tx.stockTransaction.create({
+                                    data: {
+                                        productId: oldPr.productId,
+                                        transactionType: 'IN',
+                                        quantity: oldPr.quantity,
+                                        unitPrice: prod.priceRupees,
+                                        totalValue: oldPr.quantity * (prod.priceRupees || 0),
+                                        balanceQuantity: prod.quantity + oldPr.quantity,
+                                        referenceType: 'Visit',
+                                        referenceId: visit.id,
+                                        notes: `Inventory restored from visit ${visit.opdNo} edit`,
+                                        performedBy: user.email
+                                    }
+                                })
+                            }
+                        }
+                    }
                     
                     // Delete existing prescriptions for this visit
                     await tx.prescription.deleteMany({
@@ -300,8 +343,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             dosage: pr.dosage || null,
                             procedure: pr.procedure || null,
                             presentation: pr.presentation || null,
-                            droppersToday: pr.droppersToday ? Number(pr.droppersToday) : null,
-                            medicineQuantity: pr.medicineQuantity ? Number(pr.medicineQuantity) : null,
+                            spy1: pr.spy1 || null,
+                            spy2: pr.spy2 || null,
+                            spy3: pr.spy3 || null,
+                            spy4: pr.spy4 || null,
+                            spy5: pr.spy5 || null,
+                            spy6: pr.spy6 || null,
+                            addition1: pr.addition1 || null,
+                            addition2: pr.addition2 || null,
+                            addition3: pr.addition3 || null,
+                            bottleSize: pr.bottleSize || null,
+                            patientHasMedicine: !!pr.patientHasMedicine,
                             administration: pr.administration || null,
                             taken: !!pr.taken,
                             dispensed: !!pr.dispensed

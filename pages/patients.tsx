@@ -61,7 +61,7 @@ export default function PatientsPage() {
     const { getCache, setCache, clearCache } = useDataCache()
     const { selectedDoctorId } = useDoctor()
     
-    const emptyForm = { firstName: '', lastName: '', phone: '', email: '', dob: '', date: '', age: '', address: '', gender: '', imageUrl: '', fatherHusbandGuardianName: '', doctorId: '' }
+    const emptyForm = { fullName: '', phone: '', email: '', dob: '', date: '', age: '', address: '', gender: '', imageUrl: '', fatherHusbandGuardianName: '', doctorId: '', weight: '', height: '' }
     const [form, setForm] = useState(emptyForm)
 
     // Calculate age from date of birth
@@ -506,9 +506,10 @@ export default function PatientsPage() {
         const dobValue = patient.dob ? new Date(patient.dob).toISOString().slice(0, 10) : ''
         const ageValue = patient.age ? String(patient.age) : (dobValue ? calculateAge(dobValue) : '')
         
+        const fullName = `${patient.firstName || ''} ${patient.lastName || ''}`.trim()
+        
         const patientData = {
-            firstName: patient.firstName || '',
-            lastName: patient.lastName || '',
+            fullName: fullName || '',
             phone: patient.phone || '',
             email: patient.email || '',
             dob: dobValue,
@@ -518,7 +519,9 @@ export default function PatientsPage() {
             gender: patient.gender || '',
             imageUrl: patient.imageUrl || '',
             fatherHusbandGuardianName: patient.fatherHusbandGuardianName || '',
-            doctorId: patient.doctorId ? patient.doctorId.toString() : (user?.role === 'doctor' ? user.id.toString() : '')
+            doctorId: patient.doctorId ? patient.doctorId.toString() : (user?.role === 'doctor' ? user.id.toString() : ''),
+            weight: patient.weight ? String(patient.weight) : '',
+            height: patient.height ? String(patient.height) : ''
         }
         
         setImagePreview(patient.imageUrl || '')
@@ -532,23 +535,34 @@ export default function PatientsPage() {
         e.preventDefault();
         // Validate required fields
         const errors: { [key: string]: string } = {};
-        if (!form.firstName.trim()) errors.firstName = 'First Name is required';
-        if (!form.lastName.trim()) errors.lastName = 'Last Name is required';
+        if (!form.fullName.trim()) errors.fullName = 'Full Name is required';
         setFieldErrors(errors);
         if (Object.keys(errors).length > 0) return;
 
         setSubmitting(true);
         setShowLoadingModal(true);
         try {
+            // Split fullName into firstName and lastName for API
+            const nameParts = form.fullName.trim().split(/\s+/)
+            const firstName = nameParts[0] || ''
+            const lastName = nameParts.slice(1).join(' ') || ''
+            
             const payload: any = { 
                 ...form,
+                firstName,
+                lastName,
                 doctorId: form.doctorId ? parseInt(form.doctorId) : (user?.role === 'doctor' ? user.id : null)
             };
+            // Remove fullName from payload as API expects firstName/lastName
+            delete payload.fullName;
+            
             // If email is blank, set to null so Prisma does not trigger unique constraint
             if (!payload.email || payload.email.trim() === '') {
                 payload.email = null;
             }
             if (payload.age) payload.age = Number(payload.age);
+            if (payload.weight) payload.weight = Number(payload.weight);
+            if (payload.height) payload.height = Number(payload.height);
 
             const method = editingId ? 'PUT' : 'POST';
             const body = editingId ? { id: editingId, ...payload } : payload;
@@ -1236,13 +1250,10 @@ export default function PatientsPage() {
                                             <div className={isGenderDropdownOpen ? 'relative z-[10000]' : 'relative z-0'}>
                                                 <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Personal Information</h3>
                                                 <div className="grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">First Name *</label>
-                                                        <input required placeholder="John" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Last Name *</label>
-                                                        <input required placeholder="Doe" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
+                                                    <div className="col-span-2">
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Full Name *</label>
+                                                        <input required placeholder="John Doe" value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
+                                                        {fieldErrors.fullName && <p className="text-xs text-red-600 mt-1">{fieldErrors.fullName}</p>}
                                                     </div>
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Date of Birth</label>
@@ -1259,6 +1270,14 @@ export default function PatientsPage() {
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Guardian Name</label>
                                                         <input placeholder="Guardian Name" value={form.fatherHusbandGuardianName || ''} onChange={e => setForm({ ...form, fatherHusbandGuardianName: e.target.value.toUpperCase() })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Weight (kg)</label>
+                                                        <input placeholder="70" type="number" step="0.1" value={form.weight || ''} onChange={e => setForm({ ...form, weight: e.target.value })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Height (cm)</label>
+                                                        <input placeholder="170" type="number" step="0.1" value={form.height || ''} onChange={e => setForm({ ...form, height: e.target.value })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
                                                     </div>
                                                 </div>
                                             </div>
@@ -1720,13 +1739,9 @@ export default function PatientsPage() {
                                                 
                                                 {/* Basic Info Grid */}
                                                 <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
-                                                    <div>
-                                                        <div className="text-xs text-muted mb-1">First Name</div>
-                                                        <div className="text-sm font-medium">{p.firstName || '-'}</div>
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-muted mb-1">Last Name</div>
-                                                        <div className="text-sm font-medium">{p.lastName || '-'}</div>
+                                                    <div className="col-span-2 md:col-span-1">
+                                                        <div className="text-xs text-muted mb-1">Full Name</div>
+                                                        <div className="text-sm font-medium">{`${p.firstName || ''} ${p.lastName || ''}`.trim() || '-'}</div>
                                                     </div>
                                                     <div>
                                                         <div className="text-xs text-muted mb-1">Age</div>
@@ -1739,6 +1754,14 @@ export default function PatientsPage() {
                                                     <div>
                                                         <div className="text-xs text-muted mb-1">Date of Birth</div>
                                                         <div className="text-sm font-medium">{p.dob ? new Date(p.dob).toLocaleDateString() : '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">Weight (kg)</div>
+                                                        <div className="text-sm font-medium">{p.weight || '-'}</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-muted mb-1">Height (cm)</div>
+                                                        <div className="text-sm font-medium">{p.height || '-'}</div>
                                                     </div>
                                                     <div>
                                                         <div className="text-xs text-muted mb-1">Father/Husband/Guardian</div>

@@ -287,7 +287,7 @@ export default function VisitDetail() {
                 if (copyType === 'PATIENT') {
                     // ===== PATIENT INFO SECTION (4 columns, 4 rows) =====
                     const col1X = 15        // Left column (OPDN, Date, Phone, Weight)
-                    const col2X = 85        // Second column (Patient Name, Father Name, Address) - moved to center
+                    const col2X = 85        // Second column (Patient Name, F/H/G Name, Address) - moved to center
                     const col3X = 140       // Third column (Age/DOB, Gender, Visit, Height)
                     const col4X = 185       // Fourth column (Patient Image)
 
@@ -350,7 +350,7 @@ export default function VisitDetail() {
                     doc.setTextColor(0, 0, 0)
 
                     doc.setFont('helvetica', 'bold')
-                    doc.text('Father Name:', col2X, yPos)
+                    doc.text('F/H/G Name:', col2X, yPos)
                     doc.setFont('helvetica', 'normal')
                     doc.setTextColor(128, 0, 128)
                     doc.text((visit.fatherHusbandGuardianName || visit.patient?.fatherHusbandGuardianName || 'N/A').toUpperCase(), col2X + 25, yPos)
@@ -627,23 +627,24 @@ export default function VisitDetail() {
                     doc.line(10, afterTableY, pageWidth - 10, afterTableY)
 
                     // Add separator image at bottom as footer - full width, no margins
-                    const separatorYPos = pageHeight - 25  // Position near bottom
+                    // Add Footer Image
+                    const footerY = pageHeight - 25
                     try {
-                        const separatorImg = new Image()
-                        separatorImg.crossOrigin = 'Anonymous'
+                        const footerImg = new Image()
+                        footerImg.crossOrigin = 'Anonymous'
                         await new Promise((resolve) => {
-                            separatorImg.onload = () => {
-                                doc.addImage(separatorImg, 'JPEG', 0, separatorYPos, pageWidth, 25)
+                            footerImg.onload = () => {
+                                doc.addImage(footerImg, 'PNG', 0, footerY, pageWidth, 25)
                                 resolve(true)
                             }
-                            separatorImg.onerror = () => {
-                                console.error('Failed to load separator image')
+                            footerImg.onerror = () => {
+                                console.error('Failed to load footer image')
                                 resolve(false)
                             }
-                            separatorImg.src = '/separator.png'
+                            footerImg.src = '/footer.png'
                         })
                     } catch (error) {
-                        console.error('Error adding separator:', error)
+                        console.error('Error adding footer:', error)
                     }
                 } // End of PATIENT copy patient info section
 
@@ -1740,7 +1741,7 @@ export default function VisitDetail() {
                         <div ref={prescriptionRef} className="prescription-container" style={{ background: 'white', color: 'black', padding: '0', position: 'relative', width: '210mm', minHeight: '297mm', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                     {/* Watermark - Only show in PATIENT copy */}
                     {copyType === 'PATIENT' && (
-                        <div className="watermark-container" style={{ position: 'absolute', top: 'calc(50% - 30px)', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.5, zIndex: 0, pointerEvents: 'none' }}>
+                        <div className="watermark-container" style={{ position: 'absolute', top: 'calc(50% - 30px)', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.25, zIndex: 0, pointerEvents: 'none' }}>
                             <img src="/watermark.png" alt="Watermark" style={{ width: '400px', height: '400px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
                         </div>
                     )}
@@ -1756,161 +1757,89 @@ export default function VisitDetail() {
                     {copyType === 'PATIENT' && (
                         <>
                             <div style={{ padding: '0 1.5rem', position: 'relative', zIndex: 1, flex: '1 0 auto' }}>
-                                {/* Patient Info Section - 4 columns, 4 rows with image positioned absolutely */}
-                                <div style={{ marginBottom: '0.5rem', position: 'relative' }}>
-                                    {/* Patient Image - Positioned absolutely on the right */}
-                                    <div style={{ position: 'absolute', right: 0, top: 0, width: '80px', height: '100px', border: '1px solid #ddd', overflow: 'hidden' }}>
-                                        {visit.patient?.imageUrl ? (
-                                            <img
-                                                src={visit.patient.imageUrl}
-                                                alt="Patient"
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                onError={(e) => {
-                                                    e.currentTarget.src = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'
-                                                }}
-                                            />
-                                        ) : (
-                                            <img
-                                                src={process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'}
-                                                alt="Patient"
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                onError={(e) => {
-                                                    const target = e.currentTarget as HTMLImageElement
-                                                    target.style.display = 'none'
-                                                    const parent = target.parentElement
-                                                    if (parent) {
-                                                        parent.style.backgroundColor = '#f0f0f0'
-                                                        parent.style.display = 'flex'
-                                                        parent.style.alignItems = 'center'
-                                                        parent.style.justifyContent = 'center'
-                                                        parent.innerHTML = '<div style="font-size: 0.6rem; color: #999;">No Image</div>'
-                                                    }
-                                                }}
-                                            />
-                                        )}
-                                    </div>
-
-                                    {/* Row 1: OPDN, Patient Name, Age/DOB */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 120px', gap: '1rem', marginBottom: '1rem', fontSize: '0.75rem', paddingRight: '100px' }}>
-                                        <div style={{ whiteSpace: 'nowrap' }}>
-                                            <span style={{ fontWeight: 'bold', backgroundColor: '#90EE90', padding: '0.1rem 0.25rem', borderRadius: '4px' }}>OPDN: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.opdNo || 'N/A'}</span>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <span style={{ fontWeight: 'bold' }}>Patient Name: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#FF0000', textTransform: 'uppercase' }}>
-                                                {visit.patient?.firstName || ''} {visit.patient?.lastName || ''}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span style={{ fontWeight: 'bold' }}>Age/DOB: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.age || visit.patient?.age || 'N/A'} YR</span>
+                                
+                                {/* Top Section: Particulars and Basic Info */}
+                                <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                                    
+                                    {/* Particulars Box (Left) */}
+                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Particulars</span>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '9px', gap: '1px' }}>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OPDN</span> <span style={{ color: 'blue', fontWeight: 'bold' }}>{visit.opdNo || 'N/A'}</span></div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>VISIT</span> {visit.visitNumber || '1'}</div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>SEX</span> {visit.gender || visit.patient?.gender || 'N/A'}</div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DOB</span> {visit.dob || visit.patient?.dob ? new Date(visit.dob || visit.patient?.dob).toLocaleDateString('en-GB') : ''}</div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>AGE</span> {visit.age || visit.patient?.age || 'N/A'}</div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>F UP</span> {visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : ''}</div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HT</span> {visit.height}</div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PHONE</span> {visit.phone || visit.patient?.phone}</div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>WT</span> {visit.weight}</div>
                                         </div>
                                     </div>
 
-                                    {/* Row 2: Date, Father Name, Gender */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 120px', gap: '1rem', marginBottom: '1rem', fontSize: '0.75rem', paddingRight: '100px' }}>
-                                        <div>
-                                            <span style={{ fontWeight: 'bold' }}>Date: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{new Date(visit.date).toLocaleDateString('en-GB')}</span>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <span style={{ fontWeight: 'bold' }}>Father Name: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#800080', textTransform: 'uppercase' }}>
-                                                {visit.fatherHusbandGuardianName || visit.patient?.fatherHusbandGuardianName || 'N/A'}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span style={{ fontWeight: 'bold' }}>Gender: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#FF8C00', textTransform: 'uppercase' }}>{visit.gender || visit.patient?.gender || 'N/A'}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Row 3: Phone, Address, Visit */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 120px', gap: '1rem', marginBottom: '1rem', fontSize: '0.75rem', paddingRight: '100px' }}>
-                                        <div>
-                                            <span style={{ fontWeight: 'bold' }}>Phone: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.phone || visit.patient?.phone || 'N/A'}</span>
-                                        </div>
-                                        <div style={{ textAlign: 'center' }}>
-                                            <span style={{ fontWeight: 'bold' }}>Address: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#800080', textTransform: 'uppercase' }}>
-                                                {visit.address || visit.patient?.address || 'N/A'}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span style={{ fontWeight: 'bold' }}>Visit No.: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.visitNumber || '1'}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Row 4: Weight, (empty), Height */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 120px', gap: '1rem', marginBottom: '1rem', fontSize: '0.75rem', paddingRight: '100px' }}>
-                                        <div>
-                                            <span style={{ fontWeight: 'bold' }}>Weight: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#C80000', textTransform: 'uppercase' }}>{visit.weight ? `${visit.weight} KG` : 'N/A'}</span>
-                                        </div>
-                                        <div></div>
-                                        <div>
-                                            <span style={{ fontWeight: 'bold' }}>Height: </span>
-                                            <span style={{ fontWeight: 'bold', color: '#C80000', textTransform: 'uppercase' }}>{visit.height ? `${visit.height} CM` : 'N/A'}</span>
+                                    {/* Basic Info Box (Right) */}
+                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Basic Info</span>
+                                        <div style={{ fontSize: '9px' }}>
+                                            <div style={{ width: '30px', height: '15px', background: 'red', marginBottom: '3px', border: '1px solid #000' }}></div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>NAME</span> {visit.patient?.firstName} {visit.patient?.lastName}</div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>F/H/G</span> {visit.patient?.fatherHusbandGuardianName}</div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>ADD</span> {visit.address || visit.patient?.address}</div>
+                                            <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OCC</span> {visit.occupation || visit.patient?.occupation}</div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Orange Separator */}
-                                <div style={{ borderBottom: '2px solid #FF8C00', marginBottom: '1rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
-
-                                {/* Medical Info Section - 2 columns */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem', marginBottom: '1rem', fontSize: '0.75rem' }}>
-                                    {/* Left Column - 5 rows */}
-                                    <div>
-                                        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'flex-start' }}>
-                                            <span style={{ fontWeight: 'bold', minWidth: '110px', display: 'inline-block' }}>Temperament: </span>
-                                            <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', fontWeight: 'normal', color: '#0000FF', letterSpacing: '0.5px', flex: 1, whiteSpace: 'normal', overflowWrap: 'break-word' }}>{visit.temperament || 'N/A'}</span>
-                                        </div>
-                                        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'flex-start' }}>
-                                            <span style={{ fontWeight: 'bold', minWidth: '110px', display: 'inline-block' }}>Pulse Diagnosis: </span>
-                                            <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', fontWeight: 'normal', color: '#0000FF', letterSpacing: '0.5px', flex: 1, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
-                                                {[visit.pulseDiagnosis, visit.pulseDiagnosis2].filter(Boolean).join(', ') || 'N/A'}
-                                            </span>
-                                        </div>
-                                        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'flex-start' }}>
-                                            <span style={{ fontWeight: 'bold', minWidth: '110px', display: 'inline-block' }}>History/Reports: </span>
-                                            <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', fontWeight: 'normal', color: '#0000FF', letterSpacing: '0.5px', flex: 1, whiteSpace: 'normal', overflowWrap: 'break-word' }}>{visit.historyReports || 'N/A'}</span>
-                                        </div>
-                                        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'flex-start' }}>
-                                            <span style={{ fontWeight: 'bold', minWidth: '110px', display: 'inline-block' }}>Major Complaints: </span>
-                                            <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', fontWeight: 'normal', color: '#0000FF', letterSpacing: '0.5px', flex: 1, whiteSpace: 'normal', overflowWrap: 'break-word' }}>{visit.majorComplaints || 'N/A'}</span>
-                                        </div>
-                                        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'flex-start' }}>
-                                            <span style={{ fontWeight: 'bold', minWidth: '110px', display: 'inline-block' }}>Improvement: </span>
-                                            <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', fontWeight: 'normal', color: '#0000FF', letterSpacing: '0.5px', flex: 1, whiteSpace: 'normal', overflowWrap: 'break-word' }}>{visit.improvements || 'N/A'}</span>
-                                        </div>
+                                {/* EH Parameters Row */}
+                                <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
+                                        <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>TEMP</span> {visit.temperament}</div>
                                     </div>
-
-                                    {/* Right Column - 2 rows */}
-                                    <div>
-                                        <div style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'flex-start' }}>
-                                            <span style={{ fontWeight: 'bold', minWidth: '110px', display: 'inline-block' }}>Investigation: </span>
-                                            <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', fontWeight: 'normal', color: '#0000FF', letterSpacing: '0.5px', flex: 1, whiteSpace: 'normal', overflowWrap: 'break-word' }}>{visit.investigations || 'N/A'}</span>
-                                        </div>
-                                        <div style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'flex-start' }}>
-                                            <span style={{ fontWeight: 'bold', minWidth: '110px', display: 'inline-block' }}>Prov. Diagnosis: </span>
-                                            <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', fontWeight: 'normal', color: '#0000FF', letterSpacing: '0.5px', flex: 1, whiteSpace: 'normal', overflowWrap: 'break-word' }}>{visit.provisionalDiagnosis || visit.diagnoses || 'N/A'}</span>
-                                        </div>
+                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
+                                        <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-1</span> {visit.pulseDiagnosis}</div>
+                                    </div>
+                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
+                                        <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-2</span> {visit.pulseDiagnosis2}</div>
                                     </div>
                                 </div>
 
-                                {/* Orange Separator */}
-                                <div style={{ borderBottom: '2px solid #FF8C00', marginBottom: '1rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
+                                {/* History & Reports */}
+                                <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '60px' }}>
+                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Prev Info</span>
+                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HISTORY & REPORTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.historyReports}</span></div>
+                                </div>
 
-                                {/* DISC Section */}
-                                <div style={{ marginBottom: '1rem', fontSize: '0.75rem' }}>
-                                    <span style={{ fontWeight: 'bold', color: '#C80000' }}>DISC: </span>
-                                    <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', fontWeight: 'normal', fontSize: '0.85rem', color: '#0000FF', letterSpacing: '0.5px' }}>
-                                        {visit.provisionalDiagnosis || visit.diagnoses || 'N/A'}
-                                    </span>
+                                {/* Chief Complaints */}
+                                <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '40px' }}>
+                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Sign & Symptoms</span>
+                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>CHIEF COMPLAINTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.majorComplaints}</span></div>
+                                </div>
+
+                                {/* Investigations & Prov Diagnosis */}
+                                <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', minHeight: '30px' }}>
+                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Investigations Order</span>
+                                        <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.investigations}</div>
+                                    </div>
+                                    <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', minHeight: '30px' }}>
+                                        <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Prov Diagnosis</span>
+                                        <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.provisionalDiagnosis || visit.diagnoses}</div>
+                                    </div>
+                                </div>
+
+                                {/* Improvements */}
+                                <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
+                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Cure</span>
+                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>IMPROVEMENTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.improvements}</span></div>
+                                </div>
+
+                                {/* Discuss */}
+                                <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
+                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Discuss</span>
+                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.investigations}</span></div>
                                 </div>
 
                                 {/* Prescription Table */}
@@ -1930,9 +1859,10 @@ export default function VisitDetail() {
                                                         visit.prescriptions.map((p: any, index: number) => {
                                                             const product = products.find((prod) => prod.id === p.productId)
                                                             const medicineName = (product?.name || p.product?.name || p.treatment?.treatmentPlan || '').toUpperCase()
+                                                            const rowStyle = p.patientHasMedicine ? { textDecoration: 'line-through', opacity: 0.5 } : {}
 
                                                             return (
-                                                                <tr key={p.id}>
+                                                                <tr key={p.id} style={rowStyle}>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '3%', fontWeight: 'bold' }}>{index + 1}</td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'left', color: '#0000FF', width: '15%', fontWeight: 'bold' }}>{medicineName}</td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
@@ -1943,7 +1873,6 @@ export default function VisitDetail() {
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', color: '#C80000', textTransform: 'uppercase', width: '8%', fontWeight: 'bold' }}>{p.timing || ''}</td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#800080', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.dosage || ''}</td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.additions || ''}</td>
-                                                                    <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.procedure || ''}</td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '8%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.presentation || ''}</td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#FF8C00', fontWeight: 'bold' }}>{(p.droppersToday?.toString() || '').toUpperCase()}</td>
                                                                     <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '5%', fontWeight: 'bold' }}>{p.quantity || ''}</td>
@@ -1961,9 +1890,9 @@ export default function VisitDetail() {
                                 <div style={{ borderBottom: '2px solid #FF8C00', marginBottom: '1rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
                             </div>
 
-                            {/* Separator Image at bottom as footer - positioned at the end */}
+                            {/* Footer Image */}
                             <div style={{ marginTop: 'auto', width: '100%', flexShrink: 0 }}>
-                                <img src="/separator.png" alt="Separator" style={{ width: '100%', height: 'auto', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                                <img src="/footer.png" alt="Footer" style={{ width: '100%', height: 'auto', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
                             </div>
                         </>
                     )}
@@ -2113,8 +2042,9 @@ export default function VisitDetail() {
                                                         const product = products.find((p: any) => p.id === prescription.productId)
                                                         const availableUnits = product?.units || 0
                                                         const isLowStock = availableUnits <= 0
+                                                        const rowStyle = prescription.patientHasMedicine ? { textDecoration: 'line-through', opacity: 0.5 } : {}
                                                         return (
-                                                            <tr key={index}>
+                                                            <tr key={index} style={rowStyle}>
                                                                 <td style={{ padding: '0.25rem', textAlign: 'center', width: '50px', fontWeight: 'bold', color: isLowStock ? '#FF0000' : '#000' }}>{availableUnits}</td>
                                                                 <td style={{ padding: '0.25rem', textAlign: 'center', width: '30px', fontWeight: 'bold' }}>{index + 1}</td>
                                                                 <td style={{ padding: '0.25rem', width: '120px', color: '#0000FF', fontWeight: 'bold' }}>{product?.name?.toUpperCase() || ''}</td>
@@ -2167,21 +2097,6 @@ export default function VisitDetail() {
                         </>
                     )}
 
-                    {/* Additional Notes at Bottom - Show in both copies */}
-                    <div style={{ padding: '0 1.5rem' }}>
-                        {(visit.specialNote || visit.procedureAdopted || visit.discussion) && (
-                            <div className="mt-3 pt-2 border-t border-gray-300">
-                                <div className="text-xs space-y-1">
-                                    {visit.specialNote && (
-                                        <div><span className="font-bold">Note:</span> {visit.specialNote}</div>
-                                    )}
-                                    {visit.procedureAdopted && (
-                                        <div><span className="font-bold">Procedure:</span> {visit.procedureAdopted}</div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
                 </div>
             </div>
             </div>
