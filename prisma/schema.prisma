@@ -309,6 +309,7 @@ model Prescription {
   timing           String?
   bottleSize       String?
   patientHasMedicine Boolean  @default(false)
+  discussions      String?
   doctorId         Int?
   product          Product?   @relation(fields: [productId], references: [id])
   treatment        Treatment? @relation(fields: [treatmentId], references: [id])

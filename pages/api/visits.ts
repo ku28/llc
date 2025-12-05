@@ -157,6 +157,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Get the doctor ID before the transaction
         const doctorIdForTask = getDoctorIdForCreate(user, req.body.doctorId)
 
+        // Fetch patient data once before transaction to avoid queries inside
+        const patientData = patientId ? await prisma.patient.findUnique({ 
+            where: { id: Number(patientId) },
+            select: { id: true, firstName: true, lastName: true, email: true, phone: true, address: true }
+        }) : null
+
         try {
             // Create or update visit, prescriptions, update inventory, and optionally create invoice - all in one transaction
             const result = await prisma.$transaction(async (tx: any) => {
@@ -264,37 +270,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     
                     // Before deleting prescriptions, restore inventory from old prescriptions
                     const oldPrescriptions = await tx.prescription.findMany({
-                        where: { visitId: visit.id }
+                        where: { visitId: visit.id },
+                        select: { id: true, productId: true, quantity: true }
                     })
                     
-                    // Restore inventory for each old prescription
-                    for (const oldPr of oldPrescriptions) {
-                        if (oldPr.productId) {
-                            const prod = await tx.product.findUnique({ where: { id: oldPr.productId } })
-                            if (prod) {
-                                await tx.product.update({
-                                    where: { id: oldPr.productId },
-                                    data: {
-                                        quantity: prod.quantity + oldPr.quantity,
-                                        totalSales: Math.max(0, prod.totalSales - oldPr.quantity)
-                                    }
-                                })
-                                
-                                // Create stock transaction for audit trail
-                                await tx.stockTransaction.create({
-                                    data: {
-                                        productId: oldPr.productId,
-                                        transactionType: 'IN',
-                                        quantity: oldPr.quantity,
-                                        unitPrice: prod.priceRupees,
-                                        totalValue: oldPr.quantity * (prod.priceRupees || 0),
-                                        balanceQuantity: prod.quantity + oldPr.quantity,
-                                        referenceType: 'Visit',
-                                        referenceId: visit.id,
-                                        notes: `Inventory restored from visit ${visit.opdNo} edit`,
-                                        performedBy: user.email
-                                    }
-                                })
+                    // Get unique product IDs and fetch all at once
+                    const oldProductIds = [...new Set(oldPrescriptions.filter((pr: any) => pr.productId).map((pr: any) => pr.productId!))]
+                    
+                    if (oldProductIds.length > 0) {
+                        const oldProducts = await tx.product.findMany({
+                            where: { id: { in: oldProductIds } }
+                        })
+                        const oldProductMap = new Map(oldProducts.map((p: any) => [p.id, p]))
+                        
+                        // Restore inventory in batch
+                        for (const oldPr of oldPrescriptions) {
+                            if (oldPr.productId) {
+                                const prod: any = oldProductMap.get(oldPr.productId)
+                                if (prod) {
+                                    await tx.product.update({
+                                        where: { id: oldPr.productId },
+                                        data: {
+                                            quantity: { increment: oldPr.quantity },
+                                            totalSales: { decrement: oldPr.quantity }
+                                        }
+                                    })
+                                }
                             }
                         }
                     }
@@ -330,11 +331,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                 let createdPrescriptions: any[] = []
                 let invoiceItems: any[] = []
+                let productUpdates: any[] = []
 
                 // 2. Process prescriptions if provided
                 if (Array.isArray(prescriptions) && prescriptions.length > 0) {
-                    // Process prescriptions in parallel for better performance
-                    const prescriptionPromises = prescriptions.map(async (pr) => {
+                    // Collect all prescription data first
+                    const prescriptionDataArray = prescriptions.map((pr) => {
                         const prescriptionData: any = {
                             visitId: visit.id,
                             productId: pr.productId ? Number(pr.productId) : undefined,
@@ -355,108 +357,91 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             bottleSize: pr.bottleSize || null,
                             patientHasMedicine: !!pr.patientHasMedicine,
                             administration: pr.administration || null,
+                            discussions: pr.discussions || null,
                             taken: !!pr.taken,
                             dispensed: !!pr.dispensed
                         }
 
-                        // Only add treatmentId if it's provided and valid
                         if (pr.treatmentId && String(pr.treatmentId).trim() !== '') {
                             prescriptionData.treatmentId = Number(pr.treatmentId)
                         }
 
-                        // Create prescription
-                        const prescription = await tx.prescription.create({ data: prescriptionData })
+                        return prescriptionData
+                    })
+
+                    // Batch create all prescriptions
+                    await tx.prescription.createMany({
+                        data: prescriptionDataArray
+                    })
+                    
+                    // Fetch the created prescriptions
+                    createdPrescriptions = await tx.prescription.findMany({
+                        where: { visitId: visit.id }
+                    })
+
+                    // Get all unique product IDs that need inventory updates
+                    const productIds = [...new Set(prescriptions.filter(pr => pr.productId).map(pr => Number(pr.productId)))]
+                    
+                    if (productIds.length > 0) {
+                        // Fetch all products at once
+                        const products = await tx.product.findMany({
+                            where: { id: { in: productIds } },
+                            include: { category: true }
+                        })
                         
-                        // 3. Handle inventory deduction if productId is provided
-                        if (pr.productId) {
+                        const productMap = new Map(products.map((p: any) => [p.id, p]))
+
+                        // Process inventory updates
+                        for (const pr of prescriptions) {
+                            if (!pr.productId) continue
+                            
                             const pid = Number(pr.productId)
                             const qtyToConsume = Number(pr.quantity || 1)
-                            
-                            // Get current product
-                            const prod = await tx.product.findUnique({ where: { id: pid } })
+                            const prod: any = productMap.get(pid)
                             
                             if (prod) {
                                 const newQty = prod.quantity - qtyToConsume
                                 
-                                // Update product quantity and sales
-                                await tx.product.update({ 
-                                    where: { id: pid }, 
-                                    data: { 
-                                        quantity: Math.max(0, newQty),
-                                        totalSales: prod.totalSales + qtyToConsume
-                                    } 
+                                // Collect for batch update
+                                productUpdates.push({ 
+                                    id: pid, 
+                                    quantity: Math.max(0, newQty),
+                                    totalSales: prod.totalSales + qtyToConsume,
+                                    priceRupees: prod.priceRupees,
+                                    name: prod.name
                                 })
 
-                                // Create stock transaction for audit trail
-                                await tx.stockTransaction.create({
-                                    data: {
-                                        productId: pid,
-                                        transactionType: 'OUT',
-                                        quantity: qtyToConsume,
-                                        unitPrice: prod.priceRupees,
-                                        totalValue: qtyToConsume * (prod.priceRupees || 0),
-                                        balanceQuantity: Math.max(0, newQty),
-                                        referenceType: 'Visit',
-                                        referenceId: visit.id,
-                                        notes: `Dispensed for visit ${opdNo}`,
-                                        performedBy: user.email
-                                    }
-                                })
-
-                                // 4. Check if stock is low and create product order if needed
-                                const reorderLevel = prod.category?.reorderLevel ?? 10
-                                if (newQty <= reorderLevel) {
-                                    // Check if there's already a pending order for this product
-                                    const existingOrder = await tx.productOrder.findFirst({
-                                        where: {
-                                            productId: pid,
-                                            status: 'pending'
-                                        }
-                                    })
-
-                                    if (!existingOrder) {
-                                        // Create auto-reorder with smart quantity (2x reorder level or minimum 10)
-                                        const orderQty = Math.max(reorderLevel * 2, 10)
-                                        await tx.productOrder.create({
-                                            data: { 
-                                                productId: pid, 
-                                                quantity: orderQty, 
-                                                status: 'pending',
-                                                orderVia: 'AUTO_REORDER'
-                                            } 
-                                        })
-                                    }
-                                }
-
-                                // 5. Prepare invoice item if auto-generating invoice
+                                // Prepare invoice item if auto-generating invoice
                                 if (autoGenerateInvoice) {
                                     invoiceItems.push({
                                         productId: pid,
                                         description: prod.name,
                                         quantity: qtyToConsume,
                                         unitPrice: prod.priceRupees,
-                                        taxRate: 0, // Can be configured
+                                        taxRate: 0,
                                         discount: 0,
                                         totalAmount: qtyToConsume * (prod.priceRupees || 0)
                                     })
                                 }
                             }
                         }
-                        
-                        return prescription
-                    })
-                    
-                    // Wait for all prescriptions to be processed
-                    createdPrescriptions = await Promise.all(prescriptionPromises)
+
+                        // Batch update all products
+                        for (const update of productUpdates) {
+                            await tx.product.update({
+                                where: { id: update.id },
+                                data: {
+                                    quantity: update.quantity,
+                                    totalSales: update.totalSales
+                                }
+                            })
+                        }
+                    }
                 }
 
                 // 6. Auto-generate customer invoice if requested and there are items
                 let invoice = null
-                if (autoGenerateInvoice && invoiceItems.length > 0) {
-                    // Get patient details for invoice
-                    const patient = await tx.patient.findUnique({ where: { id: Number(patientId) } })
-                    
-                    if (patient) {
+                if (autoGenerateInvoice && invoiceItems.length > 0 && patientData) {
                         // Generate Invoice Number
                         const lastInvoice = await tx.customerInvoice.findFirst({
                             orderBy: { id: 'desc' }
@@ -473,10 +458,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             data: {
                                 invoiceNumber,
                                 patientId: Number(patientId),
-                                customerName: `${patient.firstName} ${patient.lastName}`,
-                                customerEmail: patient.email || undefined,
-                                customerPhone: patient.phone || undefined,
-                                customerAddress: patient.address || undefined,
+                                customerName: `${patientData.firstName} ${patientData.lastName || ''}`,
+                                customerEmail: patientData.email || undefined,
+                                customerPhone: patientData.phone || undefined,
+                                customerAddress: patientData.address || undefined,
                                 invoiceDate: new Date(),
                                 dueDate: nextVisit ? new Date(nextVisit) : undefined,
                                 status: balanceAmount === 0 ? 'paid' : (paidAmount > 0 ? 'partial' : 'unpaid'),
@@ -495,23 +480,87 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                 items: true
                             }
                         })
-                    }
                 }
 
-                // Fetch complete visit with prescriptions
-                const fullVisit = await tx.visit.findUnique({ 
-                    where: { id: visit.id }, 
-                    include: { prescriptions: true } 
-                })
+                return { visit, invoice, prescriptions: createdPrescriptions, opdNo: generatedOpdNo, productUpdates }
+            }, {
+                timeout: 60000 // Increase timeout to 60 seconds for complex operations
+            })
 
-                // Create or update suggested task for receptionist with 1 hour expiry
-                if (createdPrescriptions.length > 0) {
-                    const patient = await tx.patient.findUnique({ where: { id: Number(patientId) } })
+            // Handle stock transactions and product reorders after transaction (non-critical operations)
+            if (result.productUpdates && result.productUpdates.length > 0) {
+                try {
+                    // Create stock transactions for audit trail
+                    const stockTransactions = result.productUpdates.map((update: any) => {
+                        const qtyConsumed = prescriptions.find((pr: any) => Number(pr.productId) === update.id)?.quantity || 1
+                        return {
+                            productId: update.id,
+                            transactionType: 'OUT',
+                            quantity: qtyConsumed,
+                            unitPrice: update.priceRupees,
+                            totalValue: qtyConsumed * (update.priceRupees || 0),
+                            balanceQuantity: update.quantity,
+                            referenceType: 'Visit',
+                            referenceId: result.visit.id,
+                            notes: `Dispensed for visit ${result.opdNo}`,
+                            performedBy: user.email
+                        }
+                    })
+
+                    await prisma.stockTransaction.createMany({
+                        data: stockTransactions
+                    })
+
+                    // Check for reorder needs
+                    for (const update of result.productUpdates) {
+                        const product = await prisma.product.findUnique({
+                            where: { id: update.id },
+                            include: { category: true }
+                        })
+
+                        if (product) {
+                            const reorderLevel = product.category?.reorderLevel ?? 10
+                            if (update.quantity <= reorderLevel) {
+                                const existingOrder = await prisma.productOrder.findFirst({
+                                    where: {
+                                        productId: update.id,
+                                        status: 'pending'
+                                    }
+                                })
+
+                                if (!existingOrder) {
+                                    const orderQty = Math.max(reorderLevel * 2, 10)
+                                    await prisma.productOrder.create({
+                                        data: {
+                                            productId: update.id,
+                                            quantity: orderQty,
+                                            status: 'pending',
+                                            orderVia: 'AUTO_REORDER'
+                                        }
+                                    })
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error creating stock transactions or product orders:', error)
+                }
+            }
+
+            // Fetch complete visit with prescriptions after transaction completes
+            const fullVisit = await prisma.visit.findUnique({ 
+                where: { id: result.visit.id }, 
+                include: { prescriptions: true } 
+            })
+
+            // Create or update suggested task for receptionist with 1 hour expiry (outside transaction)
+            if (result.prescriptions.length > 0 && patientData) {
+                try {
                     const oneHourLater = new Date()
                     oneHourLater.setHours(oneHourLater.getHours() + 1)
 
                     // Build task description with attachments
-                    let taskDescription = `Visit OPD No: ${generatedOpdNo}\nPatient: ${patient?.firstName} ${patient?.lastName}\nPrescriptions: ${createdPrescriptions.length} item(s)`
+                    let taskDescription = `Visit OPD No: ${result.opdNo}\nPatient: ${patientData.firstName} ${patientData.lastName || ''}\nPrescriptions: ${result.prescriptions.length} item(s)`
                     
                     // Add reports attachments to description if provided
                     if (reportsAttachments && typeof reportsAttachments === 'string') {
@@ -529,9 +578,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     }
 
                     // Check if a suggested task already exists for this visit
-                    const existingTask = await tx.task.findFirst({
+                    const existingTask = await prisma.task.findFirst({
                         where: {
-                            visitId: visit.id,
+                            visitId: result.visit.id,
                             isSuggested: true,
                             assignedTo: null // Only update if not yet assigned
                         }
@@ -539,10 +588,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                     if (existingTask) {
                         // Update existing task
-                        await tx.task.update({
+                        await prisma.task.update({
                             where: { id: existingTask.id },
                             data: {
-                                title: `Process prescription for ${patient?.firstName} ${patient?.lastName}`,
+                                title: `Process prescription for ${patientData.firstName} ${patientData.lastName || ''}`,
                                 description: taskDescription,
                                 expiresAt: oneHourLater,
                                 attachmentUrl: officeCopyPdfUrl || null
@@ -550,28 +599,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         })
                     } else {
                         // Create new suggested task with doctorId
-                        await tx.task.create({
+                        await prisma.task.create({
                             data: {
-                                title: `Process prescription for ${patient?.firstName} ${patient?.lastName}`,
+                                title: `Process prescription for ${patientData.firstName} ${patientData.lastName || ''}`,
                                 description: taskDescription,
                                 type: 'task',
                                 status: 'pending',
                                 isSuggested: true,
                                 expiresAt: oneHourLater,
-                                visitId: visit.id,
+                                visitId: result.visit.id,
                                 doctorId: doctorIdForTask, // Link task to the doctor
                                 attachmentUrl: officeCopyPdfUrl || null
                             }
                         })
                     }
+                } catch (taskError) {
+                    // Log task creation error but don't fail the whole request
+                    console.error('Error creating/updating task:', taskError)
                 }
+            }
 
-                return { visit: fullVisit, invoice }
-            }, {
-                timeout: 30000 // Increase timeout to 30 seconds
-            })
-
-            return res.status(201).json(result.visit)
+            return res.status(201).json(fullVisit)
         } catch (err: any) {
             console.error('Error creating visit:', err)
             return res.status(500).json({ error: String(err?.message || err) })

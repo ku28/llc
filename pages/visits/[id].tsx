@@ -1840,7 +1840,7 @@ export default function VisitDetail() {
                                             {/* Discuss */}
                                             <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
                                                 <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Discuss</span>
-                                                <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.investigations}</span></div>
+                                                <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.discussion}</span></div>
                                             </div>
 
                                             {/* Prescription Table */}

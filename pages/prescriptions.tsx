@@ -1286,7 +1286,7 @@ export default function PrescriptionsPage() {
             procedure: '', presentation: '',
             droppersToday: '', medicineQuantity: '',
             administration: '', patientHasMedicine: false,
-            bottleSize: ''
+            bottleSize: '', discussions: ''
         }])
     }
 
@@ -1939,7 +1939,7 @@ export default function PrescriptionsPage() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Investigation Ordered</label>
-                                    <input placeholder="Blood test, X-ray" value={form.investigations} onChange={e => setForm({ ...form, investigations: e.target.value.toUpperCase(), discussion: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
+                                    <input placeholder="Blood test, X-ray" value={form.investigations} onChange={e => setForm({ ...form, investigations: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Provisional Diagnosis</label>
@@ -1949,9 +1949,13 @@ export default function PrescriptionsPage() {
                                     <label className="block text-sm font-medium mb-1.5">Improvements</label>
                                     <input placeholder="Patient showing recovery" value={form.improvements} onChange={e => setForm({ ...form, improvements: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
                                 </div>
-                                <div className="sm:col-span-2">
+                                <div>
                                     <label className="block text-sm font-medium mb-1.5">Special Note</label>
                                     <input placeholder="Follow-up in 7 days" value={form.specialNote} onChange={e => setForm({ ...form, specialNote: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1.5">Discussions</label>
+                                    <input placeholder="Discussion notes" value={form.discussion} onChange={e => setForm({ ...form, discussion: e.target.value.toUpperCase() })} className="w-full p-2 border rounded" />
                                 </div>
 
                                 {/* History / Reports - Split into two columns */}
@@ -2165,7 +2169,8 @@ export default function PrescriptionsPage() {
                                                     medicineQuantity: tp.medicineQuantity?.toString() || '',
                                                     administration: treatment.administration || '',
                                                     patientHasMedicine: false,
-                                                    bottleSize: tp.bottleSize || ''
+                                                    bottleSize: tp.bottleSize || '',
+                                                    discussions: tp.discussions || ''
                                                 }))
                                                 setPrescriptions(newPrescriptions) // Replace, not add
                                                 setSelectedTreatmentId(String(treatment.id))

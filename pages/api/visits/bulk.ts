@@ -66,7 +66,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         // Helper function to safely convert to string or null
         const toString = (value: any): string | null => {
-            if (value === null || value === undefined || value === '') return null
+            if (value === null || value === undefined || value === '' || value === 0) return null
             if (typeof value === 'string') {
                 const trimmed = value.trim()
                 // Treat "0" as empty
@@ -241,15 +241,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                     .replace(/[^\w\s]/g, '')
             }
 
-            // Group visits by normalized patient identifier (phone or name)
+            // Group visits by normalized patient identifier (name as primary key)
             const patientGroups = new Map<string, any[]>()
 
             visits.forEach((visit: any) => {
-                const normalizedPhone = normalizePhone(visit.phone)
                 const normalizedName = visit.patientName ? normalizePatientName(visit.patientName) : null
 
-                // Use phone as primary key, fallback to name
-                const patientKey = normalizedPhone || normalizedName || `unknown_${visit.opdNo}`
+                // Use name as primary key, fallback to phone or opdNo
+                const patientKey = normalizedName || normalizePhone(visit.phone) || `unknown_${visit.opdNo}`
 
                 if (!patientGroups.has(patientKey)) {
                     patientGroups.set(patientKey, [])
@@ -336,6 +335,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             const patientGroupArray = Array.from(patientGroups.entries())
 
             for (const [patientKey, visitsForPatient] of patientGroupArray) {
+                console.log(`[Patient ${patientKey.substring(0, 10)}...] Processing ${visitsForPatient.length} visits`)
+                
                 // Find or create patient from visit #1
                 let patient = null
                 const firstVisit = visitsForPatient[0] // Already sorted by visit number
@@ -351,28 +352,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                     patient = patientNameMap.get(normalizedName)
                 }
 
-                // If patient doesn't exist, we need to find visit #1 to create them
+                // If patient doesn't exist, create them from the first available visit
                 if (!patient) {
-                    const visit1 = visitsForPatient.find((v: any) => (toNumber(v.visitNumber) || 1) === 1)
+                    // Use the first visit in the sorted list (which might not be visit #1)
+                    const visitForPatientCreation = visitsForPatient[0]
 
-                    if (!visit1) {
-                        // No visit #1 found - skip this patient group
-                        visitsForPatient.forEach((v: any) => {
-                            errors.push({
-                                opdNo: v.opdNo,
-                                error: `Visit #1 required to create patient "${v.patientName}". Please include visit #1 in the import file.`
-                            })
-                        })
-                        continue // Skip this patient group
-                    }
-
-                    // Create patient from visit #1 data
-                    const nameParts = (visit1.patientName || 'Unknown Patient').trim().split(/\s+/)
+                    // Create patient from first visit data
+                    const nameParts = (visitForPatientCreation.patientName || 'Unknown Patient').trim().split(/\s+/)
                     const firstName = nameParts[0]
                     const lastName = nameParts.slice(1).join(' ') || null
+                    
+                    console.log(`✓ Creating patient: ${firstName} ${lastName || ''}`)
 
-                    let finalDob: Date | null = parseDate(visit1.dob)
-                    let finalAge: number | null = parseAge(visit1.age)
+                    let finalDob: Date | null = parseDate(visitForPatientCreation.dob)
+                    let finalAge: number | null = parseAge(visitForPatientCreation.age)
 
                     if (finalDob) {
                         finalAge = calculateAgeFromDob(finalDob)
@@ -380,16 +373,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                         finalDob = calculateDobFromAge(finalAge)
                     }
 
-                    const visitDate = parseDate(visit1.date) || new Date()
+                    const visitDate = parseDate(visitForPatientCreation.date) || new Date()
 
                     patient = await prisma.patient.create({
                         data: {
                             firstName: firstName,
                             lastName: lastName,
-                            phone: visit1.phone || null,
-                            address: visit1.address || null,
-                            fatherHusbandGuardianName: visit1.fatherHusbandGuardianName || null,
-                            gender: visit1.gender || null,
+                            phone: visitForPatientCreation.phone || null,
+                            address: visitForPatientCreation.address || null,
+                            fatherHusbandGuardianName: visitForPatientCreation.fatherHusbandGuardianName || null,
+                            gender: visitForPatientCreation.gender || null,
                             dob: finalDob,
                             age: finalAge,
                             doctorId: doctorId,
@@ -560,26 +553,63 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                         // Create prescriptions if provided - use batch creation for better performance
                         if (prescriptions && Array.isArray(prescriptions) && prescriptions.length > 0) {
                             const prescriptionData = []
-
-                            // Get or create "Imported" category for auto-created products with matching doctorId
-                            let importedCategory = await prisma.category.findFirst({
-                                where: {
-                                    name: 'Imported',
-                                    doctorId: doctorId
+                            
+                            // Helper function to determine category based on product name
+                            const getCategoryFromName = (productName: string): string => {
+                                const name = productName.trim().toLowerCase()
+                                const words = name.split(/\s+/)
+                                
+                                // Check if any word is exactly 'drp' or if name starts with 'drp'
+                                if (name.startsWith('drp') || words.includes('drp')) {
+                                    return 'Drops'
                                 }
-                            })
-
-                            if (!importedCategory) {
-                                importedCategory = await prisma.category.create({
-                                    data: {
-                                        name: 'Imported',
-                                        code: 'IMPORTED',
-                                        reorderLevel: 0,
+                                if (name.startsWith('syr') || words.includes('syr')) {
+                                    return 'Syrup'
+                                }
+                                if (name.startsWith('tab') || words.includes('tab')) {
+                                    return 'Tablet'
+                                }
+                                if (name.startsWith('cap') || words.includes('cap')) {
+                                    return 'Capsule'
+                                }
+                                if (name.startsWith('oint') || words.includes('oint')) {
+                                    return 'Ointment'
+                                }
+                                
+                                return 'Imported' // Default category
+                            }
+                            
+                            // Pre-fetch or create all needed categories
+                            const categoryCache = new Map<string, any>()
+                            
+                            // Get or create "Imported" category for auto-created products with matching doctorId
+                            const getOrCreateCategory = async (categoryName: string) => {
+                                if (categoryCache.has(categoryName)) {
+                                    return categoryCache.get(categoryName)
+                                }
+                                
+                                let category = await prisma.category.findFirst({
+                                    where: {
+                                        name: categoryName,
                                         doctorId: doctorId
                                     }
                                 })
+                                
+                                if (!category) {
+                                    category = await prisma.category.create({
+                                        data: {
+                                            name: categoryName,
+                                            code: categoryName.toUpperCase(),
+                                            reorderLevel: 0,
+                                            doctorId: doctorId
+                                        }
+                                    })
+                                }
+                                
+                                categoryCache.set(categoryName, category)
+                                return category
                             }
-
+                            
                             for (const prData of prescriptions) {
                                 if (!prData.productName) continue // Skip empty prescriptions
 
@@ -593,15 +623,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                 // Try to find the product using pre-fetched map with normalized name
                                 let product: any = productNameMap.get(normalizedProductName)
 
-                                // If product not found, create it with "Imported" category and doctorId
+                                // If product not found, create it with appropriate category based on name
                                 if (!product) {
+                                    // Determine category from product name
+                                    const categoryName = getCategoryFromName(prData.productName)
+                                    const category = await getOrCreateCategory(categoryName)
+                                    
                                     product = await prisma.product.create({
                                         data: {
                                             name: prData.productName.trim(), // Use original name but trimmed
                                             priceRupees: 0,
                                             quantity: 0,
                                             totalPurchased: 100, // Default total purchased for imported products
-                                            categoryId: importedCategory.id,
+                                            categoryId: category.id,
                                             doctorId: doctorId
                                         }
                                     })
@@ -625,7 +659,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     addition2: toString(prData.addition2),
                                     addition3: toString(prData.addition3),
                                     procedure: toString(prData.procedure),
-                                    presentation: toString(prData.presentation)
+                                    presentation: toString(prData.presentation),
+                                    discussions: toString(prData.discussion || prData.discussions)
                                 })
                             }
 
@@ -639,7 +674,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
                         results.push({ success: true, opdNo, visitId: visit.id })
                     } catch (err: any) {
-                        console.error(`[Visit ${visitData.opdNo}] Failed:`, err.message)
+                        console.error(`❌ Visit ${visitData.opdNo} failed:`, err.message)
                         errors.push({
                             opdNo: visitData.opdNo,
                             error: err.message
