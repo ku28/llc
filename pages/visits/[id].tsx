@@ -1766,27 +1766,63 @@ export default function VisitDetail() {
                                                 <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
                                                     <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Particulars</span>
                                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '9px', gap: '1px' }}>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OPDN</span> <span style={{ color: 'blue', fontWeight: 'bold' }}>{visit.opdNo || 'N/A'}</span></div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>VISIT</span> {visit.visitNumber || '1'}</div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>SEX</span> {visit.gender || visit.patient?.gender || 'N/A'}</div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DOB</span> {visit.dob || visit.patient?.dob ? new Date(visit.dob || visit.patient?.dob).toLocaleDateString('en-GB') : ''}</div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>AGE</span> {visit.age || visit.patient?.age || 'N/A'}</div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>F UP</span> {visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : ''}</div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HT</span> {visit.height}</div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PHONE</span> {visit.phone || visit.patient?.phone}</div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>WT</span> {visit.weight}</div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OPDN</span> <span style={{ color: 'blue', fontWeight: 'bold', marginLeft: '4px' }}>{visit.opdNo || 'N/A'}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>VISIT</span> <span style={{ marginLeft: '4px' }}>{visit.visitNumber || '1'}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>SEX</span> <span style={{ marginLeft: '4px' }}>{visit.gender || visit.patient?.gender || 'N/A'}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DOB</span> <span style={{ marginLeft: '4px' }}>{visit.dob || visit.patient?.dob ? new Date(visit.dob || visit.patient?.dob).toLocaleDateString('en-GB') : ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>AGE</span> <span style={{ marginLeft: '4px' }}>{visit.age || visit.patient?.age || 'N/A'}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>F UP</span> <span style={{ marginLeft: '4px' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HT</span> <span style={{ marginLeft: '4px' }}>{visit.height}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PHONE</span> <span style={{ marginLeft: '4px' }}>{visit.phone || visit.patient?.phone}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>WT</span> <span style={{ marginLeft: '4px' }}>{visit.weight}</span></div>
                                                     </div>
                                                 </div>
 
-                                                {/* Basic Info Box (Right) */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Basic Info</span>
-                                                    <div style={{ fontSize: '9px' }}>
-                                                        <div style={{ width: '30px', height: '15px', background: 'red', marginBottom: '3px', border: '1px solid #000' }}></div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>NAME</span> {visit.patient?.firstName} {visit.patient?.lastName}</div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>F/H/G</span> {visit.patient?.fatherHusbandGuardianName}</div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>ADD</span> {visit.address || visit.patient?.address}</div>
-                                                        <div><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OCC</span> {visit.occupation || visit.patient?.occupation}</div>
+                                                {/* Right Box: Patient Info */}
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', display: 'flex', gap: '5px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Patient Info</span>
+                                                    
+                                                    <div style={{ flex: 1 }}>
+                                                        {/* Indicator Box - Added to Patient Copy */}
+                                                        <div style={{ width: '30px', height: '15px', background: visit.improvements ? 'green' : 'red', marginBottom: '3px', border: '1px solid #000' }}></div>
+
+                                                        <div style={{ fontSize: '0.75rem' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>NAME:</span> <span style={{ fontWeight: 'bold', color: '#FF0000', marginLeft: '4px' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>FATHER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '4px' }}>{visit.patient?.fatherHusbandGuardianName || ''}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.patient?.address || visit.address || ''}</span></div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Patient Image */}
+                                                    <div style={{ width: '60px', height: '75px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0 }}>
+                                                        {visit.patient?.imageUrl ? (
+                                                            <img
+                                                                src={visit.patient.imageUrl}
+                                                                alt="Patient"
+                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <img
+                                                                src={process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'}
+                                                                alt="Patient"
+                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                onError={(e) => {
+                                                                    const target = e.currentTarget as HTMLImageElement
+                                                                    target.style.display = 'none'
+                                                                    const parent = target.parentElement
+                                                                    if (parent) {
+                                                                        parent.style.backgroundColor = '#f0f0f0'
+                                                                        parent.style.display = 'flex'
+                                                                        parent.style.alignItems = 'center'
+                                                                        parent.style.justifyContent = 'center'
+                                                                        parent.innerHTML = '<div style="font-size: 0.6rem; color: #999;">No Image</div>'
+                                                                    }
+                                                                }}
+                                                            />
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1795,28 +1831,28 @@ export default function VisitDetail() {
                                             <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
                                                 <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
                                                     <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
-                                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>TEMP</span> {visit.temperament}</div>
+                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>TEMP</span> <span style={{ marginLeft: '4px' }}>{visit.temperament}</span></div>
                                                 </div>
                                                 <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
                                                     <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
-                                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-1</span> {visit.pulseDiagnosis}</div>
+                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-1</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis}</span></div>
                                                 </div>
                                                 <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
                                                     <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
-                                                    <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-2</span> {visit.pulseDiagnosis2}</div>
+                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-2</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis2}</span></div>
                                                 </div>
                                             </div>
 
                                             {/* History & Reports */}
                                             <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '60px' }}>
                                                 <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Prev Info</span>
-                                                <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HISTORY & REPORTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.historyReports}</span></div>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HISTORY & REPORTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.historyReports}</span></div>
                                             </div>
 
                                             {/* Chief Complaints */}
                                             <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '40px' }}>
                                                 <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Sign & Symptoms</span>
-                                                <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>CHIEF COMPLAINTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.majorComplaints}</span></div>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>CHIEF COMPLAINTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.majorComplaints}</span></div>
                                             </div>
 
                                             {/* Investigations & Prov Diagnosis */}
@@ -1834,13 +1870,13 @@ export default function VisitDetail() {
                                             {/* Improvements */}
                                             <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
                                                 <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Cure</span>
-                                                <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>IMPROVEMENTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.improvements}</span></div>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>IMPROVEMENTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.improvements}</span></div>
                                             </div>
 
                                             {/* Discuss */}
                                             <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
                                                 <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Discuss</span>
-                                                <div style={{ fontSize: '9px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.discussion}</span></div>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.discussion}</span></div>
                                             </div>
 
                                             {/* Prescription Table */}
@@ -1876,7 +1912,20 @@ export default function VisitDetail() {
                                                                                 <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.additions || ''}</td>
                                                                                 <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '8%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.presentation || ''}</td>
                                                                                 <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#FF8C00', fontWeight: 'bold' }}>{(p.droppersToday?.toString() || '').toUpperCase()}</td>
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '5%', fontWeight: 'bold' }}>{p.quantity || ''}</td>
+                                                                                {index === 0 && (
+                                                                                    <td rowSpan={visit.prescriptions.length} style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '12%', verticalAlign: 'top' }}>
+                                                                                        <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '5px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                                                                                            <div style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '0.6rem', marginBottom: '2px' }}>NEXT VISIT</div>
+                                                                                            <div style={{ color: '#C80000', fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '8px' }}>
+                                                                                                {visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : 'N/A'}
+                                                                                            </div>
+                                                                                            <div style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '0.6rem', marginBottom: '2px' }}>FOLLOW UP</div>
+                                                                                            <div style={{ color: '#008000', fontWeight: 'bold', fontSize: '0.8rem' }}>
+                                                                                                {visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </td>
+                                                                                )}
                                                                             </tr>
                                                                         )
                                                                     })
@@ -1905,125 +1954,100 @@ export default function VisitDetail() {
                                             {/* Blue Separator Line - Full Width */}
                                             <div style={{ borderBottom: '2px solid #0000FF', marginBottom: '1rem', marginLeft: '-1.5rem', marginRight: '-1.5rem' }}></div>
 
-                                            {/* Section with rows and patient image */}
-                                            <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem' }}>
-                                                <div style={{ flex: 1 }}>
-                                                    {/* Row 1: 6 columns - opdn, patient name, visit no, phone, father's name, location */}
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000', backgroundColor: '#90EE90', display: 'inline-block', padding: '0.1rem 0.25rem', borderRadius: '4px' }}>OPDN:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.patient?.opdNo || visit.opdNo || ''}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Patient Name:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#FF0000', textTransform: 'uppercase' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Visit No.:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Phone:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#800080', textTransform: 'uppercase' }}>{visit.patient?.phone || visit.phone || ''}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Father:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#FF8C00', textTransform: 'uppercase' }}>{visit.patient?.fatherHusbandGuardianName || ''}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Address:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.patient?.address || visit.address || ''}</div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Row 2: 3 columns - temperament, age/dob, disc */}
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Temperament:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#800080', textTransform: 'uppercase' }}>{visit.temperament || ''}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>DOB:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.patient?.dob || visit.dob ? new Date(visit.patient?.dob || visit.dob).toLocaleDateString() : ''}</div>
-                                                        </div>
-                                                        <div></div>
-                                                    </div>
-
-                                                    {/* Row 3: 3 columns - pulse diagnosis, date, history/report */}
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Pulse:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.pulseDiagnosis || ''}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Date:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#C80000', textTransform: 'uppercase' }}>{new Date(visit.date).toLocaleDateString()}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>History:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.historyReports || ''}</div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Row 4: 3 columns - gender, next visit, major complaints */}
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Gender:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#FF8C00', textTransform: 'uppercase' }}>{visit.patient?.gender || visit.gender || ''}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Next Visit:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#C80000', textTransform: 'uppercase' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Complaints:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.majorComplaints || ''}</div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Row 5: 2 columns - improvements, provisional diagnosis */}
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Improvements:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#008000', textTransform: 'uppercase' }}>{visit.improvements || ''}</div>
-                                                        </div>
-                                                        <div>
-                                                            <div style={{ fontSize: '0.6rem', fontWeight: 'bold', color: '#000' }}>Prov. Diagnosis:</div>
-                                                            <div style={{ fontWeight: 'bold', color: '#0000FF', textTransform: 'uppercase' }}>{visit.provisionalDiagnosis || ''}</div>
-                                                        </div>
+                                            {/* Top Row: Particulars and Patient Info */}
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                                                
+                                                {/* Left Box: Particulars */}
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Particulars</span>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '0.75rem' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>OPDN:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.patient?.opdNo || visit.opdNo || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>VISIT:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>PHONE:</span> <span style={{ fontWeight: 'bold', color: '#800080', marginLeft: '4px' }}>{visit.patient?.phone || visit.phone || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>DOB:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.patient?.dob || visit.dob ? new Date(visit.patient?.dob || visit.dob).toLocaleDateString() : ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>GENDER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '4px' }}>{visit.patient?.gender || visit.gender || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>DATE:</span> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '4px' }}>{new Date(visit.date).toLocaleDateString()}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>NEXT:</span> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '4px' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</span></div>
                                                     </div>
                                                 </div>
 
-                                                {/* Patient Image - Right Side */}
-                                                <div style={{ width: '80px', height: '100px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0 }}>
-                                                    {visit.patient?.imageUrl ? (
-                                                        <img
-                                                            src={visit.patient.imageUrl}
-                                                            alt="Patient"
-                                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                            onError={(e) => {
-                                                                e.currentTarget.src = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <img
-                                                            src={process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'}
-                                                            alt="Patient"
-                                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                            onError={(e) => {
-                                                                const target = e.currentTarget as HTMLImageElement
-                                                                target.style.display = 'none'
-                                                                const parent = target.parentElement
-                                                                if (parent) {
-                                                                    parent.style.backgroundColor = '#f0f0f0'
-                                                                    parent.style.display = 'flex'
-                                                                    parent.style.alignItems = 'center'
-                                                                    parent.style.justifyContent = 'center'
-                                                                    parent.innerHTML = '<div style="font-size: 0.6rem; color: #999;">No Image</div>'
-                                                                }
-                                                            }}
-                                                        />
-                                                    )}
+                                                {/* Right Box: Patient Info */}
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', display: 'flex', gap: '5px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Patient Info</span>
+                                                    
+                                                    <div style={{ flex: 1 }}>
+                                                        {/* Indicator Box Removed from Office Copy */}
+                                                        
+                                                        <div style={{ fontSize: '0.75rem' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>NAME:</span> <span style={{ fontWeight: 'bold', color: '#FF0000', marginLeft: '4px' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>FATHER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '4px' }}>{visit.patient?.fatherHusbandGuardianName || ''}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.patient?.address || visit.address || ''}</span></div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Patient Image */}
+                                                    <div style={{ width: '60px', height: '75px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0 }}>
+                                                        {visit.patient?.imageUrl ? (
+                                                            <img
+                                                                src={visit.patient.imageUrl}
+                                                                alt="Patient"
+                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                onError={(e) => {
+                                                                    e.currentTarget.src = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <img
+                                                                src={process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png'}
+                                                                alt="Patient"
+                                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                onError={(e) => {
+                                                                    const target = e.currentTarget as HTMLImageElement
+                                                                    target.style.display = 'none'
+                                                                    const parent = target.parentElement
+                                                                    if (parent) {
+                                                                        parent.style.backgroundColor = '#f0f0f0'
+                                                                        parent.style.display = 'flex'
+                                                                        parent.style.alignItems = 'center'
+                                                                        parent.style.justifyContent = 'center'
+                                                                        parent.innerHTML = '<div style="font-size: 0.6rem; color: #999;">No Image</div>'
+                                                                    }
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Middle Row: Medical Info */}
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                                                {/* Box 1: Parameters */}
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Parameters</span>
+                                                    <div style={{ fontSize: '0.75rem' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>TEMP:</span> <span style={{ fontWeight: 'bold', color: '#800080', marginLeft: '4px' }}>{visit.temperament || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>PULSE:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.pulseDiagnosis || ''}</span></div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Box 2: History & Complaints */}
+                                                <div style={{ flex: 2, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>History & Complaints</span>
+                                                    <div style={{ fontSize: '0.75rem' }}>
+                                                        <div style={{ marginBottom: '2px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>HISTORY:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.historyReports || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>COMPLAINTS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.majorComplaints || ''}</span></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Bottom Row: Diagnosis & Cure */}
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Diagnosis & Cure</span>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.75rem' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>IMPROVEMENTS:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.improvements || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>PROV. DIAGNOSIS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.provisionalDiagnosis || ''}</span></div>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -2034,7 +2058,10 @@ export default function VisitDetail() {
                                             <div style={{ marginBottom: '1rem' }}>
                                                 {(() => {
                                                     const hasSpy4 = visit.prescriptions?.some((p: any) => p.spy4)
+                                                    const hasSpy5 = visit.prescriptions?.some((p: any) => p.spy5)
                                                     const hasSpy6 = visit.prescriptions?.some((p: any) => p.spy6)
+                                                    const hasAdd2 = visit.prescriptions?.some((p: any) => p.addition2)
+                                                    const hasAdd3 = visit.prescriptions?.some((p: any) => p.addition3)
 
                                                     return (
                                                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem' }}>
@@ -2044,19 +2071,23 @@ export default function VisitDetail() {
                                                                     const availableUnits = product?.units || 0
                                                                     const isLowStock = availableUnits <= 0
                                                                     const rowStyle = prescription.patientHasMedicine ? { textDecoration: 'line-through', opacity: 0.5 } : {}
+                                                                    const totalPrice = (product?.priceRupees || 0) * (prescription.quantity || 0)
                                                                     return (
                                                                         <tr key={index} style={rowStyle}>
-                                                                            <td style={{ padding: '0.25rem', textAlign: 'center', width: '50px', fontWeight: 'bold', color: isLowStock ? '#FF0000' : '#000' }}>{availableUnits}</td>
+                                                                            <td style={{ padding: '0.25rem', textAlign: 'center', width: '60px', fontWeight: 'bold', color: '#000' }}>{totalPrice}</td>
                                                                             <td style={{ padding: '0.25rem', textAlign: 'center', width: '30px', fontWeight: 'bold' }}>{index + 1}</td>
                                                                             <td style={{ padding: '0.25rem', width: '120px', color: '#0000FF', fontWeight: 'bold' }}>{product?.name?.toUpperCase() || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy1 || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy2 || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy3 || ''}</td>
-                                                                            {hasSpy4 && <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy4 || ''}</td>}
-                                                                            {hasSpy6 && <td style={{ padding: '0.25rem', width: '60px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy6 || ''}</td>}
+                                                                            <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy1 || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy2 || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy3 || ''}</td>
+                                                                            {hasSpy4 && <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy4 || ''}</td>}
+                                                                            {hasSpy5 && <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy5 || ''}</td>}
+                                                                            {hasSpy6 && <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy6 || ''}</td>}
                                                                             <td style={{ padding: '0.25rem', width: '60px', color: '#C80000', textTransform: 'uppercase', fontWeight: 'bold' }}>{prescription.timing || ''}</td>
                                                                             <td style={{ padding: '0.25rem', width: '60px', color: '#800080', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.dosage || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.additions || ''}</td>
+                                                                            <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.addition1 || prescription.additions || ''}</td>
+                                                                            {hasAdd2 && <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.addition2 || ''}</td>}
+                                                                            {hasAdd3 && <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.addition3 || ''}</td>}
                                                                             <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.procedure || ''}</td>
                                                                             <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.presentation || ''}</td>
                                                                             <td style={{ padding: '0.25rem', width: '60px', color: '#FF8C00', fontWeight: 'bold' }}>{(prescription.droppersToday?.toString() || '').toUpperCase()}</td>
