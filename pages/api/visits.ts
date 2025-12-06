@@ -146,7 +146,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             visitNumber,
             followUpCount,
             reportsAttachments, // JSON string of report attachments
-            patientCopyPdfUrl, // Cloudinary URL for patient copy
             officeCopyPdfUrl, // Cloudinary URL for office copy
             prescriptions, // optional array of { treatmentId, dosage, administration, quantity, taken, productId }
             autoGenerateInvoice // flag to automatically create customer invoice
@@ -255,8 +254,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     visitNumber: visitNumber ? Number(visitNumber) : undefined,
                     followUpCount: followUpCount ? Number(followUpCount) : undefined,
                     reportsAttachments: reportsAttachments !== undefined ? reportsAttachments : undefined,
-                    patientCopyPdfUrl: patientCopyPdfUrl || undefined,
                     officeCopyPdfUrl: officeCopyPdfUrl || undefined,
+                    isImported: false, // Explicitly mark as not imported for PDF generation
                     doctorId: getDoctorIdForCreate(user, req.body.doctorId)
                 }
                 
@@ -379,8 +378,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         where: { visitId: visit.id }
                     })
 
-                    // Get all unique product IDs that need inventory updates
-                    const productIds = [...new Set(prescriptions.filter(pr => pr.productId).map(pr => Number(pr.productId)))]
+                    // Get all unique product IDs that need inventory updates (filter out invalid IDs)
+                    const productIds = [...new Set(
+                        prescriptions
+                            .filter(pr => pr.productId && !isNaN(Number(pr.productId)))
+                            .map(pr => Number(pr.productId))
+                    )]
                     
                     if (productIds.length > 0) {
                         // Fetch all products at once
@@ -393,7 +396,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                         // Process inventory updates
                         for (const pr of prescriptions) {
-                            if (!pr.productId) continue
+                            if (!pr.productId || isNaN(Number(pr.productId))) continue
                             
                             const pid = Number(pr.productId)
                             const qtyToConsume = Number(pr.quantity || 1)

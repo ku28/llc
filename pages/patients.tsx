@@ -11,6 +11,7 @@ import { useDataCache } from '../contexts/DataCacheContext'
 import { useDoctor } from '../contexts/DoctorContext'
 import RefreshButton from '../components/RefreshButton'
 import PhoneNumber from '../components/PhoneNumber'
+import CameraModal from '../components/CameraModal'
 import genderOptions from '../data/gender.json'
 
 export default function PatientsPage() {
@@ -392,6 +393,36 @@ export default function PatientsPage() {
         }
     }
 
+    // Handle camera capture from CameraModal
+    async function handleCameraCapture(base64Image: string) {
+        try {
+            setUploadingImage(true)
+            setImagePreview(base64Image)
+            
+            // Upload to Cloudinary
+            const res = await fetch('/api/upload-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64Image, folder: 'patients' })
+            })
+
+            const data = await res.json()
+
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to upload image')
+            }
+
+            setForm({ ...form, imageUrl: data.url })
+            showSuccess('Photo captured successfully!')
+            setUploadingImage(false)
+        } catch (error: any) {
+            console.error('Image upload error:', error)
+            showError(`Failed to upload image: ${error.message || 'Unknown error'}`)
+            setUploadingImage(false)
+            setImagePreview('')
+        }
+    }
+
     // Cleanup camera on unmount
     useEffect(() => {
         return () => {
@@ -547,8 +578,20 @@ export default function PatientsPage() {
             const firstName = nameParts[0] || ''
             const lastName = nameParts.slice(1).join(' ') || ''
             
+            // Create clean payload with only the necessary fields
             const payload: any = { 
-                ...form,
+                fullName: form.fullName,
+                phone: form.phone,
+                email: form.email,
+                dob: form.dob,
+                date: form.date,
+                age: form.age,
+                address: form.address,
+                gender: form.gender,
+                imageUrl: form.imageUrl,
+                fatherHusbandGuardianName: form.fatherHusbandGuardianName,
+                weight: form.weight,
+                height: form.height,
                 firstName,
                 lastName,
                 doctorId: form.doctorId ? parseInt(form.doctorId) : (user?.role === 'doctor' ? user.id : null)
@@ -844,6 +887,14 @@ export default function PatientsPage() {
 
     return (
         <div>
+            {/* Camera Modal */}
+            <CameraModal
+                isOpen={showCamera}
+                onClose={() => setShowCamera(false)}
+                onCapture={handleCameraCapture}
+                title="Capture Patient Photo"
+            />
+            
             {/* Progress Modal for Deleting - Minimizable */}
             {deleting && deleteProgress.total > 0 && !isDeleteMinimized && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
@@ -1184,11 +1235,25 @@ export default function PatientsPage() {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className={`fixed inset-0 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }} onClick={!showSuccessModal ? closeModal : undefined}>
+                <div className={`fixed inset-0 bg-black transition-opacity duration-300 ${isAnimating ? 'bg-opacity-50' : 'bg-opacity-0'}`} style={{ zIndex: 9999 }} onClick={!showSuccessModal && !showLoadingModal ? closeModal : undefined}>
                     <div className={`fixed inset-0 flex items-center justify-center p-4 transition-all duration-300 ${isAnimating ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`} style={{ zIndex: 10000 }}>
                         <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/20 backdrop-blur-sm max-w-2xl w-full" onClick={e => e.stopPropagation()}>
                             <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
-                            {showSuccessModal ? (
+                            {showLoadingModal ? (
+                                // Loading State
+                                <div className="relative p-12 text-center">
+                                    <div className="w-20 h-20 mx-auto mb-6">
+                                        <svg className="animate-spin h-20 w-20 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 mb-3">
+                                        {editingId ? 'Updating Patient...' : 'Registering Patient...'}
+                                    </h3>
+                                    <p className="text-gray-600 dark:text-gray-400">Please wait while we process your request</p>
+                                </div>
+                            ) : showSuccessModal ? (
                                 // Success State
                                 <div className="relative p-12 text-center">
                                     <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce-in">

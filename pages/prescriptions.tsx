@@ -1421,10 +1421,21 @@ export default function PrescriptionsPage() {
     async function performSubmit() {
         setLoading(true)
         try {
+            // Filter out prescriptions with invalid or empty productId
+            const validPrescriptions = prescriptions.filter(pr => {
+                const productId = pr.productId
+                return productId && productId !== '' && !isNaN(Number(productId))
+            })
+
+            // Warn if some prescriptions were filtered out
+            if (validPrescriptions.length < prescriptions.length) {
+                showError(`${prescriptions.length - validPrescriptions.length} prescription(s) skipped due to missing medicine selection`)
+            }
+
             // Prepare payload
             const payload = { 
                 ...form, 
-                prescriptions, 
+                prescriptions: validPrescriptions, 
                 autoGenerateInvoice: true
             }
 
@@ -1524,19 +1535,45 @@ export default function PrescriptionsPage() {
                 // Staff view - Create/Edit prescriptions (original form)
                 <>
                     <div className="section-header">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-start justify-between gap-4">
                             <div>
                                 <h2 className="section-title">{isEditMode ? 'Edit Visit & Prescriptions' : 'Create Visit & Prescriptions'}</h2>
                                 <p className="text-sm text-muted">Comprehensive visit recording with prescriptions and patient updates</p>
                             </div>
-                            {!isEditMode && hasDraft && (
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg">
-                                    <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Draft Auto-Saved</span>
-                                </div>
-                            )}
+                            <div className="flex items-start gap-3">
+                                {!isEditMode && hasDraft && (
+                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg">
+                                        <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Draft Auto-Saved</span>
+                                    </div>
+                                )}
+                                {/* Update/Save Button */}
+                                <button
+                                    type="button"
+                                    disabled={loading}
+                                    onClick={submit}
+                                    className="px-6 py-2 text-base font-bold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-300 transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                                >
+                                    {loading ? (
+                                        <>
+                                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span>{isEditMode ? 'Updating...' : 'Saving...'}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            <span>{isEditMode ? 'Update Prescription' : 'Save Prescription'}</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -1558,68 +1595,103 @@ export default function PrescriptionsPage() {
                     </div>
 
                     <form onSubmit={submit} className="space-y-5">
-                        {/* Step Progress Indicator */}
-                        <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6">
-                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
-                            <div className="relative">
-                                {/* Progress Bar */}
-                                <div className="flex items-center justify-between mb-4">
-                                    {steps.map((step, index) => (
-                                        <div key={step.number} className="flex items-center" style={{ width: index === steps.length - 1 ? 'auto' : '100%' }}>
-                                            {/* Step Circle */}
-                                            <button
-                                                type="button"
-                                                onClick={() => goToStep(step.number)}
-                                                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 ${currentStep === step.number
-                                                    ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-lg shadow-emerald-500/30 scale-110'
-                                                    : currentStep > step.number
-                                                        ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-2 border-emerald-300 dark:border-emerald-700'
-                                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-2 border-gray-200 dark:border-gray-700'
-                                                    } hover:scale-105 cursor-pointer`}
-                                            >
-                                                {currentStep > step.number ? (
-                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                    </svg>
-                                                ) : (
-                                                    step.number
+                        {/* Step Title */}
+                        <div className="text-center">
+                            <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
+                                {steps[currentStep - 1].title}
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {steps[currentStep - 1].description}
+                            </p>
+                        </div>
+
+                        {/* Step Progress Indicator - With Back and Next buttons on sides */}
+                        <div className="flex items-center gap-2 sm:gap-4">
+                            {/* Back Button - Outside the box on the left */}
+                            <button
+                                type="button"
+                                onClick={prevStep}
+                                disabled={currentStep === 1}
+                                className="flex-shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105 flex items-center gap-2"
+                                title="Previous step"
+                            >
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                                <span className="hidden sm:inline text-sm font-medium text-gray-700 dark:text-gray-300">Back</span>
+                            </button>
+
+                            <div className="relative overflow-hidden rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-3 sm:p-4 lg:p-6 flex-1">
+                                <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
+                                <div className="relative overflow-x-auto">
+                                    {/* Progress Bar */}
+                                    <div className="flex items-start justify-between min-w-max">
+                                        {steps.map((step, index) => (
+                                            <div key={step.number} className="flex items-center" style={{ width: index === steps.length - 1 ? 'auto' : '100%' }}>
+                                                <div className="flex flex-col items-center">
+                                                    {/* Step Circle */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => goToStep(step.number)}
+                                                        className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm transition-all duration-300 ${currentStep === step.number
+                                                            ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-lg shadow-emerald-500/30 scale-110'
+                                                            : currentStep > step.number
+                                                                ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-2 border-emerald-300 dark:border-emerald-700'
+                                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-2 border-gray-200 dark:border-gray-700'
+                                                            } hover:scale-105 cursor-pointer`}
+                                                        title={`${step.title}: ${step.description}`}
+                                                    >
+                                                        {currentStep > step.number ? (
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        ) : (
+                                                            step.number
+                                                        )}
+                                                    </button>
+
+                                                    {/* Step Description Below Number */}
+                                                    <div className="mt-1 sm:mt-2 text-center">
+                                                        <div className={`text-[10px] sm:text-xs font-semibold ${currentStep === step.number
+                                                            ? 'text-emerald-700 dark:text-emerald-300'
+                                                            : currentStep > step.number
+                                                                ? 'text-emerald-600 dark:text-emerald-400'
+                                                                : 'text-gray-500 dark:text-gray-400'
+                                                            }`}>
+                                                            {step.title}
+                                                        </div>
+                                                        <div className="text-[9px] sm:text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{step.description}</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Connecting Line */}
+                                                {index < steps.length - 1 && (
+                                                    <div className="flex-1 h-0.5 mx-1 sm:mx-2 lg:mx-3 bg-gray-200 dark:bg-gray-700 relative" style={{ marginTop: '-30px' }}>
+                                                        <div
+                                                            className={`absolute inset-0 bg-gradient-to-r from-emerald-500 to-green-500 transition-all duration-500 ${currentStep > step.number ? 'w-full' : 'w-0'
+                                                                }`}
+                                                        ></div>
+                                                    </div>
                                                 )}
-                                            </button>
-
-                                            {/* Step Info - Only on larger screens */}
-                                            <div className="hidden lg:block ml-3 flex-shrink-0">
-                                                <div className={`text-sm font-semibold ${currentStep === step.number
-                                                    ? 'text-emerald-700 dark:text-emerald-300'
-                                                    : currentStep > step.number
-                                                        ? 'text-emerald-600 dark:text-emerald-400'
-                                                        : 'text-gray-500 dark:text-gray-400'
-                                                    }`}>
-                                                    {step.title}
-                                                </div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">{step.description}</div>
                                             </div>
-
-                                            {/* Connecting Line */}
-                                            {index < steps.length - 1 && (
-                                                <div className="flex-1 h-0.5 mx-3 bg-gray-200 dark:bg-gray-700 relative">
-                                                    <div
-                                                        className={`absolute inset-0 bg-gradient-to-r from-emerald-500 to-green-500 transition-all duration-500 ${currentStep > step.number ? 'w-full' : 'w-0'
-                                                            }`}
-                                                    ></div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Current Step Title - Mobile */}
-                                <div className="lg:hidden text-center">
-                                    <div className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">
-                                        {steps[currentStep - 1].title}
+                                        ))}
                                     </div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">{steps[currentStep - 1].description}</div>
                                 </div>
                             </div>
+
+                            {/* Next Button - Outside the box on the right */}
+                            <button
+                                type="button"
+                                onClick={nextStep}
+                                disabled={currentStep === steps.length}
+                                className="flex-shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white transition-all duration-300 hover:scale-105 shadow-lg shadow-emerald-500/30 flex items-center gap-2"
+                                title="Next step"
+                            >
+                                <span className="hidden sm:inline text-sm font-medium">Next</span>
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
                         </div>
 
                         {/* Patient Selection Card - Green Futuristic Theme */}
@@ -1869,24 +1941,6 @@ export default function PrescriptionsPage() {
                             </div>
                         </div>
 
-                        {/* Navigation Buttons for Step 1 */}
-                        {currentStep === 1 && (
-                            <div className="flex justify-end">
-                                <button
-                                    type="button"
-                                    onClick={nextStep}
-                                    className="px-4 sm:px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
-                                    title="Next: Clinical Info"
-                                >
-                                    <span className="hidden sm:inline">Next: Clinical Info</span>
-                                    <span className="sm:hidden">Next</span>
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
-                            </div>
-                        )}
-
                         {/* Clinical Information Card */}
                         <div className={`relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 ${isTemperamentOpen || isPulseDiagnosisOpen || isPulseDiagnosis2Open ? 'z-[10000]' : 'z-0'}`}
                             style={{ display: currentStep !== 2 ? 'none' : 'block' }}
@@ -2097,36 +2151,6 @@ export default function PrescriptionsPage() {
                             </div>
                         </div>
 
-                        {/* Navigation Buttons for Step 3 */}
-                        {currentStep === 3 && (
-                            <div className="flex justify-between">
-                                <button
-                                    type="button"
-                                    onClick={prevStep}
-                                    className="px-4 sm:px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
-                                    title="Back to previous step"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                    <span className="hidden sm:inline">Back</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={nextStep}
-                                    className="px-4 sm:px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
-                                    title="Next: Select Medicines"
-                                >
-                                    <span className="hidden sm:inline">Next: Select Medicines</span>
-                                    <span className="sm:hidden">Next</span>
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
-                            </div>
-                        )}
-
-
                         {/* Medicines Selection Card */}
                         <div className={`relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6 ${isTreatmentSelectOpen || isMedicineSelectOpen ? 'z-[10000]' : 'z-0'}`}
                             style={{ display: currentStep !== 4 ? 'none' : 'block', overflow: 'visible', position: 'relative' }}
@@ -2241,16 +2265,13 @@ export default function PrescriptionsPage() {
                                     <label className="block text-sm font-medium mb-2">Or Add Individual Medicine</label>
                                     <div className="mb-3">
                                         <CustomSelect
-                                            value={selectedProductId}
+                                            value=""
                                             onChange={(value) => {
-                                                setSelectedProductId(value)
                                                 if (value && value !== '') {
-                                                    // Check if already in selected medicines
+                                                    // Add to selectedMedicines if not already selected
                                                     if (!selectedMedicines.includes(value)) {
                                                         setSelectedMedicines([...selectedMedicines, value])
                                                     }
-                                                    // Clear selection after adding
-                                                    setSelectedProductId('')
                                                 }
                                             }}
                                             options={[
@@ -2473,7 +2494,7 @@ export default function PrescriptionsPage() {
                                                                 </div>
                                                             ) : (
                                                                 <CustomSelect
-                                                                    key={`medicine-select-${i}-${Date.now()}`}
+                                                                    key={`medicine-select-${i}`}
                                                                     value={pr.productId}
                                                                     onChange={(val) => {
                                                                         if (!isDeleted) {
@@ -2719,35 +2740,6 @@ export default function PrescriptionsPage() {
                             )}
                         </div>
 
-                        {/* Navigation Buttons for Step 5 */}
-                        {currentStep === 5 && (
-                            <div className="flex justify-between">
-                                <button
-                                    type="button"
-                                    onClick={prevStep}
-                                    className="px-4 sm:px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
-                                    title="Back to previous step"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                    <span className="hidden sm:inline">Back</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={nextStep}
-                                    className="px-4 sm:px-6 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
-                                    title="Next: Payment & Submit"
-                                >
-                                    <span className="hidden sm:inline">Next: Payment & Submit</span>
-                                    <span className="sm:hidden">Next</span>
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
-                            </div>
-                        )}
-
                         {/* Financial Information Card */}
                         <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6"
                             style={{ display: currentStep !== 6 ? 'none' : 'block' }}
@@ -2770,43 +2762,6 @@ export default function PrescriptionsPage() {
                                 <div>
                                     <label className="block text-sm font-medium mb-1.5">Balance Due (₹)</label>
                                     <input type="number" step="0.01" placeholder="0.00" value={form.balance || ''} onChange={e => setForm({ ...form, balance: e.target.value })} className="w-full p-2 border rounded" />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Submit Button */}
-                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6"
-                            style={{ display: currentStep !== 6 ? 'none' : 'block' }}
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
-                            <div className="relative flex items-center justify-between">
-                                <div className="text-sm text-gray-600 dark:text-gray-400">
-                                    {prescriptions.length > 0 && (
-                                        <span className="font-medium">{prescriptions.length} prescription(s) added</span>
-                                    )}
-                                </div>
-                                <div className="flex flex-wrap gap-2 sm:gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={prevStep}
-                                        className="px-4 sm:px-6 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 flex items-center gap-2"
-                                        title="Back to previous step"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                        </svg>
-                                        <span className="hidden sm:inline">Back</span>
-                                    </button>
-                                    <button disabled={loading} className="px-4 sm:px-6 py-3 text-sm sm:text-base font-semibold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-300 transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed">
-                                        <span className="hidden sm:inline">{loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Visit & Prescriptions' : 'Save Visit & Prescriptions')}</span>
-                                        <span className="sm:hidden">{loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Save')}</span>
-                                    </button>
-                                    {lastCreatedVisitId && (
-                                        <a href={`/visits/${lastCreatedVisitId}`} target="_blank" rel="noreferrer" className="px-3 sm:px-6 py-3 text-sm sm:text-base font-medium text-emerald-700 dark:text-emerald-300 bg-white dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-2 border-emerald-300 dark:border-emerald-700 rounded-xl shadow-md hover:shadow-lg transition-all duration-300">
-                                            <span className="hidden sm:inline">Open Last Visit</span>
-                                            <span className="sm:hidden">View</span>
-                                        </a>
-                                    )}
                                 </div>
                             </div>
                         </div>

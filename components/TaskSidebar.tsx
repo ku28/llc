@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useToast } from '../hooks/useToast'
+import CameraModal from './CameraModal'
 
 const TASK_RETENTION_HOURS = 24 // Hours before completed tasks are deleted
 
@@ -71,6 +72,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
     const [selectedPdfUrl, setSelectedPdfUrl] = useState<string>('')
     const [attachmentUrls, setAttachmentUrls] = useState<Array<{url: string, name: string}>>([])
     const [uploadingAttachment, setUploadingAttachment] = useState(false)
+    const [cameraModalOpen, setCameraModalOpen] = useState(false)
     const [usedSuggestedTaskId, setUsedSuggestedTaskId] = useState<number | null>(null)
     const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null)
     const [extendingTaskId, setExtendingTaskId] = useState<number | null>(null)
@@ -295,37 +297,18 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
         }
     }
 
-    const handleCameraCapture = async () => {
+    const handleCameraCapture = async (imageData: string) => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-            const video = document.createElement('video')
-            video.srcObject = stream
-            video.play()
-            
-            // Wait for video to be ready
-            await new Promise(resolve => {
-                video.onloadedmetadata = resolve
-            })
-            
-            // Capture frame
-            const canvas = document.createElement('canvas')
-            canvas.width = video.videoWidth
-            canvas.height = video.videoHeight
-            const ctx = canvas.getContext('2d')
-            ctx?.drawImage(video, 0, 0)
-            
-            // Stop stream
-            stream.getTracks().forEach(track => track.stop())
-            
-            // Convert to blob and upload
-            canvas.toBlob(async (blob) => {
-                if (blob) {
-                    const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' })
-                    await handleFileUpload(file)
-                }
-            }, 'image/jpeg', 0.9)
+            setUploadingAttachment(true)
+            // Convert base64 to blob
+            const response = await fetch(imageData)
+            const blob = await response.blob()
+            const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' })
+            await handleFileUpload(file)
         } catch (error) {
-            showError('Camera access denied or unavailable')
+            showError('Failed to process camera image')
+        } finally {
+            setUploadingAttachment(false)
         }
     }
 
@@ -422,15 +405,16 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
 
             {/* Sidebar with futuristic green glow */}
             <div 
-                className={`fixed right-0 top-0 h-full w-full sm:w-[550px] bg-gradient-to-br from-gray-900 via-gray-950 to-black shadow-2xl z-50 transform transition-all duration-500 ease-out flex flex-col ${isOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} border-l border-emerald-500/20`}
+                className={`fixed right-0 top-0 h-full w-full sm:w-[550px] bg-gradient-to-br from-gray-900 via-gray-950 to-black shadow-2xl z-50 transform transition-all duration-500 ease-out flex flex-col ${isOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} border-l-2 border-emerald-500/30`}
                 style={{
-                    boxShadow: isOpen ? '-5px 0 30px rgba(16, 185, 129, 0.15)' : 'none'
+                    boxShadow: isOpen ? '-10px 0 50px rgba(16, 185, 129, 0.2), -5px 0 20px rgba(5, 150, 105, 0.3)' : 'none'
                 }}
             >
-                {/* Header */}
-                <div className="sticky top-0 bg-gradient-to-r from-emerald-950/90 via-gray-900/90 to-emerald-950/90 backdrop-blur-xl border-b border-emerald-500/20 px-4 py-3 flex items-center justify-between z-10">
+                {/* Futuristic Header with green glow */}
+                <div className="sticky top-0 bg-gradient-to-r from-emerald-950/90 via-gray-900/90 to-emerald-950/90 backdrop-blur-xl border-b-2 border-emerald-500/30 px-6 py-4 flex items-center justify-between z-10 shadow-lg shadow-emerald-500/10">
                     <div>
-                        <h2 className="text-base font-semibold text-emerald-100">
+                        <h2 className="text-lg font-bold bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500 bg-clip-text text-transparent flex items-center gap-2">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-lg shadow-emerald-500/50"></span>
                             Task Management
                         </h2>
                     </div>
@@ -443,7 +427,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                 }
                                 showSuccess('Tasks refreshed')
                             }}
-                            className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all text-emerald-400 hover:text-emerald-300"
+                            className="group p-2 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all duration-300 text-emerald-400 hover:text-emerald-300"
                             title="Refresh tasks"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -452,7 +436,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                         </button>
                         <button
                             onClick={onClose}
-                            className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all text-emerald-400 hover:text-emerald-300"
+                            className="group p-2 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all duration-300 text-emerald-400 hover:text-emerald-300 hover:rotate-90 hover:scale-110"
                         >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -462,8 +446,8 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                 </div>
 
                 {/* Receptionist Selection Boxes */}
-                <div className="px-4 py-3 bg-gradient-to-br from-emerald-950/50 via-gray-900/50 to-emerald-950/50 border-b border-emerald-500/20">
-                    <h3 className="text-xs font-medium text-emerald-400/70 mb-2">Select Receptionist(s)</h3>
+                <div className="px-6 py-4 bg-gradient-to-br from-emerald-950/50 via-gray-900/50 to-emerald-950/50 border-b-2 border-emerald-500/20">
+                    <h3 className="text-xs font-medium text-emerald-400/90 mb-3">Select Receptionist(s)</h3>
                     {loading ? (
                         <div className="flex items-center justify-center py-4">
                             <div className="animate-spin rounded-full h-6 w-6 border-2 border-emerald-500/20 border-t-emerald-500"></div>
@@ -478,10 +462,10 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                     <button
                                         key={receptionist.id}
                                         onClick={() => toggleReceptionistSelection(receptionist.id)}
-                                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 flex items-center gap-2 ${
+                                        className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 flex items-center gap-2 ${
                                             isSelected
-                                                ? 'bg-emerald-500 text-white border-2 border-emerald-400'
-                                                : 'bg-gray-900/50 text-emerald-300 border-2 border-emerald-500/30 hover:border-emerald-500/50 hover:bg-gray-900/70'
+                                                ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/30 border border-emerald-400/50'
+                                                : 'bg-gradient-to-br from-gray-800/50 to-gray-900/50 text-emerald-300 border border-emerald-500/30 hover:border-emerald-500/50 hover:bg-gray-800/70 hover:shadow-lg hover:shadow-emerald-500/10'
                                         }`}
                                     >
                                         {receptionist.profileImage ? (
@@ -492,7 +476,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                             />
                                         ) : (
                                             <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                                isSelected ? 'bg-white/20' : 'bg-emerald-500/30'
+                                                isSelected ? 'bg-white/20' : 'bg-emerald-500/30 text-emerald-400'
                                             }`}>
                                                 {receptionist.name[0]?.toUpperCase()}
                                             </div>
@@ -512,17 +496,17 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
 
                 {selectedReceptionists.length > 0 && (
                     <>
-                        {/* Form */}
-                        <div className="p-3 bg-gradient-to-br from-emerald-950/50 via-gray-900/50 to-emerald-950/50 border-b border-emerald-500/20">
-                            <form onSubmit={handleSubmit} className="space-y-2.5">
+                        {/* Futuristic Form */}
+                        <div className="p-4 bg-gradient-to-br from-emerald-950/50 via-gray-900/50 to-emerald-950/50 border-b-2 border-emerald-500/20">
+                            <form onSubmit={handleSubmit} className="space-y-3">
                                 <div className="flex gap-2">
                                     <button
                                         type="button"
                                         onClick={() => setTaskType('task')}
-                                        className={`flex-1 px-2.5 py-1.5 rounded text-xs font-medium transition-all ${
+                                        className={`flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 ${
                                             taskType === 'task'
-                                                ? 'bg-emerald-500 text-white'
-                                                : 'bg-gray-800/50 text-emerald-400 hover:bg-gray-800/70 border border-emerald-500/20'
+                                                ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/30'
+                                                : 'bg-gray-900/50 text-emerald-300 hover:bg-gray-800/70 border border-emerald-500/30'
                                         }`}
                                     >
                                         Task
@@ -530,10 +514,10 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                     <button
                                         type="button"
                                         onClick={() => setTaskType('message')}
-                                        className={`flex-1 px-2.5 py-1.5 rounded text-xs font-medium transition-all ${
+                                        className={`flex-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-300 ${
                                             taskType === 'message'
-                                                ? 'bg-emerald-500 text-white'
-                                                : 'bg-gray-800/50 text-emerald-400 hover:bg-gray-800/70 border border-emerald-500/20'
+                                                ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/30'
+                                                : 'bg-gray-900/50 text-emerald-300 hover:bg-gray-800/70 border border-emerald-500/30'
                                         }`}
                                     >
                                         Message
@@ -545,7 +529,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     placeholder={taskType === 'task' ? 'Task title' : 'Message subject'}
-                                    className="w-full px-2.5 py-1.5 border border-emerald-500/20 rounded text-xs bg-gray-900/50 text-emerald-100 placeholder-emerald-400/40 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50"
+                                    className="w-full px-3 py-2 border-2 border-emerald-500/30 rounded-lg bg-gray-900/50 text-emerald-100 placeholder-emerald-400/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-xs"
                                     required
                                 />
 
@@ -554,7 +538,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         placeholder={taskType === 'task' ? 'Description (optional)' : 'Content (optional)'}
-                                        className="w-full px-2.5 py-1.5 border border-emerald-500/20 rounded text-xs resize-none bg-gray-900/50 text-emerald-100 placeholder-emerald-400/40 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50"
+                                        className="w-full px-3 py-2 border-2 border-emerald-500/30 rounded-lg text-xs resize-none bg-gray-900/50 text-emerald-100 placeholder-emerald-400/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
                                         rows={2}
                                     />
                                     
@@ -567,7 +551,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                                 className="hidden"
                                                 accept="image/*,application/pdf"
                                             />
-                                            <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded text-xs text-emerald-300 transition-all">
+                                            <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs text-emerald-400 transition-all duration-300 cursor-pointer">
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                                                 </svg>
@@ -577,9 +561,9 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                         
                                         <button
                                             type="button"
-                                            onClick={handleCameraCapture}
+                                            onClick={() => setCameraModalOpen(true)}
                                             disabled={uploadingAttachment}
-                                            className="flex items-center justify-center gap-2 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded text-xs text-emerald-300 transition-all disabled:opacity-50"
+                                            className="flex items-center justify-center gap-2 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs text-emerald-400 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -593,16 +577,15 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                     {attachmentUrls.length > 0 && (
                                         <div className="space-y-1.5">
                                             {attachmentUrls.map((attachment, index) => (
-                                                <div key={index} className="flex items-center justify-between px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded text-xs group hover:bg-emerald-500/15 transition-colors">
-                                                    <div className="flex items-center gap-2 text-emerald-300 flex-1 min-w-0">
-                                                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <div key={index} className="flex items-center justify-between px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs group hover:bg-emerald-500/15 transition-all">
+                                                    <div className="flex items-center gap-2 text-emerald-300 flex-1 min-w-0">\n                                                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                                         </svg>
                                                         <a 
                                                             href={attachment.url} 
                                                             target="_blank" 
                                                             rel="noopener noreferrer"
-                                                            className="truncate hover:text-emerald-200 underline"
+                                                            className="truncate hover:text-blue-600 underline"
                                                             title={attachment.name}
                                                         >
                                                             {attachment.name}
@@ -627,7 +610,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="w-full px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-medium transition-colors disabled:opacity-50"
+                                    className="group relative w-full px-3 py-2 bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 hover:from-emerald-400 hover:via-green-400 hover:to-emerald-500 text-white rounded-lg transition-all duration-300 font-semibold text-xs shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.02] disabled:opacity-50"
                                 >
                                     {submitting 
                                         ? 'Sending...' 
@@ -639,13 +622,13 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                             </form>
                         </div>
 
-                        {/* Tabs */}
-                        <div className="flex border-b border-emerald-500/20 bg-gradient-to-br from-emerald-950/30 via-gray-900/30 to-emerald-950/30">
+                        {/* Futuristic Tabs */}
+                        <div className="flex border-b-2 border-emerald-500/20 bg-gradient-to-br from-gray-900/50 to-gray-950/50">
                             <button
                                 onClick={() => setActiveTab('suggested')}
-                                className={`flex-1 px-4 py-2 text-xs font-medium transition-all ${
+                                className={`flex-1 px-4 py-2 text-xs font-medium transition-all duration-300 ${
                                     activeTab === 'suggested'
-                                        ? 'bg-emerald-500/20 text-emerald-300 border-b-2 border-emerald-500'
+                                        ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-400 border-b-2 border-emerald-500 shadow-lg shadow-emerald-500/20'
                                         : 'text-emerald-400/60 hover:text-emerald-400 hover:bg-emerald-500/10'
                                 }`}
                             >
@@ -653,9 +636,9 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                             </button>
                             <button
                                 onClick={() => setActiveTab('in-progress')}
-                                className={`flex-1 px-4 py-2 text-xs font-medium transition-all ${
+                                className={`flex-1 px-4 py-2 text-xs font-medium transition-all duration-300 ${
                                     activeTab === 'in-progress'
-                                        ? 'bg-emerald-500/20 text-emerald-300 border-b-2 border-emerald-500'
+                                        ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-400 border-b-2 border-emerald-500 shadow-lg shadow-emerald-500/20'
                                         : 'text-emerald-400/60 hover:text-emerald-400 hover:bg-emerald-500/10'
                                 }`}
                             >
@@ -663,9 +646,9 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                             </button>
                             <button
                                 onClick={() => setActiveTab('history')}
-                                className={`flex-1 px-4 py-2 text-xs font-medium transition-all ${
+                                className={`flex-1 px-4 py-2 text-xs font-medium transition-all duration-300 ${
                                     activeTab === 'history'
-                                        ? 'bg-emerald-500/20 text-emerald-300 border-b-2 border-emerald-500'
+                                        ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-400 border-b-2 border-emerald-500 shadow-lg shadow-emerald-500/20'
                                         : 'text-emerald-400/60 hover:text-emerald-400 hover:bg-emerald-500/10'
                                 }`}
                             >
@@ -679,10 +662,10 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                 <div className="space-y-2">
                                     {suggestedTasks.length === 0 ? (
                                         <div className="text-center py-8">
-                                            <svg className="w-10 h-10 mx-auto mb-2 text-emerald-400/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="w-10 h-10 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                                             </svg>
-                                            <p className="text-emerald-400/40 text-xs">No suggested tasks</p>
+                                            <p className="text-gray-500 text-xs">No suggested tasks</p>
                                         </div>
                                     ) : (
                                         suggestedTasks.map((task) => {
@@ -692,36 +675,36 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                             return (
                                                 <div
                                                     key={task.id}
-                                                    className={`bg-gray-900/40 border rounded-lg p-2.5 transition-all hover:bg-gray-900/60 ${
-                                                        isExpired ? 'border-red-500/30 opacity-60' : 'border-purple-500/30'
+                                                    className={`bg-white border rounded-lg p-2.5 transition-colors hover:bg-gray-50 ${
+                                                        isExpired ? 'border-red-300 opacity-60' : 'border-purple-300'
                                                     }`}
                                                 >
                                                     <div className="flex items-start justify-between gap-2 mb-2">
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5 mb-1">
-                                                                <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-purple-500/20 text-purple-400">
+                                                                <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-purple-100 text-purple-700">
                                                                     Suggested
                                                                 </span>
                                                                 {isExpired ? (
-                                                                    <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-red-500/20 text-red-400">
+                                                                    <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-red-100 text-red-700">
                                                                         Expired
                                                                     </span>
                                                                 ) : timeLeft !== null && (
-                                                                    <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-orange-500/20 text-orange-400">
+                                                                    <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-orange-100 text-orange-700">
                                                                         {timeLeft}m left
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <h4 className="font-medium text-xs text-emerald-100 mb-0.5">
+                                                            <h4 className="font-medium text-xs text-gray-900 mb-0.5">
                                                                 {task.title}
                                                             </h4>
                                                             {task.description && (
-                                                                <p className="text-[11px] text-emerald-400/50 mb-1 whitespace-pre-wrap">
+                                                                <p className="text-[11px] text-gray-600 mb-1 whitespace-pre-wrap">
                                                                     {task.description}
                                                                 </p>
                                                             )}
                                                             {task.visit && (
-                                                                <div className="text-[10px] text-emerald-400/40 mb-1">
+                                                                <div className="text-[10px] text-gray-500 mb-1">
                                                                     Patient: {task.visit.patient.firstName} {task.visit.patient.lastName} • OPD: {task.visit.opdNo}
                                                                 </div>
                                                             )}
@@ -731,7 +714,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                                         <button
                                                             onClick={() => useSuggestedTask(task)}
                                                             disabled={usingTaskId === task.id}
-                                                            className="px-2 py-1 text-[10px] font-medium rounded bg-emerald-500 text-white hover:bg-emerald-600 transition-all disabled:opacity-50 flex items-center gap-1"
+                                                            className="px-2 py-1 text-[10px] font-medium rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-1"
                                                         >
                                                             {usingTaskId === task.id ? (
                                                                 <>
@@ -773,14 +756,14 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                                                     showError('PDF not available')
                                                                 }
                                                             }}
-                                                            className="px-2 py-1 text-[10px] font-medium rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all"
+                                                            className="px-2 py-1 text-[10px] font-medium rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
                                                         >
                                                             View PDF
                                                         </button>
                                                         <button
                                                             onClick={() => extendExpiry(task.id, 1)}
                                                             disabled={extendingTaskId === task.id}
-                                                            className="px-2 py-1 text-[10px] font-medium rounded bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-all disabled:opacity-50 flex items-center gap-1"
+                                                            className="px-2 py-1 text-[10px] font-medium rounded bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors disabled:opacity-50 flex items-center gap-1"
                                                         >
                                                             {extendingTaskId === task.id ? (
                                                                 <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
@@ -794,7 +777,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                                         <button
                                                             onClick={() => deleteSuggestedTask(task.id)}
                                                             disabled={deletingTaskId === task.id}
-                                                            className="px-2 py-1 text-[10px] font-medium rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all disabled:opacity-50 flex items-center gap-1"
+                                                            className="px-2 py-1 text-[10px] font-medium rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors disabled:opacity-50 flex items-center gap-1"
                                                         >
                                                             {deletingTaskId === task.id ? (
                                                                 <svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24">
@@ -817,43 +800,43 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                 <div className="space-y-2">
                                     {tasks.filter(t => t.status === 'pending').length === 0 ? (
                                         <div className="text-center py-8">
-                                            <svg className="w-10 h-10 mx-auto mb-2 text-emerald-400/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="w-10 h-10 mx-auto mb-2 text-gray-400 dark:text-emerald-400/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                             </svg>
-                                            <p className="text-emerald-400/40 text-xs">No tasks in progress</p>
+                                            <p className="text-gray-500 dark:text-emerald-400/40 text-xs">No tasks in progress</p>
                                         </div>
                                     ) : (
                                         tasks.filter(t => t.status === 'pending').map((task) => (
                                             <div
                                                 key={task.id}
-                                                className="bg-gray-900/40 border border-emerald-500/20 rounded-lg p-2.5 transition-all hover:bg-gray-900/60"
+                                                className="bg-white border border-blue-200 rounded-lg p-2.5 transition-colors hover:bg-gray-50"
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-1.5 mb-1">
                                                             <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded ${
                                                                 task.type === 'task'
-                                                                    ? 'bg-emerald-500/20 text-emerald-400'
-                                                                    : 'bg-purple-500/20 text-purple-400'
+                                                                    ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                                                                    : 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400'
                                                             }`}>
                                                                 {task.type === 'task' ? 'Task' : 'Msg'}
                                                             </span>
                                                         </div>
-                                                        <h4 className="font-medium text-xs text-emerald-100 mb-0.5 truncate">
+                                                        <h4 className="font-medium text-xs text-gray-900 dark:text-emerald-100 mb-0.5 truncate">
                                                             {task.title}
                                                         </h4>
                                                         {task.description && (
-                                                            <p className="text-[11px] text-emerald-400/50 mb-1 line-clamp-2">
+                                                            <p className="text-[11px] text-gray-600 dark:text-emerald-400/50 mb-1 line-clamp-2">
                                                                 {task.description}
                                                             </p>
                                                         )}
-                                                        <div className="text-[10px] text-emerald-400/40">
+                                                        <div className="text-[10px] text-gray-500 dark:text-emerald-400/40">
                                                             {task.assignedByName} • {new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                         </div>
                                                     </div>
                                                     <button
                                                         onClick={() => toggleTaskStatus(task.id, task.status)}
-                                                        className="px-2 py-1 text-[10px] font-medium rounded bg-emerald-500 text-white hover:bg-emerald-600 transition-all"
+                                                        className="px-2 py-1 text-[10px] font-medium rounded bg-green-600 text-white hover:bg-green-700 transition-colors"
                                                     >
                                                         Done
                                                     </button>
@@ -868,46 +851,46 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                                 <div className="space-y-2">
                                     {tasks.filter(t => t.status === 'completed').length === 0 ? (
                                         <div className="text-center py-8">
-                                            <svg className="w-10 h-10 mx-auto mb-2 text-emerald-400/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="w-10 h-10 mx-auto mb-2 text-gray-400 dark:text-emerald-400/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                             </svg>
-                                            <p className="text-emerald-400/40 text-xs">No completed tasks</p>
+                                            <p className="text-gray-500 dark:text-emerald-400/40 text-xs">No completed tasks</p>
                                         </div>
                                     ) : (
                                         tasks.filter(t => t.status === 'completed').map((task) => (
                                             <div
                                                 key={task.id}
-                                                className="bg-gray-900/40 border border-green-500/30 rounded-lg p-2.5 transition-all hover:bg-gray-900/60"
+                                                className="bg-white border border-green-200 rounded-lg p-2.5 transition-colors hover:bg-gray-50"
                                             >
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-1.5 mb-1">
                                                             <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded ${
                                                                 task.type === 'task'
-                                                                    ? 'bg-emerald-500/20 text-emerald-400'
-                                                                    : 'bg-purple-500/20 text-purple-400'
+                                                                    ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                                                                    : 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400'
                                                             }`}>
                                                                 {task.type === 'task' ? 'Task' : 'Msg'}
                                                             </span>
-                                                            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-green-500/20 text-green-400">
+                                                            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400">
                                                                 Done
                                                             </span>
                                                         </div>
-                                                        <h4 className="font-medium text-xs text-emerald-100 mb-0.5 truncate">
+                                                        <h4 className="font-medium text-xs text-gray-900 dark:text-emerald-100 mb-0.5 truncate">
                                                             {task.title}
                                                         </h4>
                                                         {task.description && (
-                                                            <p className="text-[11px] text-emerald-400/50 mb-1 line-clamp-2">
+                                                            <p className="text-[11px] text-gray-600 dark:text-emerald-400/50 mb-1 line-clamp-2">
                                                                 {task.description}
                                                             </p>
                                                         )}
-                                                        <div className="text-[10px] text-emerald-400/40">
+                                                        <div className="text-[10px] text-gray-500 dark:text-emerald-400/40">
                                                             To: {task.assignedToName} • {new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                                         </div>
                                                     </div>
                                                     <button
                                                         onClick={() => toggleTaskStatus(task.id, task.status)}
-                                                        className="px-2 py-1 text-[10px] font-medium rounded bg-gray-700/50 text-gray-400 hover:bg-gray-700 transition-all"
+                                                        className="px-2 py-1 text-[10px] font-medium rounded bg-gray-200 dark:bg-gray-700/50 text-gray-700 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700 transition-all"
                                                     >
                                                         Undo
                                                     </button>
@@ -937,7 +920,7 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                             {/* Header */}
                             <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-gray-800/90 to-gray-900/90 border-b border-emerald-500/20 backdrop-blur-sm">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                                     <h3 className="text-lg font-bold bg-gradient-to-r from-emerald-400 to-green-400 bg-clip-text text-transparent">
                                         Office Copy Preview
                                     </h3>
@@ -1001,6 +984,13 @@ export default function TaskSidebar({ isOpen, onClose }: TaskSidebarProps) {
                     </div>
                 </>
             )}
+
+            <CameraModal
+                isOpen={cameraModalOpen}
+                onClose={() => setCameraModalOpen(false)}
+                onCapture={handleCameraCapture}
+                title="Capture Attachment"
+            />
         </>
     )
 }

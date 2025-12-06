@@ -18,6 +18,7 @@ export default function VisitDetail() {
     const [reportsAttachments, setReportsAttachments] = useState<Array<{ url: string, name: string, type: string }>>([])
     const [selectedReportUrl, setSelectedReportUrl] = useState<string | null>(null)
     const [selectedReportName, setSelectedReportName] = useState<string>('')
+    const [isPdfReady, setIsPdfReady] = useState(false)
     const prescriptionRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -37,13 +38,6 @@ export default function VisitDetail() {
                     setReportsAttachments([])
                 }
             }
-
-            // Auto-generate and upload PDFs if not already done (skip imported visits)
-            if (visitData.prescriptions && visitData.prescriptions.length > 0 && !visitData.isImported) {
-                if (!visitData.patientCopyPdfUrl || !visitData.officeCopyPdfUrl) {
-                    setTimeout(() => generateAndUploadPdfs(visitData), 1500)
-                }
-            }
         })
 
         // Fetch products for medicine names
@@ -52,15 +46,65 @@ export default function VisitDetail() {
         }).catch(err => console.error('Failed to fetch products:', err))
     }, [id])
 
+    // Effect to check when DOM is ready for PDF generation
+    useEffect(() => {
+        if (visit && prescriptionRef.current) {
+            console.log('📋 DOM is ready for PDF generation')
+            setIsPdfReady(true)
+        }
+    }, [visit])
+
+    // Separate effect to handle PDF generation after DOM is ready
+    useEffect(() => {
+        if (!visit || !isPdfReady) {
+            console.log('⏳ Waiting for PDF generation readiness...', {
+                hasVisit: !!visit,
+                isPdfReady
+            })
+            return
+        }
+        
+        // Auto-generate and upload office PDF if not already done (skip imported visits)
+        if (visit.prescriptions && visit.prescriptions.length > 0 && !visit.isImported && !visit.officeCopyPdfUrl) {
+            console.log('🔍 Conditions met for PDF generation - scheduling...', {
+                prescriptionCount: visit.prescriptions.length,
+                isImported: visit.isImported,
+                hasOfficePdf: !!visit.officeCopyPdfUrl
+            })
+            
+            // Wait for DOM to be fully ready and rendered
+            const timer = setTimeout(() => {
+                if (prescriptionRef.current) {
+                    console.log('✅ Starting PDF generation now!')
+                    generateAndUploadPdfs(visit)
+                } else {
+                    console.error('❌ prescriptionRef is null even after waiting')
+                }
+            }, 2000)
+            
+            return () => clearTimeout(timer)
+        } else {
+            console.log('⏭️ Skipping PDF generation:', {
+                hasPrescriptions: !!(visit.prescriptions && visit.prescriptions.length > 0),
+                isImported: visit.isImported,
+                hasOfficePdf: !!visit.officeCopyPdfUrl
+            })
+        }
+    }, [visit, isPdfReady])
+
     const generateAndUploadPdfs = async (visitData: any) => {
         if (!visitData || !prescriptionRef.current) {
-            console.log('Cannot generate PDFs: missing visitData or prescriptionRef')
+            console.log('❌ Cannot generate PDFs: missing visitData or prescriptionRef', {
+                hasVisitData: !!visitData,
+                hasPrescriptionRef: !!prescriptionRef.current
+            })
             return
         }
 
         try {
-            console.log('Starting PDF generation for visit:', visitData.id)
-            console.log('prescriptionRef.current exists:', !!prescriptionRef.current)
+            console.log('🚀 Starting PDF generation for visit:', visitData.id)
+            console.log('✓ prescriptionRef.current exists:', !!prescriptionRef.current)
+            console.log('✓ Visit OPD No:', visitData.opdNo)
 
             // Wait for the component to render
             await new Promise(resolve => setTimeout(resolve, 1000))
@@ -68,32 +112,27 @@ export default function VisitDetail() {
             // Store ref to avoid losing it during state changes
             const refElement = prescriptionRef.current
 
-            // Generate both PDFs without changing copyType between captures
-            console.log('Generating patient copy...')
+            // Generate only office copy PDF
+            console.log('📄 Generating office copy...')
             const originalCopyType = copyType
-            setCopyType('PATIENT')
-            await new Promise(resolve => setTimeout(resolve, 800))
-            const patientCopyUrl = await uploadPdfToCloudinary('PATIENT', visitData, refElement)
-            console.log('Patient copy URL:', patientCopyUrl)
-
-            console.log('Generating office copy...')
             setCopyType('OFFICE')
             await new Promise(resolve => setTimeout(resolve, 800))
+            
+            console.log('📤 Uploading office copy to Cloudinary...')
             const officeCopyUrl = await uploadPdfToCloudinary('OFFICE', visitData, refElement)
-            console.log('Office copy URL:', officeCopyUrl)
+            console.log('📋 Office copy URL:', officeCopyUrl)
 
             // Reset to original copy type
             setCopyType(originalCopyType)
 
-            // Update visit with PDF URLs
-            if (patientCopyUrl && officeCopyUrl) {
-                console.log('Updating visit with PDF URLs...')
+            // Update visit with office PDF URL only
+            if (officeCopyUrl) {
+                console.log('✅ Updating visit with office PDF URL...')
                 const updateResponse = await fetch('/api/visits', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         id: visitData.id,
-                        patientCopyPdfUrl: patientCopyUrl,
                         officeCopyPdfUrl: officeCopyUrl,
                         patientId: visitData.patientId,
                         opdNo: visitData.opdNo
@@ -101,27 +140,27 @@ export default function VisitDetail() {
                 })
 
                 if (updateResponse.ok) {
-                    console.log('Visit updated successfully with PDF URLs')
+                    console.log('✅ Visit updated successfully with office PDF URL')
                     // Refresh visit data
                     const updatedVisit = await fetch(`/api/visits?id=${id}`).then(r => r.json())
                     setVisit(updatedVisit)
                 } else {
-                    console.error('Failed to update visit:', await updateResponse.text())
+                    const errorText = await updateResponse.text()
+                    console.error('❌ Failed to update visit:', errorText)
                 }
             } else {
-                console.error('One or both PDF URLs are null')
+                console.error('❌ Office PDF URL is null - upload failed')
             }
         } catch (error) {
-            console.error('Failed to generate/upload PDFs:', error)
+            console.error('❌ Failed to generate/upload PDFs:', error)
         }
     }
-
     const uploadPdfToCloudinary = async (type: 'PATIENT' | 'OFFICE', visitData?: any, refElement?: HTMLDivElement | null) => {
         const currentVisit = visitData || visit
         const elementToCapture = refElement || prescriptionRef.current
 
         if (!currentVisit || !elementToCapture) {
-            console.log('Cannot upload PDF: missing visit or prescriptionRef', {
+            console.log('❌ Cannot upload PDF: missing visit or prescriptionRef', {
                 hasVisit: !!currentVisit,
                 hasRef: !!elementToCapture
             })
@@ -129,7 +168,8 @@ export default function VisitDetail() {
         }
 
         try {
-            console.log(`Capturing ${type} copy...`)
+            console.log(`📸 Capturing ${type} copy...`)
+            console.log(`   Element dimensions: ${elementToCapture.scrollWidth}x${elementToCapture.scrollHeight}`)
 
             // Capture as canvas
             const canvas = await html2canvas(elementToCapture, {
@@ -142,7 +182,7 @@ export default function VisitDetail() {
                 imageTimeout: 15000
             })
 
-            console.log(`Canvas captured: ${canvas.width}x${canvas.height}`)
+            console.log(`✓ Canvas captured: ${canvas.width}x${canvas.height}`)
 
             // Convert canvas to PDF
             const pdf = new jsPDF({
@@ -156,10 +196,10 @@ export default function VisitDetail() {
 
             // Get PDF as base64 data URI
             const pdfDataUri = pdf.output('datauristring')
-            console.log(`PDF generated, data URI length: ${pdfDataUri.length} (${(pdfDataUri.length / 1024 / 1024).toFixed(2)} MB)`)
+            console.log(`✓ PDF generated, size: ${(pdfDataUri.length / 1024 / 1024).toFixed(2)} MB`)
 
             // Upload to Cloudinary with timeout
-            console.log(`Uploading ${type} copy to Cloudinary...`)
+            console.log(`☁️  Uploading ${type} copy to Cloudinary...`)
 
             const controller = new AbortController()
             const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
@@ -176,29 +216,28 @@ export default function VisitDetail() {
                 })
 
                 clearTimeout(timeoutId)
-                clearTimeout(timeoutId)
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-                    console.error(`Cloudinary upload failed:`, errorData)
+                    console.error(`❌ Cloudinary upload failed:`, errorData)
                     return null
                 }
 
                 const result = await response.json()
-                console.log(`${type} copy uploaded successfully:`, result.url)
+                console.log(`✅ ${type} copy uploaded successfully:`, result.url)
 
                 return result.url
             } catch (fetchError: any) {
                 clearTimeout(timeoutId)
                 if (fetchError.name === 'AbortError') {
-                    console.error(`Upload timeout after 60 seconds`)
+                    console.error(`⏱️  Upload timeout after 60 seconds`)
                 } else {
-                    console.error(`Fetch error:`, fetchError)
+                    console.error(`❌ Fetch error:`, fetchError)
                 }
                 return null
             }
         } catch (error) {
-            console.error(`Failed to upload ${type} copy to Cloudinary:`, error)
+            console.error(`❌ Failed to upload ${type} copy to Cloudinary:`, error)
             return null
         }
     }
@@ -1742,8 +1781,8 @@ export default function VisitDetail() {
                             <div ref={prescriptionRef} className="prescription-container" style={{ background: 'white', color: 'black', padding: '0', position: 'relative', width: '210mm', minHeight: '297mm', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                                 {/* Watermark - Only show in PATIENT copy */}
                                 {copyType === 'PATIENT' && (
-                                    <div className="watermark-container" style={{ position: 'absolute', top: 'calc(50% - 30px)', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.25, zIndex: 0, pointerEvents: 'none' }}>
-                                        <img src="/watermark.png" alt="Watermark" style={{ width: '400px', height: '400px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                                    <div className="watermark-container" style={{ position: 'absolute', top: 'calc(50% - 30px)', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.175, zIndex: 0, pointerEvents: 'none' }}>
+                                        <img src="/watermark.png" alt="Watermark" style={{ width: '520px', height: '520px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
                                     </div>
                                 )}
 
@@ -1938,6 +1977,11 @@ export default function VisitDetail() {
 
                                             {/* Orange Separator after table */}
                                             <div style={{ borderBottom: '2px solid #FF8C00', marginBottom: '1rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
+                                        </div>
+
+                                        {/* Watermark Stamp - Positioned above footer on the right */}
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '2rem', marginBottom: '0.5rem' }}>
+                                            <img src="/watermark.png" alt="Watermark" style={{ width: '60px', height: 'auto', display: 'block', opacity: 0.8 }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
                                         </div>
 
                                         {/* Footer Image */}

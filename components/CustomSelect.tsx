@@ -216,8 +216,10 @@ export default function CustomSelect({
         setIsOpen(true)
         setHighlightedIndex(0)
         
-        // Always update the value as user types (allows custom entries)
-        onChange(newValue)
+        // Only update the value as user types if allowCustom is enabled
+        if (allowCustom) {
+            onChange(newValue)
+        }
     }
 
     const handleInputFocus = () => {
