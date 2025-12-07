@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if(!user) return
         
         const { 
-            provDiagnosis, planNumber, speciality, organ, diseaseAction, 
+            provDiagnosis, planNumber, speciality, imbalance, systems, organ, diseaseAction, 
             treatmentPlan, administration, notes, products 
         } = req.body
         
@@ -53,6 +53,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     provDiagnosis,
                     planNumber,
                     speciality,
+                    imbalance,
+                    systems,
                     organ,
                     diseaseAction,
                     treatmentPlan,
@@ -100,7 +102,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if(!user) return
         
         const { 
-            id, provDiagnosis, planNumber, speciality, organ, diseaseAction, 
+            id, provDiagnosis, planNumber, speciality, imbalance, systems, organ, diseaseAction, 
             treatmentPlan, administration, notes, products 
         } = req.body
         
@@ -119,6 +121,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     provDiagnosis,
                     planNumber,
                     speciality,
+                    imbalance,
+                    systems,
                     organ,
                     diseaseAction,
                     treatmentPlan,

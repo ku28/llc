@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import jsPDF from 'jspdf'
@@ -8,13 +8,13 @@ import DateInput from '../components/DateInput'
 import LoadingModal from '../components/LoadingModal'
 import CameraModal from '../components/CameraModal'
 import ConfirmModal from '../components/ConfirmModal'
+import ToastNotification from '../components/ToastNotification'
 import genderOptions from '../data/gender.json'
 import temperamentOptions from '../data/temperament.json'
 import pulseDiagnosisOptions from '../data/pulseDiagnosis.json'
 import pulseDiagnosis2Options from '../data/pulseDiagnosis2.json'
 import components from '../data/components.json'
 import timing from '../data/timing.json'
-import dosage from '../data/dosage.json'
 import doseQuantity from '../data/doseQuantity.json'
 import doseTiming from '../data/doseTiming.json'
 import dilution from '../data/dilution.json'
@@ -48,6 +48,7 @@ export default function PrescriptionsPage() {
     const videoRef = useRef<HTMLVideoElement>(null)
     const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
     const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({})
+    const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null)
 
     // Refs to track which field user is editing (prevent circular updates)
     const isUpdatingHeightFromFeet = useRef(false)
@@ -72,6 +73,7 @@ export default function PrescriptionsPage() {
     const [lastCreatedVisitId, setLastCreatedVisitId] = useState<number | null>(null)
     const [lastCreatedVisit, setLastCreatedVisit] = useState<any | null>(null)
     const [previousWeight, setPreviousWeight] = useState<string>('')
+    const [previousPrescriptionCount, setPreviousPrescriptionCount] = useState<number>(0)
     const previewRef = useRef<HTMLDivElement | null>(null)
     const isPatient = user?.role?.toLowerCase() === 'user'
 
@@ -149,6 +151,16 @@ export default function PrescriptionsPage() {
     const [isTreatmentSelectOpen, setIsTreatmentSelectOpen] = useState(false)
     const [isMedicineSelectOpen, setIsMedicineSelectOpen] = useState(false)
     const [isPrescriptionDropdownOpen, setIsPrescriptionDropdownOpen] = useState<{ [key: number]: { [field: string]: boolean } }>({})
+    
+    // Undo functionality for restore default
+    const [undoStack, setUndoStack] = useState<any[]>([])
+    const [undoAllStack, setUndoAllStack] = useState<any[]>([])
+    
+    // Treatment plan comparison modal
+    const [showPlanCompareModal, setShowPlanCompareModal] = useState(false)
+    const [selectedProvDiagnosis, setSelectedProvDiagnosis] = useState<string>('')
+    const [freeTextDiagnosis, setFreeTextDiagnosis] = useState<string>('')
+    const [showAddPlanButton, setShowAddPlanButton] = useState(false)
 
     // Step configuration
     const steps = [
@@ -337,6 +349,9 @@ export default function PrescriptionsPage() {
         let additionsBottleAdded = false
 
         prescriptions.forEach(pr => {
+            // Skip medicines that patient already has ("not taken")
+            if (pr.patientHasMedicine) return
+            
             const product = products.find(p => String(p.id) === String(pr.productId))
             if (product && product.priceRupees !== undefined) {
                 const quantity = parseInt(pr.quantity) || 1
@@ -399,6 +414,51 @@ export default function PrescriptionsPage() {
             }
         }
     }, [form.height])
+
+    // Auto-save prescriptions periodically to prevent data loss (backup mechanism)
+    useEffect(() => {
+        if (!isEditMode && prescriptions.length > 0 && form.patientId) {
+            const backupTimer = setTimeout(() => {
+                try {
+                    const backup = {
+                        prescriptions,
+                        timestamp: new Date().toISOString(),
+                        patientId: form.patientId
+                    }
+                    localStorage.setItem('prescriptionBackup', JSON.stringify(backup))
+                    console.log('Prescription backup saved at', new Date().toLocaleTimeString())
+                } catch (err) {
+                    console.error('Failed to save prescription backup:', err)
+                }
+            }, 5000) // Save every 5 seconds
+
+            return () => clearTimeout(backupTimer)
+        }
+    }, [prescriptions, form.patientId, isEditMode])
+
+    // Monitor prescription count changes to detect unexpected deletions
+    useEffect(() => {
+        const currentCount = prescriptions.length
+        
+        // Detect suspicious emptying of prescriptions
+        if (previousPrescriptionCount > 0 && currentCount === 0 && !loading) {
+            console.error(`⚠️ WARNING: Prescriptions dropped from ${previousPrescriptionCount} to 0!`, new Error().stack)
+            
+            // Try to auto-restore from backup
+            setTimeout(() => {
+                const restored = restoreFromBackup()
+                if (!restored) {
+                    showError(`Warning: All ${previousPrescriptionCount} medicines disappeared! No backup found to restore.`)
+                }
+            }, 100)
+        }
+        
+        // Update tracking
+        if (currentCount !== previousPrescriptionCount) {
+            console.log(`Prescription count changed: ${previousPrescriptionCount} → ${currentCount}`)
+            setPreviousPrescriptionCount(currentCount)
+        }
+    }, [prescriptions, previousPrescriptionCount, loading])
 
     // Auto-convert height: feet-inches to cm
     useEffect(() => {
@@ -1164,6 +1224,27 @@ export default function PrescriptionsPage() {
         setShowRestoreDraftModal(false)
     }
 
+    // Restore prescriptions from backup
+    function restoreFromBackup() {
+        try {
+            const backupStr = localStorage.getItem('prescriptionBackup')
+            if (backupStr) {
+                const backup = JSON.parse(backupStr)
+                if (backup.prescriptions && Array.isArray(backup.prescriptions) && backup.prescriptions.length > 0) {
+                    setPrescriptions(backup.prescriptions)
+                    showSuccess(`Restored ${backup.prescriptions.length} medicines from backup (${new Date(backup.timestamp).toLocaleString()})`)
+                    return true
+                }
+            }
+            showError('No backup found')
+            return false
+        } catch (err) {
+            console.error('Failed to restore from backup:', err)
+            showError('Failed to restore from backup')
+            return false
+        }
+    }
+
     // Helpers to format dates for inputs
     function formatDateForInput(dateStr?: string | null) {
         if (!dateStr) return ''
@@ -1290,6 +1371,9 @@ export default function PrescriptionsPage() {
         }])
     }
 
+    // Debounce timer ref
+    const updateTimerRef = useRef<NodeJS.Timeout | null>(null)
+    
     function updatePrescription(i: number, patch: any) {
         const copy = [...prescriptions]
 
@@ -1330,7 +1414,93 @@ export default function PrescriptionsPage() {
         }
 
         copy[i] = { ...copy[i], ...patch }
+        
+        // Clear any pending update
+        if (updateTimerRef.current) {
+            clearTimeout(updateTimerRef.current)
+        }
+        
+        // Update immediately for responsive UI
         setPrescriptions(copy)
+    }
+
+    // Reorder prescriptions via drag and drop
+    function reorderPrescriptions(fromIndex: number, toIndex: number) {
+        if (fromIndex === toIndex) return
+        
+        const copy = [...prescriptions]
+        const [movedItem] = copy.splice(fromIndex, 1)
+        copy.splice(toIndex, 0, movedItem)
+        setPrescriptions(copy)
+        showSuccess('Medicine reordered successfully')
+    }
+
+    // Restore default dosage & administrative details for a single prescription
+    function restoreDefaultValues(index: number) {
+        // Save current state for undo
+        setUndoStack([...undoStack, { index, prescription: { ...prescriptions[index] } }])
+        
+        updatePrescription(index, {
+            quantity: 15,
+            timing: 'BM',
+            dosage: '10|TDS|WTR'
+        })
+        showSuccess('Default values restored')
+    }
+
+    // Restore default dosage & administrative details for all prescriptions
+    function restoreDefaultValuesForAll() {
+        // Save current state for undo
+        setUndoAllStack([...undoAllStack, [...prescriptions]])
+        
+        // Also add each prescription to individual undo stack so all buttons become undo buttons
+        const newUndoStack = prescriptions.map((pr, index) => ({
+            index,
+            prescription: { ...pr }
+        }))
+        setUndoStack(newUndoStack)
+        
+        const copy = prescriptions.map(pr => ({
+            ...pr,
+            quantity: 15,
+            timing: 'BM',
+            dosage: '10|TDS|WTR'
+        }))
+        setPrescriptions(copy)
+        showSuccess(`Default values restored for all ${copy.length} medicines`)
+    }
+    
+    // Undo single restore
+    function undoRestore() {
+        if (undoStack.length === 0) {
+            showError('Nothing to undo')
+            return
+        }
+        
+        const lastUndo = undoStack[undoStack.length - 1]
+        const newStack = undoStack.slice(0, -1)
+        setUndoStack(newStack)
+        
+        updatePrescription(lastUndo.index, lastUndo.prescription)
+        showSuccess('Undo successful')
+    }
+    
+    // Undo restore all
+    function undoRestoreAll() {
+        if (undoAllStack.length === 0) {
+            showError('Nothing to undo')
+            return
+        }
+        
+        const lastState = undoAllStack[undoAllStack.length - 1]
+        const newStack = undoAllStack.slice(0, -1)
+        setUndoAllStack(newStack)
+        
+        // Clear individual undo stack when undoing all
+        setUndoStack([])
+        
+        setPrescriptions(lastState)
+        showSuccess('Undo successful')
     }
 
     // Step navigation functions
@@ -1430,6 +1600,19 @@ export default function PrescriptionsPage() {
             // Warn if some prescriptions were filtered out
             if (validPrescriptions.length < prescriptions.length) {
                 showError(`${prescriptions.length - validPrescriptions.length} prescription(s) skipped due to missing medicine selection`)
+            }
+
+            // SAFETY CHECK: If editing and all prescriptions became invalid, prevent accidental deletion
+            if (isEditMode && prescriptions.length > 0 && validPrescriptions.length === 0) {
+                const shouldContinue = confirm(
+                    `⚠️ WARNING: All medicines appear to be invalid and would be deleted!\n\n` +
+                    `This could be a data corruption issue. Are you sure you want to continue?\n\n` +
+                    `Click Cancel to go back and check your medicines.`
+                )
+                if (!shouldContinue) {
+                    setLoading(false)
+                    return
+                }
             }
 
             // Prepare payload
@@ -1578,21 +1761,7 @@ export default function PrescriptionsPage() {
                     </div>
 
                     {/* Toast Notifications */}
-                    <div className="fixed top-4 right-4 z-50 space-y-2">
-                        {toasts.map(toast => (
-                            <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-slideIn ${toast.type === 'success' ? 'bg-green-500 text-white' :
-                                toast.type === 'error' ? 'bg-red-500 text-white' :
-                                    'bg-emerald-500 text-white'
-                                }`}>
-                                <span className="flex-1">{toast.message}</span>
-                                <button onClick={() => removeToast(toast.id)} className="text-white hover:text-gray-200">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                        ))}
-                    </div>
+                    <ToastNotification toasts={toasts} removeToast={removeToast} />
 
                     <form onSubmit={submit} className="space-y-5">
                         {/* Step Title */}
@@ -2165,64 +2334,43 @@ export default function PrescriptionsPage() {
                                 </label>
                                 <div className="flex gap-2" style={{ position: 'relative', zIndex: 100 }}>
                                     <CustomSelect
-                                        value={selectedTreatmentId || ""}
-                                        onChange={(treatmentId) => {
-                                            if (selectedTreatmentId) return; // Prevent changing once selected
-                                            const treatment = treatments.find(t => String(t.id) === String(treatmentId))
-                                            if (treatment && treatment.treatmentProducts && treatment.treatmentProducts.length > 0) {
-                                                // Replace all medicines with the treatment plan (not add)
-                                                const newPrescriptions = treatment.treatmentProducts.map((tp: any) => ({
-                                                    treatmentId: String(treatment.id),
-                                                    productId: String(tp.productId),
-                                                    spy1: tp.spy1 || '',
-                                                    spy2: tp.spy2 || '',
-                                                    spy3: tp.spy3 || '',
-                                                    spy4: tp.spy4 || '',
-                                                    spy5: tp.spy5 || '',
-                                                    spy6: tp.spy6 || '',
-                                                    quantity: tp.quantity || treatment.quantity || 1,
-                                                    timing: tp.timing || '',
-                                                    dosage: tp.dosage || treatment.dosage || '',
-                                                    additions: tp.additions || '',
-                                                    addition1: tp.addition1 || '',
-                                                    addition2: tp.addition2 || '',
-                                                    addition3: tp.addition3 || '',
-                                                    procedure: tp.procedure || treatment.procedure || '',
-                                                    presentation: tp.presentation || '',
-                                                    droppersToday: tp.droppersToday?.toString() || '',
-                                                    medicineQuantity: tp.medicineQuantity?.toString() || '',
-                                                    administration: treatment.administration || '',
-                                                    patientHasMedicine: false,
-                                                    bottleSize: tp.bottleSize || '',
-                                                    discussions: tp.discussions || ''
-                                                }))
-                                                setPrescriptions(newPrescriptions) // Replace, not add
-                                                setSelectedTreatmentId(String(treatment.id))
-                                                setSelectedTreatmentPlan(treatment) // Store the full treatment plan object
-                                                setOriginalTreatmentData(JSON.parse(JSON.stringify(newPrescriptions))) // Deep copy
+                                        value={selectedProvDiagnosis || freeTextDiagnosis || ""}
+                                        onChange={(value) => {
+                                            if (selectedTreatmentId) return; // Prevent changing once a plan is selected
+                                            
+                                            // Check if this is a diagnosis from the list
+                                            const diagnosisTreatments = treatments.filter(t => 
+                                                t.provDiagnosis === value && !t.deleted
+                                            )
+                                            
+                                            if (diagnosisTreatments.length > 0) {
+                                                // This is an existing diagnosis - show plan comparison modal
+                                                setSelectedProvDiagnosis(value)
+                                                setFreeTextDiagnosis('')
+                                                setShowPlanCompareModal(true)
+                                            } else {
+                                                // This is free text - store it and show button to add plan later
+                                                setFreeTextDiagnosis(value)
+                                                setSelectedProvDiagnosis('')
+                                                setShowAddPlanButton(true)
                                             }
                                         }}
                                         options={[
-                                            { value: '', label: '-- select treatment plan to load medicines --' },
-                                            ...(Array.isArray(treatments) ? treatments : [])
-                                                .filter(t => !t.deleted) // Only show non-deleted treatments in dropdown
-                                                .filter(t => !(t.provDiagnosis === 'IMPORTED' && t.planNumber === '00')) // Hide imported treatment plan
-                                                .map(t => {
-                                                    // Count how many plans exist for this diagnosis
-                                                    const sameDignosisPlans = treatments.filter(plan =>
-                                                        plan.provDiagnosis === t.provDiagnosis && !plan.deleted
-                                                    )
-                                                    // If only one plan exists for this diagnosis, show as Plan 1
-                                                    const displayPlanNumber = sameDignosisPlans.length === 1 ? '1' : t.planNumber
-
-                                                    return {
-                                                        value: String(t.id),
-                                                        label: `${displayPlanNumber ? `Plan ${displayPlanNumber} - ` : ''}${t.treatmentPlan || t.provDiagnosis || `Treatment #${t.id}`} (${t.treatmentProducts?.length || 0} medicines)`
-                                                    }
-                                                })
+                                            { value: '', label: '-- select provisional diagnosis or type new --' },
+                                            // Get unique provisional diagnoses
+                                            ...Array.from(new Set(
+                                                (Array.isArray(treatments) ? treatments : [])
+                                                    .filter(t => !t.deleted && t.provDiagnosis)
+                                                    .filter(t => !(t.provDiagnosis === 'IMPORTED' && t.planNumber === '00'))
+                                                    .map(t => t.provDiagnosis)
+                                            )).map(diagnosis => ({
+                                                value: diagnosis,
+                                                label: diagnosis
+                                            }))
                                         ]}
-                                        placeholder="-- select treatment plan --"
+                                        placeholder="-- select or type diagnosis --"
                                         className={`flex-1 ${selectedTreatmentId ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}
+                                        allowCustom={true}
                                     />
                                 </div>
                                 {selectedTreatmentId && (
@@ -2245,11 +2393,21 @@ export default function PrescriptionsPage() {
                                                 setSelectedTreatmentId(null)
                                                 setSelectedTreatmentPlan(null)
                                                 setOriginalTreatmentData([])
+                                                setSelectedProvDiagnosis('')
+                                                setFreeTextDiagnosis('')
+                                                setShowAddPlanButton(false)
                                             }}
                                             className="ml-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs font-semibold"
                                         >
                                             Clear
                                         </button>
+                                    </div>
+                                )}
+                                {freeTextDiagnosis && !selectedTreatmentId && (
+                                    <div className="mt-2 flex items-center gap-2 text-sm">
+                                        <span className="text-blue-600 dark:text-blue-400 font-semibold">New Diagnosis:</span>
+                                        <span className="text-gray-700 dark:text-gray-300">{freeTextDiagnosis}</span>
+                                        <span className="text-gray-500 dark:text-gray-400 text-xs">(will create treatment plan when saving)</span>
                                     </div>
                                 )}
                                 <p className="text-xs text-muted mt-1">This will <strong>replace all medicines</strong> with the selected treatment plan. To add individual medicines, use the selector below.</p>
@@ -2375,18 +2533,39 @@ export default function PrescriptionsPage() {
                         )}
 
                         {/* Prescriptions Card */}
-                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6"
-                            style={{ display: currentStep !== 5 ? 'none' : 'block' }}
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-2xl"></div>
+                        {currentStep === 5 && (
+                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-white dark:bg-gray-900 shadow-lg p-6">
                             <div className="relative flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Prescriptions</h3>
-                                <button type="button" onClick={addEmptyPrescription} className="px-3 sm:px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-700 rounded-lg transition-colors shadow-sm hover:shadow-md" title="Add empty prescription row">
-                                    <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    <span className="hidden sm:inline">Add Empty Row</span>
-                                </button>
+                                <div className="flex gap-2">
+                                    {prescriptions.length > 0 && (
+                                        <button 
+                                            type="button" 
+                                            onClick={undoAllStack.length > 0 ? undoRestoreAll : restoreDefaultValuesForAll}
+                                            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 shadow-sm hover:shadow-md ${
+                                                undoAllStack.length > 0 
+                                                    ? 'text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700'
+                                                    : 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700'
+                                            }`}
+                                            title={undoAllStack.length > 0 ? 'Undo the last Restore Default on All action' : 'Restore default values (Qty: 15, Timing: BM, Dose: 10|TDS|WTR) for all medicines'}
+                                        >
+                                            <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                {undoAllStack.length > 0 ? (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                ) : (
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                )}
+                                            </svg>
+                                            <span className="hidden sm:inline">{undoAllStack.length > 0 ? 'Undo All' : 'Restore Default on All'}</span>
+                                        </button>
+                                    )}
+                                    <button type="button" onClick={addEmptyPrescription} className="px-3 sm:px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-700 rounded-lg transition-colors shadow-sm hover:shadow-md" title="Add empty prescription row">
+                                        <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        <span className="hidden sm:inline">Add Empty Row</span>
+                                    </button>
+                                </div>
                             </div>
                             {prescriptions.length === 0 ? (
                                 <div className="relative text-center py-8 text-gray-500 dark:text-gray-400">
@@ -2397,12 +2576,56 @@ export default function PrescriptionsPage() {
                                     {prescriptions.map((pr, i) => {
                                         const prescriptionTreatment = pr.treatmentId && Array.isArray(treatments) ? treatments.find(t => String(t.id) === String(pr.treatmentId)) : null
                                         const isDeleted = prescriptionTreatment?.deleted === true
+                                        
+                                        // Pre-calculate product and category info to avoid repeated lookups
+                                        const product = products.find(p => String(p.id) === String(pr.productId))
+                                        const categoryName = product ? (typeof product.category === 'string' ? product.category : product.category?.name || '').toLowerCase() : ''
+                                        const showSpyFields = ['drops', 'eco drops', 'dilutions', 'misc', 'new sp drops', 'special drops'].includes(categoryName)
+                                        const showBottleSize = ['drops', 'eco drops', 'dilutions', 'misc', 'new sp drops', 'special drops'].includes(categoryName)
+                                        
+                                        // Pre-parse dosage to avoid repeated parsing in onChange handlers
+                                        const parsedDosageValues = parseDosage(pr.dosage || '')
 
                                         return (
-                                            <div key={i} className={`relative group transition-all duration-300 ${isDeleted ? 'border border-red-400/50 dark:border-red-600/50 bg-red-50/50 dark:bg-red-950/30 rounded-2xl' : 'border border-emerald-200/40 dark:border-emerald-700/40 bg-gradient-to-br from-white via-emerald-50/20 to-transparent dark:from-gray-900/80 dark:via-emerald-950/10 dark:to-gray-900/80 rounded-2xl hover:border-emerald-400/60 dark:hover:border-emerald-600/60 hover:shadow-xl hover:shadow-emerald-500/10'}`}>
+                                            <div 
+                                                key={`prescription-${i}-${pr.productId || 'empty'}`} 
+                                                draggable={!isDeleted}
+                                                onDragStart={(e) => {
+                                                    setDraggedItemIndex(i)
+                                                    e.dataTransfer.effectAllowed = 'move'
+                                                    // Add a subtle visual indicator
+                                                    e.currentTarget.style.opacity = '0.5'
+                                                }}
+                                                onDragEnd={(e) => {
+                                                    e.currentTarget.style.opacity = '1'
+                                                    setDraggedItemIndex(null)
+                                                }}
+                                                onDragOver={(e) => {
+                                                    e.preventDefault()
+                                                    e.dataTransfer.dropEffect = 'move'
+                                                }}
+                                                onDrop={(e) => {
+                                                    e.preventDefault()
+                                                    if (draggedItemIndex !== null && draggedItemIndex !== i) {
+                                                        reorderPrescriptions(draggedItemIndex, i)
+                                                    }
+                                                }}
+                                                className={`relative group ${isDeleted ? 'border border-red-400/50 dark:border-red-600/50 bg-red-50/50 dark:bg-red-950/30 rounded-2xl' : 'border border-emerald-200/40 dark:border-emerald-700/40 bg-white dark:bg-gray-800 rounded-2xl hover:border-emerald-400/60 dark:hover:border-emerald-600/60'} ${!isDeleted ? 'cursor-move' : ''}`} 
+                                                style={{ transform: 'translateZ(0)', willChange: 'auto' }}
+                                            >
+                                                {/* Drag handle indicator */}
+                                                {!isDeleted && (
+                                                    <div className="absolute -left-3 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-60 pointer-events-none">
+                                                        <div className="w-1 h-1 bg-emerald-600 dark:bg-emerald-400 rounded-full"></div>
+                                                        <div className="w-1 h-1 bg-emerald-600 dark:bg-emerald-400 rounded-full"></div>
+                                                        <div className="w-1 h-1 bg-emerald-600 dark:bg-emerald-400 rounded-full"></div>
+                                                        <div className="w-1 h-1 bg-emerald-600 dark:bg-emerald-400 rounded-full"></div>
+                                                    </div>
+                                                )}
+                                                
                                                 {/* Futuristic glow effect on hover */}
                                                 {!isDeleted && (
-                                                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-400/0 via-green-400/0 to-emerald-500/0 group-hover:from-emerald-400/5 group-hover:via-green-400/5 group-hover:to-emerald-500/5 transition-all duration-500 pointer-events-none"></div>
+                                                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-400/0 via-green-400/0 to-emerald-500/0 group-hover:from-emerald-400/5 group-hover:via-green-400/5 group-hover:to-emerald-500/5 transition-all duration-300 pointer-events-none"></div>
                                                 )}
 
                                                 {isDeleted && (
@@ -2431,66 +2654,50 @@ export default function PrescriptionsPage() {
                                                                             </svg>
                                                                         </button>
                                                                     )}
-                                                                    {(() => {
-                                                                        const product = products.find(p => String(p.id) === String(pr.productId))
-                                                                        return (
-                                                                            <div className="space-y-2.5">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="px-2 py-1 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-[10px] font-bold">{i + 1}</span>
-                                                                                    <span className={`font-semibold leading-tight ${pr.patientHasMedicine ? 'line-through text-gray-400' : ''}`}>{product ? product.name : `Product #${pr.productId}`}</span>
-                                                                                </div>
-                                                                                {product?.category && (
-                                                                                    <div className="space-y-1.5">
-                                                                                        <div className="flex items-center gap-1 text-[10px]">
-                                                                                            {(() => {
-                                                                                                const categoryName = typeof product.category === 'string' ? product.category : product.category.name
-                                                                                                if (product.unit) {
-                                                                                                    const unitParts = String(product.unit).trim().split(/\s+/)
-                                                                                                    const unitType = unitParts.length >= 2 ? unitParts[1] : ''
-                                                                                                    return (
-                                                                                                        <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full">
-                                                                                                            {categoryName} {unitType ? `(${unitType})` : ''}
-                                                                                                        </span>
-                                                                                                    )
-                                                                                                }
-                                                                                                return (
-                                                                                                    <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full">
-                                                                                                        {categoryName}
-                                                                                                    </span>
-                                                                                                )
+                                                                    <div className="space-y-2.5">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="px-2 py-1 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-[10px] font-bold">{i + 1}</span>
+                                                                            <span className={`font-semibold leading-tight ${pr.patientHasMedicine ? 'line-through text-gray-400' : ''}`}>{product ? product.name : `Product #${pr.productId}`}</span>
+                                                                        </div>
+                                                                        {product?.category && (
+                                                                            <div className="space-y-1.5">
+                                                                                <div className="flex items-center gap-1 text-[10px]">
+                                                                                    {product.unit ? (
+                                                                                        <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full">
+                                                                                            {categoryName} {(() => {
+                                                                                                const unitParts = String(product.unit).trim().split(/\s+/)
+                                                                                                const unitType = unitParts.length >= 2 ? unitParts[1] : ''
+                                                                                                return unitType ? `(${unitType})` : ''
                                                                                             })()}
-                                                                                        </div>
-                                                                                        {product && (
-                                                                                            <div className="space-y-1">
-                                                                                                <div className="text-[10px] text-gray-500">Stock: {product.quantity}</div>
-                                                                                                {(() => {
-                                                                                                    const categoryName = (typeof product.category === 'string' ? product.category : product.category?.name || '').toLowerCase()
-                                                                                                    const showBottleSize = ['drops', 'eco drops', 'dilutions', 'misc', 'new sp drops', 'special drops'].includes(categoryName)
-                                                                                                    if (showBottleSize) {
-                                                                                                        return (
-                                                                                                            <div className="mt-2">
-                                                                                                                <CustomSelect
-                                                                                                                    value={pr.bottleSize || ''}
-                                                                                                                    onChange={(val) => !isDeleted && updatePrescription(i, { bottleSize: val })}
-                                                                                                                    options={bottlePricing.map(bp => ({
-                                                                                                                        value: bp.value,
-                                                                                                                        label: bp.label
-                                                                                                                    }))}
-                                                                                                                    placeholder="Bottle Size"
-                                                                                                                    className="text-xs h-8"
-                                                                                                                />
-                                                                                                            </div>
-                                                                                                        )
-                                                                                                    }
-                                                                                                    return null
-                                                                                                })()}
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span className="px-1.5 py-0.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full">
+                                                                                            {categoryName}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                {product && (
+                                                                                    <div className="space-y-1">
+                                                                                        <div className="text-[10px] text-gray-500">Stock: {product.quantity}</div>
+                                                                                        {showBottleSize && (
+                                                                                            <div className="mt-2">
+                                                                                                <CustomSelect
+                                                                                                    value={pr.bottleSize || ''}
+                                                                                                    onChange={(val) => !isDeleted && updatePrescription(i, { bottleSize: val })}
+                                                                                                    options={bottlePricing.map(bp => ({
+                                                                                                        value: bp.value,
+                                                                                                        label: bp.label
+                                                                                                    }))}
+                                                                                                    placeholder="Bottle Size"
+                                                                                                    className="text-xs h-8"
+                                                                                                />
                                                                                             </div>
                                                                                         )}
                                                                                     </div>
                                                                                 )}
                                                                             </div>
-                                                                        )
-                                                                    })()}
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             ) : (
                                                                 <CustomSelect
@@ -2518,27 +2725,20 @@ export default function PrescriptionsPage() {
                                                         </div>
 
                                                         {/* RIGHT: SPY Grid + Additions */}
-                                                        {(() => {
-                                                            const product = products.find(p => String(p.id) === String(pr.productId))
-                                                            const categoryName = product ? (typeof product.category === 'string' ? product.category : product.category?.name || '').toLowerCase() : ''
-                                                            const showSpyFields = ['drops', 'eco drops', 'dilutions', 'misc', 'new sp drops', 'special drops'].includes(categoryName)
-                                                            
-                                                            if (!showSpyFields) return null
-                                                            
-                                                            return (
+                                                        {showSpyFields && (
                                                         <div className={`flex-1 ${isDeleted ? 'opacity-60 cursor-not-allowed pointer-events-none' : ''}`}>
                                                             <label className="block text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Spagyric Components</label>
                                                             {/* Row 1: SPY 1-3 */}
                                                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3">{[1, 2, 3].map(num => {
                                                                     const spyKey = `spy${num}` as keyof typeof pr
                                                                     const spyValue = pr[spyKey] as string || ''
+                                                                    const parsedSpy = parseComponent(spyValue)
                                                                     return (
                                                                         <div key={num} className="flex gap-1">
                                                                             <CustomSelect
-                                                                                value={parseComponent(spyValue).name}
+                                                                                value={parsedSpy.name}
                                                                                 onChange={(val) => {
-                                                                                    const parsed = parseComponent(spyValue)
-                                                                                    updatePrescription(i, { [spyKey]: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                                    updatePrescription(i, { [spyKey]: formatComponent(val.toUpperCase(), parsedSpy.volume) })
                                                                                 }}
                                                                                 options={components}
                                                                                 placeholder={`SPY${num}`}
@@ -2547,10 +2747,9 @@ export default function PrescriptionsPage() {
                                                                             />
                                                                             <input
                                                                                 type="text"
-                                                                                value={parseComponent(spyValue).volume}
+                                                                                value={parsedSpy.volume}
                                                                                 onChange={(e) => {
-                                                                                    const parsed = parseComponent(spyValue)
-                                                                                    updatePrescription(i, { [spyKey]: formatComponent(parsed.name, e.target.value) })
+                                                                                    updatePrescription(i, { [spyKey]: formatComponent(parsedSpy.name, e.target.value) })
                                                                                 }}
                                                                                 placeholder="Vol"
                                                                                 className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
@@ -2582,13 +2781,13 @@ export default function PrescriptionsPage() {
                                                                     {[4, 5, 6].map(num => {
                                                                         const spyKey = `spy${num}` as keyof typeof pr
                                                                         const spyValue = pr[spyKey] as string || ''
+                                                                        const parsedSpy = parseComponent(spyValue)
                                                                         return (
                                                                             <div key={num} className="flex gap-1">
                                                                                 <CustomSelect
-                                                                                    value={parseComponent(spyValue).name}
+                                                                                    value={parsedSpy.name}
                                                                                     onChange={(val) => {
-                                                                                        const parsed = parseComponent(spyValue)
-                                                                                        updatePrescription(i, { [spyKey]: formatComponent(val.toUpperCase(), parsed.volume) })
+                                                                                        updatePrescription(i, { [spyKey]: formatComponent(val.toUpperCase(), parsedSpy.volume) })
                                                                                     }}
                                                                                     options={components}
                                                                                     placeholder={`SPY${num}`}
@@ -2597,10 +2796,9 @@ export default function PrescriptionsPage() {
                                                                                 />
                                                                                 <input
                                                                                     type="text"
-                                                                                    value={parseComponent(spyValue).volume}
+                                                                                    value={parsedSpy.volume}
                                                                                     onChange={(e) => {
-                                                                                        const parsed = parseComponent(spyValue)
-                                                                                        updatePrescription(i, { [spyKey]: formatComponent(parsed.name, e.target.value) })
+                                                                                        updatePrescription(i, { [spyKey]: formatComponent(parsedSpy.name, e.target.value) })
                                                                                     }}
                                                                                     placeholder="Vol"
                                                                                     className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
@@ -2633,12 +2831,12 @@ export default function PrescriptionsPage() {
                                                                     {[1, 2, 3].map(num => {
                                                                         const additionKey = `addition${num}` as keyof typeof pr
                                                                         const additionValue = pr[additionKey] as string || ''
-                                                                        const parsed = parseComponent(additionValue)
+                                                                        const parsedAddition = parseComponent(additionValue)
                                                                         return (
                                                                             <div key={num} className="flex gap-1">
                                                                                 <CustomSelect
-                                                                                    value={parsed.name}
-                                                                                    onChange={(val) => updatePrescription(i, { [additionKey]: formatComponent(val.toUpperCase(), parsed.volume) })}
+                                                                                    value={parsedAddition.name}
+                                                                                    onChange={(val) => updatePrescription(i, { [additionKey]: formatComponent(val.toUpperCase(), parsedAddition.volume) })}
                                                                                     options={additions}
                                                                                     placeholder={`Add ${num}`}
                                                                                     allowCustom={true}
@@ -2646,8 +2844,8 @@ export default function PrescriptionsPage() {
                                                                                 />
                                                                                 <input
                                                                                     type="text"
-                                                                                    value={parsed.volume}
-                                                                                    onChange={(e) => updatePrescription(i, { [additionKey]: formatComponent(parsed.name, e.target.value) })}
+                                                                                    value={parsedAddition.volume}
+                                                                                    onChange={(e) => updatePrescription(i, { [additionKey]: formatComponent(parsedAddition.name, e.target.value) })}
                                                                                     placeholder="Vol"
                                                                                     className="w-14 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-xs h-8 dark:bg-gray-800 text-center"
                                                                                 />
@@ -2657,8 +2855,7 @@ export default function PrescriptionsPage() {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                            )
-                                                        })()}
+                                                        )}
                                                     </div>
 
                                                     {/* Row 2: Remaining Fields in ONE LINE */}
@@ -2676,20 +2873,20 @@ export default function PrescriptionsPage() {
                                                             </div>
                                                             <div className="flex-1 min-w-[80px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dose</label>
-                                                                <CustomSelect value={parseDosage(pr.dosage || '').quantity} onChange={(val) => { const parsed = parseDosage(pr.dosage || ''); updatePrescription(i, { dosage: formatDosage(val, parsed.timing, parsed.dilution) }) }} options={doseQuantity} placeholder="Dose" allowCustom={true} className="text-xs h-8" />
+                                                                <CustomSelect value={parsedDosageValues.quantity} onChange={(val) => { updatePrescription(i, { dosage: formatDosage(val, parsedDosageValues.timing, parsedDosageValues.dilution) }) }} options={doseQuantity} placeholder="Dose" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[80px]">
-                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">DoseTiming</label>
-                                                                <CustomSelect value={parseDosage(pr.dosage || '').timing} onChange={(val) => { const parsed = parseDosage(pr.dosage || ''); updatePrescription(i, { dosage: formatDosage(parsed.quantity, val, parsed.dilution) }) }} options={doseTiming} placeholder="Time" allowCustom={true} className="text-xs h-8" />
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Frequency</label>
+                                                                <CustomSelect value={parsedDosageValues.timing} onChange={(val) => { updatePrescription(i, { dosage: formatDosage(parsedDosageValues.quantity, val, parsedDosageValues.dilution) }) }} options={doseTiming} placeholder="Time" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[80px]">
-                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dilution</label>
-                                                                <CustomSelect value={parseDosage(pr.dosage || '').dilution} onChange={(val) => { const parsed = parseDosage(pr.dosage || ''); updatePrescription(i, { dosage: formatDosage(parsed.quantity, parsed.timing, val) }) }} options={dilution} placeholder="Dil" allowCustom={true} className="text-xs h-8" />
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Along With</label>
+                                                                <CustomSelect value={parsedDosageValues.dilution} onChange={(val) => { updatePrescription(i, { dosage: formatDosage(parsedDosageValues.quantity, parsedDosageValues.timing, val) }) }} options={dilution} placeholder="Dil" allowCustom={true} className="text-xs h-8" />
                                                             </div>
 
                                                             {/* Procedure, Presentation, Administration */}
                                                             <div className="flex-1 min-w-[112px]">
-                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Procedure</label>
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Instruction</label>
                                                                 <CustomSelect value={pr.procedure || ''} onChange={(val) => updatePrescription(i, { procedure: val.toUpperCase() })} options={procedure} placeholder="Proc" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[112px]">
@@ -2697,7 +2894,7 @@ export default function PrescriptionsPage() {
                                                                 <CustomSelect value={pr.presentation || ''} onChange={(val) => updatePrescription(i, { presentation: val.toUpperCase() })} options={presentation} placeholder="Pres" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[128px]">
-                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Administration</label>
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Site</label>
                                                                 <CustomSelect value={pr.administration || ''} onChange={(val) => updatePrescription(i, { administration: val.toUpperCase() })} options={administration} placeholder="Admin" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                         </div>
@@ -2712,7 +2909,7 @@ export default function PrescriptionsPage() {
                                                                         onChange={(e) => updatePrescription(i, { patientHasMedicine: e.target.checked })}
                                                                         className="peer sr-only"
                                                                     />
-                                                                    <div className="w-5 h-5 border-2 border-emerald-300 dark:border-emerald-600 rounded-md peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-500 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-emerald-500/30">
+                                                                    <div className="w-5 h-5 border-2 border-emerald-300 dark:border-emerald-600 rounded-md peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-500 peer-checked:border-emerald-500 flex items-center justify-center shadow-sm peer-checked:shadow-emerald-500/30">
                                                                         <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                                                         </svg>
@@ -2722,13 +2919,34 @@ export default function PrescriptionsPage() {
                                                             </label>
 
                                                             {!isDeleted && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }}
-                                                                    className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-600 border border-red-300 dark:border-red-700 rounded-lg transition-all duration-200 hover:shadow-md"
-                                                                >
-                                                                    Remove
-                                                                </button>
+                                                                <>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={undoStack.some(u => u.index === i) ? undoRestore : () => restoreDefaultValues(i)}
+                                                                        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-300 hover:shadow-md ${
+                                                                            undoStack.some(u => u.index === i)
+                                                                                ? 'text-purple-600 dark:text-purple-400 hover:text-white hover:bg-purple-500 dark:hover:bg-purple-600 border border-purple-300 dark:border-purple-700'
+                                                                                : 'text-blue-600 dark:text-blue-400 hover:text-white hover:bg-blue-500 dark:hover:bg-blue-600 border border-blue-300 dark:border-blue-700'
+                                                                        }`}
+                                                                        title={undoStack.some(u => u.index === i) ? 'Undo the last Restore Default action' : 'Restore default values (Qty: 15, Timing: BM, Dose: 10|TDS|WTR)'}
+                                                                    >
+                                                                        <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            {undoStack.some(u => u.index === i) ? (
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                                            ) : (
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                            )}
+                                                                        </svg>
+                                                                        {undoStack.some(u => u.index === i) ? 'Undo' : 'Restore Default'}
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }}
+                                                                        className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-600 border border-red-300 dark:border-red-700 rounded-lg hover:shadow-md"
+                                                                    >
+                                                                        Remove
+                                                                    </button>
+                                                                </>
                                                             )}
                                                         </div>
                                                     </div>
@@ -2739,6 +2957,7 @@ export default function PrescriptionsPage() {
                                 </div>
                             )}
                         </div>
+                        )}
 
                         {/* Financial Information Card */}
                         <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900/80 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-6"
@@ -2767,23 +2986,179 @@ export default function PrescriptionsPage() {
                         </div>
                     </form>
 
+                    {/* Treatment Plan Comparison Modal */}
+                    {showPlanCompareModal && selectedProvDiagnosis && (
+                        <div
+                            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn overflow-y-auto"
+                            style={{ animation: 'fadeIn 0.2s ease-in-out' }}
+                        >
+                            <div
+                                className="bg-gradient-to-br from-white to-emerald-50/30 dark:from-gray-800 dark:to-emerald-950/30 rounded-2xl shadow-2xl shadow-emerald-500/20 max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-scaleIn border border-emerald-200/30 dark:border-emerald-700/30"
+                                style={{ animation: 'scaleIn 0.3s ease-out' }}
+                            >
+                                {/* Modal Header */}
+                                <div className="p-6 border-b border-emerald-200/50 dark:border-emerald-700/50 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-900/20 dark:to-green-900/20">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Select Treatment Plan</h3>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                Choose a plan for: <span className="font-semibold text-emerald-600 dark:text-emerald-400">{selectedProvDiagnosis}</span>
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setShowPlanCompareModal(false)
+                                                setSelectedProvDiagnosis('')
+                                            }}
+                                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                        >
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Modal Body - Treatment Plans Grid */}
+                                <div className="p-6 overflow-y-auto flex-1">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {treatments
+                                            .filter(t => t.provDiagnosis === selectedProvDiagnosis && !t.deleted)
+                                            .map((treatment, idx) => {
+                                                const displayPlanNumber = treatment.planNumber || (idx + 1)
+                                                return (
+                                                    <div
+                                                        key={treatment.id}
+                                                        className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border-2 border-emerald-200 dark:border-emerald-700 rounded-xl p-4 hover:shadow-lg transition-all"
+                                                    >
+                                                        {/* Plan Header */}
+                                                        <div className="flex items-center justify-between mb-3">
+                                                            <h4 className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                                                                Plan {displayPlanNumber}
+                                                            </h4>
+                                                            <span className="px-2 py-1 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-semibold rounded-full">
+                                                                {treatment.treatmentProducts?.length || 0} medicines
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Plan Details */}
+                                                        <div className="space-y-2 mb-4 text-sm">
+                                                            {treatment.speciality && (
+                                                                <div>
+                                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">Speciality:</span>
+                                                                    <p className="text-gray-600 dark:text-gray-400">{treatment.speciality}</p>
+                                                                </div>
+                                                            )}
+                                                            {treatment.organ && (
+                                                                <div>
+                                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">Organ:</span>
+                                                                    <p className="text-gray-600 dark:text-gray-400">{treatment.organ}</p>
+                                                                </div>
+                                                            )}
+                                                            {treatment.diseaseAction && (
+                                                                <div>
+                                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">Disease Action:</span>
+                                                                    <p className="text-gray-600 dark:text-gray-400">{treatment.diseaseAction}</p>
+                                                                </div>
+                                                            )}
+                                                            {treatment.administration && (
+                                                                <div>
+                                                                    <span className="font-semibold text-gray-700 dark:text-gray-300">Administration:</span>
+                                                                    <p className="text-gray-600 dark:text-gray-400">{treatment.administration}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Medicines List */}
+                                                        {treatment.treatmentProducts && treatment.treatmentProducts.length > 0 && (
+                                                            <div className="mb-4">
+                                                                <h5 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Medicines:</h5>
+                                                                <div className="space-y-1 max-h-40 overflow-y-auto">
+                                                                    {treatment.treatmentProducts.map((tp: any, tpIdx: number) => {
+                                                                        const product = products.find(p => String(p.id) === String(tp.productId))
+                                                                        return (
+                                                                            <div key={tpIdx} className="text-xs p-2 bg-white/60 dark:bg-gray-800/60 rounded border border-emerald-200/40 dark:border-emerald-700/40">
+                                                                                <p className="font-medium text-gray-900 dark:text-white">
+                                                                                    {tpIdx + 1}. {product?.name || 'Unknown Medicine'}
+                                                                                </p>
+                                                                                {tp.dosage && (
+                                                                                    <p className="text-gray-600 dark:text-gray-400">Dosage: {tp.dosage}</p>
+                                                                                )}
+                                                                            </div>
+                                                                        )
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Select Button */}
+                                                        <button
+                                                            onClick={() => {
+                                                                // Load this treatment plan
+                                                                if (treatment.treatmentProducts && treatment.treatmentProducts.length > 0) {
+                                                                    const newPrescriptions = treatment.treatmentProducts.map((tp: any) => ({
+                                                                        treatmentId: String(treatment.id),
+                                                                        productId: String(tp.productId),
+                                                                        spy1: tp.spy1 || '',
+                                                                        spy2: tp.spy2 || '',
+                                                                        spy3: tp.spy3 || '',
+                                                                        spy4: tp.spy4 || '',
+                                                                        spy5: tp.spy5 || '',
+                                                                        spy6: tp.spy6 || '',
+                                                                        quantity: tp.quantity || treatment.quantity || 1,
+                                                                        timing: tp.timing || '',
+                                                                        dosage: tp.dosage || treatment.dosage || '',
+                                                                        additions: tp.additions || '',
+                                                                        addition1: tp.addition1 || '',
+                                                                        addition2: tp.addition2 || '',
+                                                                        addition3: tp.addition3 || '',
+                                                                        procedure: tp.procedure || treatment.procedure || '',
+                                                                        presentation: tp.presentation || '',
+                                                                        droppersToday: tp.droppersToday?.toString() || '',
+                                                                        medicineQuantity: tp.medicineQuantity?.toString() || '',
+                                                                        administration: treatment.administration || '',
+                                                                        patientHasMedicine: false,
+                                                                        bottleSize: tp.bottleSize || '',
+                                                                        discussions: tp.discussions || ''
+                                                                    }))
+                                                                    setPrescriptions(newPrescriptions)
+                                                                    setSelectedTreatmentId(String(treatment.id))
+                                                                    setSelectedTreatmentPlan(treatment)
+                                                                    setOriginalTreatmentData(JSON.parse(JSON.stringify(newPrescriptions)))
+                                                                }
+                                                                setShowPlanCompareModal(false)
+                                                                setSelectedProvDiagnosis('')
+                                                                showSuccess(`Plan ${displayPlanNumber} loaded successfully`)
+                                                            }}
+                                                            className="w-full px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg"
+                                                        >
+                                                            Select This Plan
+                                                        </button>
+                                                    </div>
+                                                )
+                                            })}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Treatment Plan Modification Modal */}
                     {showSaveModal && (
                         <div
-                            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn"
+                            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn"
                             style={{
                                 animation: 'fadeIn 0.2s ease-in-out'
                             }}
                         >
                             <div
-                                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 animate-scaleIn"
+                                className="bg-gradient-to-br from-white to-emerald-50/30 dark:from-gray-800 dark:to-emerald-950/30 rounded-2xl shadow-2xl shadow-emerald-500/20 max-w-md w-full p-6 animate-scaleIn border border-emerald-200/30 dark:border-emerald-700/30"
                                 style={{
                                     animation: 'scaleIn 0.3s ease-out'
                                 }}
                             >
-                                <h3 className="text-lg font-semibold mb-4">Treatment Plan Modified</h3>
-                                <p className="text-sm text-muted mb-6">
+                                <h3 className="text-lg font-semibold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Treatment Plan Modified</h3>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                                     You've modified the treatment plan data. Would you like to save these changes as a new treatment plan, or use them just for this prescription?
                                 </p>
                                 <div className="space-y-3">
@@ -2988,6 +3363,175 @@ export default function PrescriptionsPage() {
                                     >
                                         Create New Treatment Plan
                                     </button>
+                                    {freeTextDiagnosis && showAddPlanButton && prescriptions.length > 0 && (
+                                        <button
+                                            onClick={async () => {
+                                                const modal = document.querySelector('.animate-fadeIn')
+                                                if (modal) {
+                                                    modal.classList.add('animate-fadeOut')
+                                                    await new Promise(resolve => setTimeout(resolve, 200))
+                                                }
+                                                setShowSaveModal(false)
+
+                                                try {
+                                                    // Show loading modal
+                                                    setTreatmentModalMessage('Creating New Treatment Plan and Saving Prescription...')
+                                                    setCreatingTreatment(true)
+
+                                                    // First, save the visit
+                                                    const payload: any = {
+                                                        patientId: form.patientId,
+                                                        opdNo: form.opdNo || generatedOpdNo,
+                                                        visitType: form.visitType,
+                                                        date: form.date,
+                                                        complaint: form.complaint,
+                                                        diagnoses: form.diagnoses,
+                                                        temperament: form.temperament,
+                                                        pulseDiagnosis: form.pulseDiagnosis,
+                                                        pulseDiagnosis2: form.pulseDiagnosis2,
+                                                        majorComplaints: form.majorComplaints,
+                                                        historyReports: form.historyReports,
+                                                        investigations: form.investigations,
+                                                        provisionalDiagnosis: freeTextDiagnosis, // Use the free text diagnosis
+                                                        weight: form.weight || null,
+                                                        height: form.height || null,
+                                                        followUpDate: form.followUpDate || null,
+                                                        amount: form.amount ? parseFloat(form.amount) : 0,
+                                                        discount: form.discount ? parseFloat(form.discount) : 0,
+                                                        payment: form.payment ? parseFloat(form.payment) : 0,
+                                                        balance: form.balance ? parseFloat(form.balance) : 0,
+                                                        prescriptions: prescriptions.map(pr => ({
+                                                            productId: pr.productId,
+                                                            customMedicine: pr.customMedicine || null,
+                                                            spy1: pr.spy1 || '',
+                                                            spy2: pr.spy2 || '',
+                                                            spy3: pr.spy3 || '',
+                                                            spy4: pr.spy4 || '',
+                                                            spy5: pr.spy5 || '',
+                                                            spy6: pr.spy6 || '',
+                                                            quantity: pr.quantity || 0,
+                                                            timing: pr.timing || '',
+                                                            dosage: pr.dosage || '',
+                                                            additions: pr.additions || '',
+                                                            addition1: pr.addition1 || '',
+                                                            addition2: pr.addition2 || '',
+                                                            addition3: pr.addition3 || '',
+                                                            procedure: pr.procedure || '',
+                                                            presentation: pr.presentation || '',
+                                                            droppersToday: pr.droppersToday ? parseFloat(pr.droppersToday) : null,
+                                                            medicineQuantity: pr.medicineQuantity ? parseFloat(pr.medicineQuantity) : null,
+                                                            administration: pr.administration || '',
+                                                            patientHasMedicine: pr.patientHasMedicine || false,
+                                                            bottleSize: pr.bottleSize || '',
+                                                            discussions: pr.discussions || ''
+                                                        }))
+                                                    }
+
+                                                    if (form.nextVisitDate && form.nextVisitTime) {
+                                                        payload.nextVisit = `${form.nextVisitDate}T${form.nextVisitTime}`
+                                                    }
+
+                                                    if (isEditMode && visitId) {
+                                                        payload.id = visitId
+                                                    }
+
+                                                    const visitRes = await fetch('/api/visits', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify(payload)
+                                                    })
+
+                                                    if (!visitRes.ok) {
+                                                        const error = await visitRes.json().catch(() => ({ error: visitRes.statusText }))
+                                                        setCreatingTreatment(false)
+                                                        showError(`${isEditMode ? 'Update' : 'Save'} failed: ` + (error?.error || visitRes.statusText))
+                                                        return
+                                                    }
+
+                                                    const visitData = await visitRes.json()
+                                                    const savedVisitId = visitData.id
+                                                    setLastCreatedVisitId(savedVisitId)
+                                                    setLastCreatedVisit(visitData)
+
+                                                    // Fetch all existing treatments to determine the next plan number
+                                                    const treatmentsRes = await fetch('/api/treatments')
+                                                    const allTreatments = await treatmentsRes.json()
+
+                                                    // Calculate next plan number
+                                                    const planNumbers = allTreatments
+                                                        .map((t: any) => t.planNumber)
+                                                        .filter((pn: string) => pn && /^\d+$/.test(pn))
+                                                        .map((pn: string) => parseInt(pn, 10))
+
+                                                    const maxPlanNumber = planNumbers.length > 0 ? Math.max(...planNumbers) : 0
+                                                    const nextPlanNumber = String(maxPlanNumber + 1).padStart(2, '0')
+
+                                                    // Create new treatment plan with free text diagnosis
+                                                    const newTreatmentData = {
+                                                        speciality: form.temperament || '',
+                                                        organ: '',
+                                                        diseaseAction: '',
+                                                        provDiagnosis: freeTextDiagnosis,
+                                                        treatmentPlan: freeTextDiagnosis,
+                                                        planNumber: nextPlanNumber,
+                                                        administration: prescriptions.length > 0 ? prescriptions[0].administration || '' : '',
+                                                        notes: `Created from new diagnosis "${freeTextDiagnosis}" - Patient: ${form.patientId ? patients.find(p => String(p.id) === form.patientId)?.firstName + ' ' + patients.find(p => String(p.id) === form.patientId)?.lastName : ''} - Date: ${new Date().toLocaleDateString()}`,
+                                                        products: prescriptions.map(pr => ({
+                                                            productId: pr.productId,
+                                                            spy1: pr.spy1 || '',
+                                                            spy2: pr.spy2 || '',
+                                                            spy3: pr.spy3 || '',
+                                                            spy4: pr.spy4 || '',
+                                                            spy5: pr.spy5 || '',
+                                                            spy6: pr.spy6 || '',
+                                                            timing: pr.timing || '',
+                                                            dosage: pr.dosage || '',
+                                                            addition1: pr.addition1 || '',
+                                                            addition2: pr.addition2 || '',
+                                                            addition3: pr.addition3 || '',
+                                                            procedure: pr.procedure || '',
+                                                            presentation: pr.presentation || ''
+                                                        }))
+                                                    }
+
+                                                    // Create the new treatment plan
+                                                    const res = await fetch('/api/treatments', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify(newTreatmentData)
+                                                    })
+
+                                                    if (!res.ok) {
+                                                        const error = await res.json().catch(() => ({ error: 'Failed to create treatment plan' }))
+                                                        setCreatingTreatment(false)
+                                                        showError(error.error || 'Failed to create treatment plan')
+                                                        return
+                                                    }
+
+                                                    const createdTreatment = await res.json()
+                                                    setCreatingTreatment(false)
+                                                    
+                                                    // Clear free text and hide button
+                                                    setFreeTextDiagnosis('')
+                                                    setShowAddPlanButton(false)
+
+                                                    // Show navigation modal
+                                                    setCreatedTreatmentId(createdTreatment.id)
+                                                    setSavedVisitIdForNav(savedVisitId)
+                                                    await new Promise(resolve => setTimeout(resolve, 300))
+                                                    setShowNavigationModal(true)
+
+                                                } catch (error: any) {
+                                                    console.error('Error creating treatment plan:', error)
+                                                    setCreatingTreatment(false)
+                                                    showError(error.message || 'Failed to create treatment plan')
+                                                }
+                                            }}
+                                            className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg transition-colors font-medium"
+                                        >
+                                            Add New Treatment Plan: "{freeTextDiagnosis}"
+                                        </button>
+                                    )}
                                     <button
                                         onClick={async () => {
                                             // Fade out animation
@@ -3033,13 +3577,13 @@ export default function PrescriptionsPage() {
                     {/* Navigation Modal - After Treatment Plan Created */}
                     {showNavigationModal && (
                         <div
-                            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 animate-fadeIn"
+                            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-fadeIn"
                             style={{
                                 animation: 'fadeIn 0.2s ease-in-out'
                             }}
                         >
                             <div
-                                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 animate-scaleIn"
+                                className="bg-gradient-to-br from-white to-emerald-50/30 dark:from-gray-800 dark:to-emerald-950/30 rounded-2xl shadow-2xl shadow-emerald-500/20 max-w-md w-full p-6 animate-scaleIn border border-emerald-200/30 dark:border-emerald-700/30"
                                 style={{
                                     animation: 'scaleIn 0.3s ease-out'
                                 }}

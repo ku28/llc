@@ -8,6 +8,15 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
 })
 
+// Increase body size limit for file uploads
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: '50mb', // Allow up to 50MB for file uploads
+        },
+    },
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' })
@@ -18,6 +27,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (!file || !fileName || !patientName) {
             return res.status(400).json({ error: 'Missing required fields: file, fileName, or patientName' })
+        }
+
+        // Validate file size (check base64 string length as proxy)
+        const estimatedSizeInMB = (file.length * 0.75) / (1024 * 1024) // Base64 is ~33% larger
+        if (estimatedSizeInMB > 40) {
+            return res.status(413).json({ error: `File too large: ${estimatedSizeInMB.toFixed(2)}MB. Maximum allowed is 40MB.` })
         }
 
         // Determine resource type based on mime type

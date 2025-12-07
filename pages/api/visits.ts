@@ -299,10 +299,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         }
                     }
                     
-                    // Delete existing prescriptions for this visit
-                    await tx.prescription.deleteMany({
+                    // SAFETY CHECK: Prevent accidental deletion of all prescriptions
+                    // Only delete if we have new prescriptions to replace them with
+                    const existingPrescriptionCount = await tx.prescription.count({
                         where: { visitId: visit.id }
                     })
+                    
+                    const newPrescriptionCount = Array.isArray(prescriptions) ? prescriptions.length : 0
+                    
+                    // If there are existing prescriptions but no new ones, something is wrong - don't delete
+                    if (existingPrescriptionCount > 0 && newPrescriptionCount === 0) {
+                        console.error(`⚠️ SAFETY: Attempted to delete ${existingPrescriptionCount} prescriptions with no replacement for visitId: ${visit.id}`)
+                        // Keep the existing prescriptions - don't delete them
+                    } else {
+                        // Safe to delete and replace
+                        if (existingPrescriptionCount > 0) {
+                            console.log(`Deleting ${existingPrescriptionCount} existing prescriptions for visitId: ${visit.id} to replace with ${newPrescriptionCount} new ones`)
+                        }
+                        await tx.prescription.deleteMany({
+                            where: { visitId: visit.id }
+                        })
+                    }
                 } else {
                     // Create new visit
                     visit = await tx.visit.create({ data: visitData })
@@ -333,6 +350,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 let productUpdates: any[] = []
 
                 // 2. Process prescriptions if provided
+                console.log(`Processing ${Array.isArray(prescriptions) ? prescriptions.length : 0} prescriptions for visitId: ${visit.id}`)
+                
                 if (Array.isArray(prescriptions) && prescriptions.length > 0) {
                     // Collect all prescription data first
                     const prescriptionDataArray = prescriptions.map((pr) => {

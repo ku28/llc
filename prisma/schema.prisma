@@ -193,6 +193,8 @@ model Treatment {
   presentation      String?
   provDiagnosis     String?
   speciality        String?
+  imbalance         String?
+  systems           String?
   srNo              String?
   timing            String?
   treatmentPlan     String?

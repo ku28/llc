@@ -45,10 +45,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // SALE/VAL = IF((RATE/U × SALES) = 0, "", RATE/U × SALES)
             const salesValue = (ratePerUnit * sales) === 0 ? 0 : (ratePerUnit * sales)
             
+            // Auto-categorize medicines with "drp" in the name as "DROPS"
+            let finalCategoryId = categoryId ? Number(categoryId) : null
+            if (!finalCategoryId && name && name.toLowerCase().includes('drp')) {
+                // Try to find the "DROPS" category
+                const dropsCategory = await prisma.category.findFirst({
+                    where: {
+                        name: { equals: 'DROPS', mode: 'insensitive' },
+                        doctorId: doctorId
+                    }
+                })
+                
+                if (dropsCategory) {
+                    finalCategoryId = dropsCategory.id
+                    console.log(`Auto-categorized "${name}" as DROPS (categoryId: ${finalCategoryId})`)
+                }
+            }
+            
             const p = await prisma.product.create({ 
                 data: { 
                     name,
-                    categoryId: categoryId ? Number(categoryId) : null,
+                    categoryId: finalCategoryId,
                     unit,
                     priceRupees: ratePerUnit,
                     purchasePriceRupees: Number(purchasePriceRupees || 0),

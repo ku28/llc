@@ -18,6 +18,8 @@ import bottlePricing from '../../data/bottlePricing.json'
 import organ from '../../data/organ.json'
 import speciality from '../../data/speciality.json'
 import diseaseAction from '../../data/diseaseAction.json'
+import imbalance from '../../data/imbalance.json'
+import systems from '../../data/systems.json'
 
 function EditTreatmentPage() {
     const router = useRouter()
@@ -35,7 +37,10 @@ function EditTreatmentPage() {
     const [isBasicInfoDropdownOpen, setIsBasicInfoDropdownOpen] = useState(false)
     const [isOrganOpen, setIsOrganOpen] = useState(false)
     const [isSpecialityOpen, setIsSpecialityOpen] = useState(false)
+    const [isImbalanceOpen, setIsImbalanceOpen] = useState(false)
+    const [isSystemsOpen, setIsSystemsOpen] = useState(false)
     const [isDiseaseActionOpen, setIsDiseaseActionOpen] = useState(false)
+    const [isAdministrationOpen, setIsAdministrationOpen] = useState(false)
     const [collapsedSections, setCollapsedSections] = useState<{[key: number]: {spy46: boolean, additions: boolean}}>({})
     
     // Helper functions for parsing component and dosage formats
@@ -63,6 +68,8 @@ function EditTreatmentPage() {
     
     const emptyForm = {
         speciality: '',
+        imbalance: '',
+        systems: '',
         organ: '',
         diseaseAction: '',
         provDiagnosis: '',
@@ -112,6 +119,8 @@ function EditTreatmentPage() {
                 // Load treatment data - convert to uppercase
                 setForm({
                     speciality: treatment.speciality?.toUpperCase() || '',
+                    imbalance: treatment.imbalance || '',
+                    systems: treatment.systems || '',
                     organ: treatment.organ?.toUpperCase() || '',
                     diseaseAction: treatment.diseaseAction?.toUpperCase() || '',
                     provDiagnosis: treatment.provDiagnosis?.toUpperCase() || '',
@@ -166,6 +175,8 @@ function EditTreatmentPage() {
                 setForm({
                     provDiagnosis: upperDiagnosis,
                     speciality: matchingTreatment.speciality?.toUpperCase() || '',
+                    imbalance: matchingTreatment.imbalance || '',
+                    systems: matchingTreatment.systems || '',
                     organ: matchingTreatment.organ?.toUpperCase() || '',
                     diseaseAction: matchingTreatment.diseaseAction?.toUpperCase() || '',
                     treatmentPlan: upperDiagnosis,
@@ -253,6 +264,8 @@ function EditTreatmentPage() {
             const treatmentData = {
                 id: parseInt(id as string),
                 speciality: form.speciality.toUpperCase(),
+                imbalance: form.imbalance,
+                systems: form.systems,
                 organ: form.organ.toUpperCase(),
                 diseaseAction: form.diseaseAction.toUpperCase(),
                 provDiagnosis: form.provDiagnosis.toUpperCase(),
@@ -375,7 +388,7 @@ function EditTreatmentPage() {
                             <p className="text-xs text-muted mt-1">Select or enter the main diagnosis. Treatment plan names will be auto-generated.</p>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 mt-3">
                         <div className={isSpecialityOpen ? 'relative z-[10000]' : 'relative z-0'}>
                             <label className="block text-sm font-medium mb-1.5">Speciality</label>
                             <CustomSelect
@@ -391,16 +404,46 @@ function EditTreatmentPage() {
                                 onOpenChange={setIsSpecialityOpen}
                             />
                         </div>
+                        <div className={isImbalanceOpen ? 'relative z-[10000]' : 'relative z-0'}>
+                            <label className="block text-sm font-medium mb-1.5">Imbalance</label>
+                            <CustomSelect
+                                value={form.imbalance}
+                                onChange={(val) => setForm({ ...form, imbalance: val })}
+                                options={[
+                                    { value: '', label: 'Select imbalance' },
+                                    ...imbalance.map(i => ({ value: i.value, label: i.label }))
+                                ]}
+                                placeholder="Select imbalance"
+                                allowCustom={true}
+                                className="w-full"
+                                onOpenChange={setIsImbalanceOpen}
+                            />
+                        </div>
+                        <div className={isSystemsOpen ? 'relative z-[10000]' : 'relative z-0'}>
+                            <label className="block text-sm font-medium mb-1.5">Systems</label>
+                            <CustomSelect
+                                value={form.systems}
+                                onChange={(val) => setForm({ ...form, systems: val })}
+                                options={[
+                                    { value: '', label: 'Select system' },
+                                    ...systems.map(s => ({ value: s.value, label: s.label }))
+                                ]}
+                                placeholder="Select system"
+                                allowCustom={true}
+                                className="w-full"
+                                onOpenChange={setIsSystemsOpen}
+                            />
+                        </div>
                         <div className={isOrganOpen ? 'relative z-[10000]' : 'relative z-0'}>
-                            <label className="block text-sm font-medium mb-1.5">Site</label>
+                            <label className="block text-sm font-medium mb-1.5">Organ</label>
                             <CustomSelect
                                 value={form.organ}
                                 onChange={(val) => setForm({ ...form, organ: val })}
                                 options={[
-                                    { value: '', label: 'Select site' },
+                                    { value: '', label: 'Select organ' },
                                     ...organ.map(o => ({ value: o, label: o }))
                                 ]}
-                                placeholder="Select site"
+                                placeholder="Select organ"
                                 allowCustom={true}
                                 className="w-full"
                                 onOpenChange={setIsOrganOpen}
@@ -422,15 +465,29 @@ function EditTreatmentPage() {
                             />
                         </div>
                     </div>
-                    <div className="mt-3">
-                        <label className="block text-sm font-medium mb-1.5">Additional Notes</label>
-                        <textarea 
-                            rows={2} 
-                            placeholder="ADDITIONAL NOTES" 
-                            value={form.notes} 
-                            onChange={e => setForm({ ...form, notes: e.target.value.toUpperCase() })}
-                            className="p-2 border rounded-lg w-full text-sm uppercase" 
-                        />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                        <div>
+                            <label className="block text-sm font-medium mb-1.5">Additional Notes</label>
+                            <textarea 
+                                rows={2} 
+                                placeholder="ADDITIONAL NOTES" 
+                                value={form.notes} 
+                                onChange={e => setForm({ ...form, notes: e.target.value.toUpperCase() })}
+                                className="p-2 border rounded-lg w-full text-sm uppercase" 
+                            />
+                        </div>
+                        <div className={isAdministrationOpen ? 'relative z-[10000]' : 'relative z-0'}>
+                            <label className="block text-sm font-medium mb-1.5">Administration</label>
+                            <CustomSelect
+                                value={form.administration}
+                                onChange={(val) => setForm({ ...form, administration: val.toUpperCase() })}
+                                options={administration}
+                                placeholder="Select administration"
+                                allowCustom={true}
+                                className="w-full"
+                                onOpenChange={setIsAdministrationOpen}
+                            />
+                        </div>
                     </div>
                 </div>
                 
@@ -959,7 +1016,7 @@ function EditTreatmentPage() {
                                                             />
                                                         </div>
                                                         <div className="flex-1 min-w-[80px]">
-                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dose Time</label>
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Frequency</label>
                                                             <CustomSelect 
                                                                 value={parseDosage(medicine.dosage || '').timing} 
                                                                 onChange={(val) => {
@@ -973,7 +1030,7 @@ function EditTreatmentPage() {
                                                             />
                                                         </div>
                                                         <div className="flex-1 min-w-[80px]">
-                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dilution</label>
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Along With</label>
                                                             <CustomSelect 
                                                                 value={parseDosage(medicine.dosage || '').dilution} 
                                                                 onChange={(val) => {
@@ -987,12 +1044,16 @@ function EditTreatmentPage() {
                                                             />
                                                         </div>
                                                         <div className="flex-1 min-w-[112px]">
-                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Procedure</label>
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Insttruction</label>
                                                             <CustomSelect value={medicine.procedure || ''} onChange={(val) => updateMedicine(medicineIndex, 'procedure', val.toUpperCase())} options={procedure} placeholder="Proc" allowCustom={true} className="text-xs h-8" />
                                                         </div>
                                                         <div className="flex-1 min-w-[112px]">
                                                             <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Presentation</label>
                                                             <CustomSelect value={medicine.presentation || ''} onChange={(val) => updateMedicine(medicineIndex, 'presentation', val.toUpperCase())} options={presentation} placeholder="Pres" allowCustom={true} className="text-xs h-8" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-[112px]">
+                                                            <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Site</label>
+                                                            <CustomSelect value={medicine.site || ''} onChange={(val) => updateMedicine(medicineIndex, 'site', val.toUpperCase())} options={administration} placeholder="Site" allowCustom={true} className="text-xs h-8" />
                                                         </div>
                                                     </div>
 

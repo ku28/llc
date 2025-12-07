@@ -18,6 +18,8 @@ import bottlePricing from '../../data/bottlePricing.json'
 import organ from '../../data/organ.json'
 import speciality from '../../data/speciality.json'
 import diseaseAction from '../../data/diseaseAction.json'
+import imbalance from '../../data/imbalance.json'
+import systems from '../../data/systems.json'
 
 function NewTreatmentPage() {
     const router = useRouter()
@@ -34,6 +36,8 @@ function NewTreatmentPage() {
     const [isBasicInfoDropdownOpen, setIsBasicInfoDropdownOpen] = useState(false)
     const [isOrganOpen, setIsOrganOpen] = useState(false)
     const [isSpecialityOpen, setIsSpecialityOpen] = useState(false)
+    const [isImbalanceOpen, setIsImbalanceOpen] = useState(false)
+    const [isSystemsOpen, setIsSystemsOpen] = useState(false)
     const [isDiseaseActionOpen, setIsDiseaseActionOpen] = useState(false)
     const [isAdministrationOpen, setIsAdministrationOpen] = useState(false)
     const [isMedicineSelectOpen, setIsMedicineSelectOpen] = useState(false)
@@ -64,6 +68,8 @@ function NewTreatmentPage() {
 
     const emptyForm = {
         speciality: '',
+        imbalance: '',
+        systems: '',
         organ: '',
         diseaseAction: '',
         provDiagnosis: '',
@@ -108,6 +114,8 @@ function NewTreatmentPage() {
         const params = new URLSearchParams(window.location.search)
         const diagnosis = params.get('diagnosis')
         const speciality = params.get('speciality')
+        const imbalance = params.get('imbalance')
+        const systems = params.get('systems')
         const organ = params.get('organ')
         const diseaseAction = params.get('diseaseAction')
 
@@ -116,6 +124,8 @@ function NewTreatmentPage() {
             setForm({
                 provDiagnosis: diagnosis.toUpperCase(),
                 speciality: speciality?.toUpperCase() || '',
+                imbalance: imbalance || '',
+                systems: systems || '',
                 organ: organ?.toUpperCase() || '',
                 diseaseAction: diseaseAction?.toUpperCase() || '',
                 treatmentPlan: diagnosis.toUpperCase(),
@@ -136,6 +146,8 @@ function NewTreatmentPage() {
                 setForm({
                     provDiagnosis: upperDiagnosis,
                     speciality: matchingTreatment.speciality?.toUpperCase() || '',
+                    imbalance: matchingTreatment.imbalance || '',
+                    systems: matchingTreatment.systems || '',
                     organ: matchingTreatment.organ?.toUpperCase() || '',
                     diseaseAction: matchingTreatment.diseaseAction?.toUpperCase() || '',
                     treatmentPlan: upperDiagnosis,
@@ -223,6 +235,8 @@ function NewTreatmentPage() {
         try {
             const treatmentData = {
                 speciality: form.speciality.toUpperCase(),
+                imbalance: form.imbalance,
+                systems: form.systems,
                 organ: form.organ.toUpperCase(),
                 diseaseAction: form.diseaseAction.toUpperCase(),
                 provDiagnosis: form.provDiagnosis.toUpperCase(),
@@ -289,6 +303,8 @@ function NewTreatmentPage() {
         const params = new URLSearchParams({
             diagnosis: form.provDiagnosis,
             speciality: form.speciality,
+            imbalance: form.imbalance,
+            systems: form.systems,
             organ: form.organ,
             diseaseAction: form.diseaseAction
         })
@@ -365,7 +381,7 @@ function NewTreatmentPage() {
                             )}
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 mt-3">
                         <div className={isSpecialityOpen ? 'relative z-[10000]' : 'relative z-0'}>
                             <label className="block text-sm font-medium mb-1.5">Speciality</label>
                             <CustomSelect
@@ -382,20 +398,52 @@ function NewTreatmentPage() {
                                 onOpenChange={setIsSpecialityOpen}
                             />
                         </div>
+                        <div className={isImbalanceOpen ? 'relative z-[10000]' : 'relative z-0'}>
+                            <label className="block text-sm font-medium mb-1.5">Imbalance</label>
+                            <CustomSelect
+                                value={form.imbalance}
+                                onChange={(val) => setForm({ ...form, imbalance: val })}
+                                options={[
+                                    { value: '', label: 'Select imbalance' },
+                                    ...imbalance.map(i => ({ value: i.value, label: i.label }))
+                                ]}
+                                placeholder="Select imbalance"
+                                allowCustom={true}
+                                className="w-full"
+                                disabled={prefillMode}
+                                onOpenChange={setIsImbalanceOpen}
+                            />
+                        </div>
+                        <div className={isSystemsOpen ? 'relative z-[10000]' : 'relative z-0'}>
+                            <label className="block text-sm font-medium mb-1.5">Systems</label>
+                            <CustomSelect
+                                value={form.systems}
+                                onChange={(val) => setForm({ ...form, systems: val })}
+                                options={[
+                                    { value: '', label: 'Select system' },
+                                    ...systems.map(s => ({ value: s.value, label: s.label }))
+                                ]}
+                                placeholder="Select system"
+                                allowCustom={true}
+                                className="w-full"
+                                disabled={prefillMode}
+                                onOpenChange={setIsSystemsOpen}
+                            />
+                        </div>
                         <div className={isOrganOpen ? 'relative z-[10000]' : 'relative z-0'}>
-                            <label className="block text-sm font-medium mb-1.5">Site</label>
+                            <label className="block text-sm font-medium mb-1.5">Organ</label>
                             <CustomSelect
                                 value={form.organ}
                                 onChange={(val) => setForm({ ...form, organ: val })}
                                 options={[
-                                    { value: '', label: 'Select site' },
+                                    { value: '', label: 'Select organ' },
                                     ...organ.map(o => ({ value: o, label: o }))
                                 ]}
-                                placeholder="Select site"
+                                placeholder="Select organ"
                                 allowCustom={true}
                                 className="w-full"
                                 disabled={prefillMode}
-                                onOpenChange={setIsBasicInfoDropdownOpen}
+                                onOpenChange={setIsOrganOpen}
                             />
                         </div>
                         <div className={isDiseaseActionOpen ? 'relative z-[10000]' : 'relative z-0'}>
@@ -955,7 +1003,7 @@ function NewTreatmentPage() {
                                                                 />
                                                             </div>
                                                             <div className="flex-1 min-w-[80px]">
-                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dose Time</label>
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Frequency</label>
                                                                 <CustomSelect
                                                                     value={parseDosage(medicine.dosage || '').timing}
                                                                     onChange={(val) => {
@@ -963,13 +1011,13 @@ function NewTreatmentPage() {
                                                                         updateMedicine(medicineIndex, 'dosage', formatDosage(parsed.quantity, val, parsed.dilution))
                                                                     }}
                                                                     options={doseTiming}
-                                                                    placeholder="Time"
+                                                                    placeholder="Frequency"
                                                                     allowCustom={true}
                                                                     className="text-xs h-8"
                                                                 />
                                                             </div>
                                                             <div className="flex-1 min-w-[80px]">
-                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dilution</label>
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Along With</label>
                                                                 <CustomSelect
                                                                     value={parseDosage(medicine.dosage || '').dilution}
                                                                     onChange={(val) => {
@@ -977,18 +1025,22 @@ function NewTreatmentPage() {
                                                                         updateMedicine(medicineIndex, 'dosage', formatDosage(parsed.quantity, parsed.timing, val.toUpperCase()))
                                                                     }}
                                                                     options={dilution}
-                                                                    placeholder="Dil"
+                                                                    placeholder="Along With"
                                                                     allowCustom={true}
                                                                     className="text-xs h-8"
                                                                 />
                                                             </div>
                                                             <div className="flex-1 min-w-[112px]">
-                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Procedure</label>
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Instruction</label>
                                                                 <CustomSelect value={medicine.procedure || ''} onChange={(val) => updateMedicine(medicineIndex, 'procedure', val.toUpperCase())} options={procedure} placeholder="Proc" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[112px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Presentation</label>
                                                                 <CustomSelect value={medicine.presentation || ''} onChange={(val) => updateMedicine(medicineIndex, 'presentation', val.toUpperCase())} options={presentation} placeholder="Pres" allowCustom={true} className="text-xs h-8" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-[112px]">
+                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Site</label>
+                                                                <CustomSelect value={medicine.administration || ''} onChange={(val) => updateMedicine(medicineIndex, 'administration', val.toUpperCase())} options={administration} placeholder="Admin" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                         </div>
 

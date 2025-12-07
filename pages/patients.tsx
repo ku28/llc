@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import * as XLSX from 'xlsx'
 import DateInput from '../components/DateInput'
@@ -62,7 +62,10 @@ export default function PatientsPage() {
     const { getCache, setCache, clearCache } = useDataCache()
     const { selectedDoctorId } = useDoctor()
     
-    const emptyForm = { fullName: '', phone: '', email: '', dob: '', date: '', age: '', address: '', gender: '', imageUrl: '', fatherHusbandGuardianName: '', doctorId: '', weight: '', height: '' }
+    const isUpdatingHeightFromFeet = useRef(false)
+    const isUpdatingFeetFromHeight = useRef(false)
+    
+    const emptyForm = { fullName: '', phone: '', email: '', dob: '', date: '', age: '', address: '', gender: '', imageUrl: '', fatherHusbandGuardianName: '', doctorId: '', weight: '', height: '', heightFeet: '', heightInches: '' }
     const [form, setForm] = useState(emptyForm)
 
     // Calculate age from date of birth
@@ -77,6 +80,51 @@ export default function PatientsPage() {
         }
         return age.toString()
     }
+
+    // Auto-convert height: cm to feet-inches
+    useEffect(() => {
+        if (isUpdatingHeightFromFeet.current) {
+            isUpdatingHeightFromFeet.current = false
+            return
+        }
+
+        if (form.height && form.height !== '') {
+            const cm = parseFloat(form.height)
+            if (!isNaN(cm) && cm > 0) {
+                const totalInches = cm / 2.54
+                const feet = Math.floor(totalInches / 12)
+                const inches = Math.round(totalInches % 12)
+                const calculatedFeet = feet.toString()
+                const calculatedInches = inches.toString()
+                if (form.heightFeet !== calculatedFeet || form.heightInches !== calculatedInches) {
+                    isUpdatingFeetFromHeight.current = true
+                    setForm((prev: any) => ({ ...prev, heightFeet: calculatedFeet, heightInches: calculatedInches }))
+                }
+            }
+        }
+    }, [form.height])
+
+    // Auto-convert height: feet-inches to cm
+    useEffect(() => {
+        if (isUpdatingFeetFromHeight.current) {
+            isUpdatingFeetFromHeight.current = false
+            return
+        }
+
+        if ((form.heightFeet !== '' || form.heightInches !== '') && form.heightFeet !== undefined && form.heightInches !== undefined) {
+            const feet = parseFloat(form.heightFeet) || 0
+            const inches = parseFloat(form.heightInches) || 0
+            if (feet > 0 || inches > 0) {
+                const totalInches = (feet * 12) + inches
+                const cm = Math.round(totalInches * 2.54)
+                const calculatedHeight = cm.toString()
+                if (form.height !== calculatedHeight) {
+                    isUpdatingHeightFromFeet.current = true
+                    setForm((prev: any) => ({ ...prev, height: calculatedHeight }))
+                }
+            }
+        }
+    }, [form.heightFeet, form.heightInches])
 
     // Calculate approximate DOB from age
     const calculateDobFromAge = (age: string) => {
@@ -1341,8 +1389,42 @@ export default function PatientsPage() {
                                                         <input placeholder="70" type="number" step="0.1" value={form.weight || ''} onChange={e => setForm({ ...form, weight: e.target.value })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Height (cm)</label>
-                                                        <input placeholder="170" type="number" step="0.1" value={form.height || ''} onChange={e => setForm({ ...form, height: e.target.value })} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm" />
+                                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Height</label>
+                                                        <div className="flex gap-2">
+                                                            {/* CM Input */}
+                                                            <div className="flex items-center flex-1">
+                                                                <input
+                                                                    type="number"
+                                                                    placeholder="175"
+                                                                    value={form.height}
+                                                                    onChange={e => setForm({ ...form, height: e.target.value })}
+                                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                                                                />
+                                                                <span className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border border-l-0 border-gray-200 dark:border-gray-700 rounded-r-lg">cm</span>
+                                                            </div>
+
+                                                            {/* Feet/Inches Input */}
+                                                            <div className="flex items-center flex-1">
+                                                                <input
+                                                                    type="number"
+                                                                    placeholder="5"
+                                                                    value={form.heightFeet}
+                                                                    onChange={e => setForm({ ...form, heightFeet: e.target.value })}
+                                                                    className="w-12 px-2 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg text-center focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                                                                    title="Feet"
+                                                                />
+                                                                <span className="px-2 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border-y border-gray-200 dark:border-gray-700">ft</span>
+                                                                <input
+                                                                    type="number"
+                                                                    placeholder="9"
+                                                                    value={form.heightInches}
+                                                                    onChange={e => setForm({ ...form, heightInches: e.target.value })}
+                                                                    className="w-12 px-2 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-center focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                                                                    title="Inches"
+                                                                />
+                                                                <span className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border border-l-0 border-gray-200 dark:border-gray-700 rounded-r-lg">in</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>

@@ -1,0 +1,50 @@
+[
+    {
+        "value": "circulatory_sys",
+        "label": "CIRCULATORY SYS"
+    },
+    {
+        "value": "digestive_sys",
+        "label": "DIGESTIVE SYS"
+    },
+    {
+        "value": "endocrine_sys",
+        "label": "ENDOCRINE SYS"
+    },
+    {
+        "value": "f_reproductive_sys",
+        "label": "F REPRODUCTIVE SYS"
+    },
+    {
+        "value": "intagumentory_sys",
+        "label": "INTAGUMENTORY SYS"
+    },
+    {
+        "value": "lymphatic_sys",
+        "label": "LYMPHATIC SYS"
+    },
+    {
+        "value": "m_reproductive_sys",
+        "label": "M REPRODUCTIVE SYS"
+    },
+    {
+        "value": "muscular_sys",
+        "label": "MUSCULAR SYS"
+    },
+    {
+        "value": "nervous_sys",
+        "label": "NERVOUS SYS"
+    },
+    {
+        "value": "respiratory_sys",
+        "label": "RESPIRATORY SYS"
+    },
+    {
+        "value": "skelatal_sys",
+        "label": "SKELATAL SYS"
+    },
+    {
+        "value": "urinary_sys",
+        "label": "URINARY SYS"
+    }
+]

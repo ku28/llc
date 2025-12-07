@@ -170,29 +170,52 @@ export default function VisitDetail() {
         try {
             console.log(`📸 Capturing ${type} copy...`)
             console.log(`   Element dimensions: ${elementToCapture.scrollWidth}x${elementToCapture.scrollHeight}`)
-
+            
+            // Force A4 width
+            const originalWidth = elementToCapture.style.width
+            elementToCapture.style.width = '794px'
+            await new Promise(resolve => setTimeout(resolve, 100))
+            
             // Capture as canvas
             const canvas = await html2canvas(elementToCapture, {
-                scale: 1.5,
+                scale: 2,
                 useCORS: true,
+                allowTaint: true,
                 logging: false,
                 backgroundColor: '#ffffff',
-                windowWidth: elementToCapture.scrollWidth,
-                windowHeight: elementToCapture.scrollHeight,
-                imageTimeout: 15000
+                imageTimeout: 15000,
+                scrollY: -window.scrollY,
+                width: 794,
+                onclone: (clonedDoc) => {
+                    clonedDoc.documentElement.style.fontSize = '16px'
+                    const clonedElement = clonedDoc.querySelector('.prescription-container') as HTMLElement
+                    if (clonedElement) {
+                        clonedElement.style.width = '794px'
+                        clonedElement.style.boxShadow = 'none'
+                        clonedElement.style.borderRadius = '0'
+                    }
+                }
             })
+            
+            // Restore width
+            elementToCapture.style.width = originalWidth
 
             console.log(`✓ Canvas captured: ${canvas.width}x${canvas.height}`)
 
             // Convert canvas to PDF
             const pdf = new jsPDF({
                 orientation: 'portrait',
-                unit: 'px',
-                format: [canvas.width, canvas.height]
+                unit: 'mm',
+                format: 'a4',
+                compress: true
             })
 
-            const imgData = canvas.toDataURL('image/jpeg', 0.85)
-            pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height)
+            const pdfWidth = 210
+            const imgData = canvas.toDataURL('image/png')
+            const imgProps = pdf.getImageProperties(imgData)
+            const imgHeight = (imgProps.height * pdfWidth) / imgProps.width
+            
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight)
 
             // Get PDF as base64 data URI
             const pdfDataUri = pdf.output('datauristring')
@@ -1083,43 +1106,59 @@ export default function VisitDetail() {
         if (!skipLoadingState) setIsGeneratingPDF(true)
 
         try {
-            // Capture the prescription container as canvas with high quality
-            const canvas = await html2canvas(prescriptionRef.current, {
+            const element = prescriptionRef.current
+            
+            // Force element to exact A4 pixel width during capture
+            const originalWidth = element.style.width
+            element.style.width = '794px' // 210mm at 96 DPI
+            
+            // Wait for layout to settle
+            await new Promise(resolve => setTimeout(resolve, 100))
+            
+            // Capture with exact dimensions
+            const canvas = await html2canvas(element, {
                 scale: 2,
                 useCORS: true,
+                allowTaint: true,
                 logging: false,
                 backgroundColor: '#ffffff',
-                windowWidth: prescriptionRef.current.scrollWidth,
-                windowHeight: prescriptionRef.current.scrollHeight
+                imageTimeout: 15000,
+                scrollY: -window.scrollY,
+                width: 794, // Force exact A4 width in pixels
+                onclone: (clonedDoc) => {
+                    clonedDoc.documentElement.style.fontSize = '16px'
+                    const clonedElement = clonedDoc.querySelector('.prescription-container') as HTMLElement
+                    if (clonedElement) {
+                        clonedElement.style.width = '794px'
+                        clonedElement.style.boxShadow = 'none'
+                        clonedElement.style.borderRadius = '0'
+                    }
+                }
             })
+            
+            // Restore original width
+            element.style.width = originalWidth
 
-            const imgData = canvas.toDataURL('image/png')
-
-            // Create PDF with letter size
+            // Create standard A4 PDF
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
-                format: 'a4'
+                format: 'a4',
+                compress: true
             })
 
-            const pageWidth = pdf.internal.pageSize.getWidth()
-            const pageHeight = pdf.internal.pageSize.getHeight()
+            const pdfWidth = 210 // A4 width in mm
+            const pdfHeight = 297 // A4 height in mm
+            
+            // Convert canvas to image data
+            const imgData = canvas.toDataURL('image/png')
+            
+            // Calculate height to maintain aspect ratio
+            const imgProps = pdf.getImageProperties(imgData)
+            const imgHeight = (imgProps.height * pdfWidth) / imgProps.width
 
-            // Calculate dimensions to fit the page while maintaining aspect ratio
-            const imgWidth = pageWidth
-            const imgHeight = (canvas.height * pageWidth) / canvas.width
-
-            // If image is taller than page, scale it down
-            let finalWidth = imgWidth
-            let finalHeight = imgHeight
-
-            if (imgHeight > pageHeight) {
-                finalHeight = pageHeight
-                finalWidth = (canvas.width * pageHeight) / canvas.height
-            }
-
-            // Add image to PDF with no margins - fill the page
-            pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, finalHeight > pageHeight ? pageHeight : finalHeight)
+            // Add image fitting the width of A4
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight)
 
             // Save with patient name and OPD number
             const patientName = `${visit.patient?.firstName || ''} ${visit.patient?.lastName || ''}`.trim() || 'Patient'
@@ -1161,63 +1200,88 @@ export default function VisitDetail() {
 
         try {
             const originalCopyType = copyType
-
+            
+            // Force A4 pixel width
+            const originalWidth = prescriptionRef.current.style.width
+            prescriptionRef.current.style.width = '794px'
+            await new Promise(resolve => setTimeout(resolve, 200))
+            
             // Capture patient copy
             setCopyType('PATIENT')
-            await new Promise(resolve => setTimeout(resolve, 100))
+            await new Promise(resolve => setTimeout(resolve, 300))
 
             const canvas1 = await html2canvas(prescriptionRef.current, {
                 scale: 2,
                 useCORS: true,
+                allowTaint: true,
                 logging: false,
                 backgroundColor: '#ffffff',
-                windowWidth: prescriptionRef.current.scrollWidth,
-                windowHeight: prescriptionRef.current.scrollHeight
+                imageTimeout: 15000,
+                scrollY: -window.scrollY,
+                width: 794,
+                onclone: (clonedDoc) => {
+                    clonedDoc.documentElement.style.fontSize = '16px'
+                    const clonedElement = clonedDoc.querySelector('.prescription-container') as HTMLElement
+                    if (clonedElement) {
+                        clonedElement.style.width = '794px'
+                        clonedElement.style.boxShadow = 'none'
+                        clonedElement.style.borderRadius = '0'
+                    }
+                }
             })
 
             // Capture office copy
             setCopyType('OFFICE')
-            await new Promise(resolve => setTimeout(resolve, 100))
+            await new Promise(resolve => setTimeout(resolve, 300))
 
             const canvas2 = await html2canvas(prescriptionRef.current, {
                 scale: 2,
                 useCORS: true,
+                allowTaint: true,
                 logging: false,
                 backgroundColor: '#ffffff',
-                windowWidth: prescriptionRef.current.scrollWidth,
-                windowHeight: prescriptionRef.current.scrollHeight
+                imageTimeout: 15000,
+                scrollY: -window.scrollY,
+                width: 794,
+                onclone: (clonedDoc) => {
+                    clonedDoc.documentElement.style.fontSize = '16px'
+                    const clonedElement = clonedDoc.querySelector('.prescription-container') as HTMLElement
+                    if (clonedElement) {
+                        clonedElement.style.width = '794px'
+                        clonedElement.style.boxShadow = 'none'
+                        clonedElement.style.borderRadius = '0'
+                    }
+                }
             })
+            
+            // Restore width
+            prescriptionRef.current.style.width = originalWidth
+            
+            // Restore width
+            prescriptionRef.current.style.width = originalWidth
 
-            // Create PDF with two pages
+            // Create PDF
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
-                format: 'a4'
+                format: 'a4',
+                compress: true
             })
 
-            const pageWidth = pdf.internal.pageSize.getWidth()
-            const pageHeight = pdf.internal.pageSize.getHeight()
-
-            // Add patient copy (page 1)
+            const pdfWidth = 210
+            
+            // Add patient copy
             const imgData1 = canvas1.toDataURL('image/png')
-            const imgHeight1 = (canvas1.height * pageWidth) / canvas1.width
-            let finalHeight1 = imgHeight1
-            if (imgHeight1 > pageHeight) {
-                finalHeight1 = pageHeight
-            }
-            pdf.addImage(imgData1, 'PNG', 0, 0, pageWidth, finalHeight1 > pageHeight ? pageHeight : finalHeight1)
+            const imgProps1 = pdf.getImageProperties(imgData1)
+            const imgHeight1 = (imgProps1.height * pdfWidth) / imgProps1.width
+            pdf.addImage(imgData1, 'PNG', 0, 0, pdfWidth, imgHeight1)
 
-            // Add new page for office copy
+            // Add office copy
             pdf.addPage()
-
-            // Add office copy (page 2)
             const imgData2 = canvas2.toDataURL('image/png')
-            const imgHeight2 = (canvas2.height * pageWidth) / canvas2.width
-            let finalHeight2 = imgHeight2
-            if (imgHeight2 > pageHeight) {
-                finalHeight2 = pageHeight
-            }
-            pdf.addImage(imgData2, 'PNG', 0, 0, pageWidth, finalHeight2 > pageHeight ? pageHeight : finalHeight2)
+            const imgProps2 = pdf.getImageProperties(imgData2)
+            const imgHeight2 = (imgProps2.height * pdfWidth) / imgProps2.width
+            pdf.addImage(imgData2, 'PNG', 0, 0, pdfWidth, imgHeight2)
 
             // Save with patient name and OPD number
             const patientName = `${visit.patient?.firstName || ''} ${visit.patient?.lastName || ''}`.trim() || 'Patient'
@@ -1249,20 +1313,35 @@ export default function VisitDetail() {
         try {
             // Add letterhead class to hide images
             prescriptionRef.current.classList.add('print-letterhead')
-            await new Promise(resolve => setTimeout(resolve, 100))
-
+            
+            // Force A4 width
+            const originalWidth = prescriptionRef.current.style.width
+            prescriptionRef.current.style.width = '794px'
+            await new Promise(resolve => setTimeout(resolve, 200))
+            
             // Capture as canvas
             const canvas = await html2canvas(prescriptionRef.current, {
                 scale: 2,
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#ffffff',
-                width: prescriptionRef.current.scrollWidth,
-                height: prescriptionRef.current.scrollHeight
+                imageTimeout: 15000,
+                scrollY: -window.scrollY,
+                width: 794,
+                onclone: (clonedDoc) => {
+                    clonedDoc.documentElement.style.fontSize = '16px'
+                    const clonedElement = clonedDoc.querySelector('.prescription-container') as HTMLElement
+                    if (clonedElement) {
+                        clonedElement.style.width = '794px'
+                        clonedElement.style.boxShadow = 'none'
+                        clonedElement.style.borderRadius = '0'
+                    }
+                }
             })
 
-            // Remove letterhead class
+            // Remove letterhead class and restore width
             prescriptionRef.current.classList.remove('print-letterhead')
+            prescriptionRef.current.style.width = originalWidth
 
             // Create a temporary image to print
             const imgData = canvas.toDataURL('image/png')
@@ -1332,15 +1411,33 @@ export default function VisitDetail() {
         }
 
         try {
+            // Force A4 width
+            const originalWidth = prescriptionRef.current.style.width
+            prescriptionRef.current.style.width = '794px'
+            await new Promise(resolve => setTimeout(resolve, 200))
+            
             // Capture as canvas
             const canvas = await html2canvas(prescriptionRef.current, {
                 scale: 2,
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#ffffff',
-                width: prescriptionRef.current.scrollWidth,
-                height: prescriptionRef.current.scrollHeight
+                imageTimeout: 15000,
+                scrollY: -window.scrollY,
+                width: 794,
+                onclone: (clonedDoc) => {
+                    clonedDoc.documentElement.style.fontSize = '16px'
+                    const clonedElement = clonedDoc.querySelector('.prescription-container') as HTMLElement
+                    if (clonedElement) {
+                        clonedElement.style.width = '794px'
+                        clonedElement.style.boxShadow = 'none'
+                        clonedElement.style.borderRadius = '0'
+                    }
+                }
             })
+            
+            // Restore width
+            prescriptionRef.current.style.width = originalWidth
 
             // Create a temporary image to print
             const imgData = canvas.toDataURL('image/png')
@@ -1419,8 +1516,16 @@ export default function VisitDetail() {
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#ffffff',
-                width: prescriptionRef.current.scrollWidth,
-                height: prescriptionRef.current.scrollHeight
+                imageTimeout: 15000,
+                scrollY: -window.scrollY,
+                onclone: (clonedDoc) => {
+                    clonedDoc.documentElement.style.fontSize = '16px'
+                    const clonedElement = clonedDoc.querySelector('.prescription-container') as HTMLElement
+                    if (clonedElement) {
+                        clonedElement.style.boxShadow = 'none'
+                        clonedElement.style.borderRadius = '0'
+                    }
+                }
             })
 
             if (paperType === 'letterhead') {
@@ -1441,8 +1546,16 @@ export default function VisitDetail() {
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#ffffff',
-                width: prescriptionRef.current.scrollWidth,
-                height: prescriptionRef.current.scrollHeight
+                imageTimeout: 15000,
+                scrollY: -window.scrollY,
+                onclone: (clonedDoc) => {
+                    clonedDoc.documentElement.style.fontSize = '16px'
+                    const clonedElement = clonedDoc.querySelector('.prescription-container') as HTMLElement
+                    if (clonedElement) {
+                        clonedElement.style.boxShadow = 'none'
+                        clonedElement.style.borderRadius = '0'
+                    }
+                }
             })
 
             if (paperType === 'letterhead') {
@@ -1776,20 +1889,20 @@ export default function VisitDetail() {
                 {/* Main Content Area with PDF Preview and Reports Sidebar */}
                 <div className="flex flex-col lg:flex-row gap-6">
                     {/* Prescription Sheet - Left Side */}
-                    <div className="flex-1 w-full lg:w-auto overflow-hidden">
+                    <div className="flex-1 w-full lg:w-auto overflow-hidden" style={{ marginBottom: '3rem' }}>
                         <div className="prescription-container-wrapper">
                             <div ref={prescriptionRef} className="prescription-container" style={{ background: 'white', color: 'black', padding: '0', position: 'relative', width: '210mm', minHeight: '297mm', boxSizing: 'border-box', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                                 {/* Watermark - Only show in PATIENT copy */}
                                 {copyType === 'PATIENT' && (
-                                    <div className="watermark-container" style={{ position: 'absolute', top: 'calc(50% - 30px)', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.175, zIndex: 0, pointerEvents: 'none' }}>
-                                        <img src="/watermark.png" alt="Watermark" style={{ width: '520px', height: '520px', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                                    <div className="watermark-container" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', opacity: 0.175, zIndex: 0, pointerEvents: 'none', width: '65%', height: 'auto' }}>
+                                        <img src="/watermark.png" alt="Watermark" style={{ width: '100%', height: 'auto', objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
                                     </div>
                                 )}
 
                                 {/* Header Image - Full width, no margin - Only show in PATIENT copy */}
                                 {copyType === 'PATIENT' && (
                                     <div className="header-container" style={{ width: '100%', overflow: 'hidden', marginBottom: '1rem', position: 'relative', zIndex: 1 }}>
-                                        <img src="/header.png" alt="Header" style={{ width: '100%', height: 'auto', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                                        <img src="/header.png" alt="Header" style={{ width: '100%', height: '90%', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
                                     </div>
                                 )}
 
@@ -1802,30 +1915,31 @@ export default function VisitDetail() {
                                             <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
 
                                                 {/* Particulars Box (Left) */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Particulars</span>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '9px', gap: '1px' }}>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Particulars</span>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '9px', gap: '2px', lineHeight: '1.1', marginTop: '-4px' }}>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OPDN</span> <span style={{ color: 'blue', fontWeight: 'bold', marginLeft: '4px' }}>{visit.opdNo || 'N/A'}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>VISIT</span> <span style={{ marginLeft: '4px' }}>{visit.visitNumber || '1'}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>SEX</span> <span style={{ marginLeft: '4px' }}>{visit.gender || visit.patient?.gender || 'N/A'}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DOB</span> <span style={{ marginLeft: '4px' }}>{visit.dob || visit.patient?.dob ? new Date(visit.dob || visit.patient?.dob).toLocaleDateString('en-GB') : ''}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>AGE</span> <span style={{ marginLeft: '4px' }}>{visit.age || visit.patient?.age || 'N/A'}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>F UP</span> <span style={{ marginLeft: '4px' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HT</span> <span style={{ marginLeft: '4px' }}>{visit.height}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DOB</span> <span style={{ marginLeft: '4px' }}>{visit.dob || visit.patient?.dob ? new Date(visit.dob || visit.patient?.dob).toLocaleDateString('en-GB') : ''}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PHONE</span> <span style={{ marginLeft: '4px' }}>{visit.phone || visit.patient?.phone}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><a href={`#nextVisit`} style={{ fontWeight: 'bold', textDecoration: 'underline', color: '#000', cursor: 'pointer' }}>F UP</a> <span style={{ marginLeft: '4px', color: '#C80000', fontWeight: 'bold' }}>{visit.followUpCount ? `#${visit.followUpCount}` : ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>NEXT VISIT</span> <span style={{ marginLeft: '4px', color: '#C80000', fontWeight: 'bold' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HT</span> <span style={{ marginLeft: '4px' }}>{visit.height}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>WT</span> <span style={{ marginLeft: '4px' }}>{visit.weight}</span></div>
                                                     </div>
                                                 </div>
 
                                                 {/* Right Box: Patient Info */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', display: 'flex', gap: '5px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Patient Info</span>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', display: 'flex', gap: '5px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Patient Info</span>
                                                     
                                                     <div style={{ flex: 1 }}>
                                                         {/* Indicator Box - Added to Patient Copy */}
                                                         <div style={{ width: '30px', height: '15px', background: visit.improvements ? 'green' : 'red', marginBottom: '3px', border: '1px solid #000' }}></div>
 
-                                                        <div style={{ fontSize: '0.75rem' }}>
+                                                        <div style={{ fontSize: '0.75rem', lineHeight: '1.1', marginTop: '-4px' }}>
                                                             <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>NAME:</span> <span style={{ fontWeight: 'bold', color: '#FF0000', marginLeft: '4px' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</span></div>
                                                             <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>FATHER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '4px' }}>{visit.patient?.fatherHusbandGuardianName || ''}</span></div>
                                                             <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.patient?.address || visit.address || ''}</span></div>
@@ -1868,103 +1982,89 @@ export default function VisitDetail() {
 
                                             {/* EH Parameters Row */}
                                             <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
-                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>TEMP</span> <span style={{ marginLeft: '4px' }}>{visit.temperament}</span></div>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>EH Parameters</span>
+                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>TEMP</span> <span style={{ marginLeft: '4px' }}>{visit.temperament}</span></div>
                                                 </div>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
-                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-1</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis}</span></div>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '12px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>EH Parameters</span>
+                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-1</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis}</span></div>
                                                 </div>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>EH Parameters</span>
-                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-2</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis2}</span></div>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '12px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>EH Parameters</span>
+                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-2</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis2}</span></div>
                                                 </div>
                                             </div>
 
                                             {/* History & Reports */}
-                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '60px' }}>
-                                                <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Prev Info</span>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HISTORY & REPORTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.historyReports}</span></div>
+                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', marginBottom: '5px', minHeight: '40px', borderSpacing: '2px' }}>
+                                                <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Prev Info</span>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '-4px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HISTORY & REPORTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.historyReports}</span></div>
                                             </div>
 
                                             {/* Chief Complaints */}
-                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '40px' }}>
-                                                <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Sign & Symptoms</span>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>CHIEF COMPLAINTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.majorComplaints}</span></div>
+                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', marginBottom: '5px', minHeight: '30px', borderSpacing: '2px' }}>
+                                                <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Sign & Symptoms</span>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '-4px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>CHIEF COMPLAINTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.majorComplaints}</span></div>
                                             </div>
 
                                             {/* Investigations & Prov Diagnosis */}
                                             <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', minHeight: '30px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Investigations Order</span>
-                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.investigations}</div>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', minHeight: '22px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Investigations Order</span>
+                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', lineHeight: '1.1', marginTop: '-4px' }}>{visit.investigations}</div>
                                                 </div>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', minHeight: '30px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Prov Diagnosis</span>
-                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px' }}>{visit.provisionalDiagnosis || visit.diagnoses}</div>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', minHeight: '22px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Prov Diagnosis</span>
+                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', lineHeight: '1.1', marginTop: '-4px' }}>{visit.provisionalDiagnosis || visit.diagnoses}</div>
                                                 </div>
                                             </div>
 
                                             {/* Improvements */}
-                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
-                                                <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Cure</span>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>IMPROVEMENTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.improvements}</span></div>
+                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', marginBottom: '5px', minHeight: '22px', borderSpacing: '2px' }}>
+                                                <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Cure</span>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '-4px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>IMPROVEMENTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.improvements}</span></div>
                                             </div>
 
                                             {/* Discuss */}
-                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', marginBottom: '5px', minHeight: '30px' }}>
-                                                <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Discuss</span>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.discussion}</span></div>
+                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', marginBottom: '5px', minHeight: '22px', borderSpacing: '2px' }}>
+                                                <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Discuss</span>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', marginTop: '-4px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.discussion}</span></div>
                                             </div>
 
                                             {/* Prescription Table */}
-                                            <div className="mb-3">
+                                            <div className="mb-2" style={{ marginTop: '0.25rem' }}>
                                                 {(() => {
                                                     const hasSpy4 = visit.prescriptions?.some((p: any) => p.spy4) || false
                                                     const hasSpy6 = visit.prescriptions?.some((p: any) => p.spy6) || false
 
                                                     return (
-                                                        <table className="w-full" style={{ fontSize: '0.7rem', borderCollapse: 'collapse' }}>
+                                                        <table className="w-full" style={{ fontSize: '0.55rem', borderCollapse: 'collapse' }}>
                                                             <tbody>
                                                                 {!visit.prescriptions || visit.prescriptions.length === 0 ? (
                                                                     <tr>
-                                                                        <td colSpan={13} style={{ textAlign: 'center', padding: '1rem', color: '#999' }}>No medications prescribed</td>
+                                                                        <td colSpan={11} style={{ textAlign: 'center', padding: '1rem', color: '#999' }}>No medications prescribed</td>
                                                                     </tr>
                                                                 ) : (
                                                                     visit.prescriptions.map((p: any, index: number) => {
                                                                         const product = products.find((prod) => prod.id === p.productId)
                                                                         const medicineName = (product?.name || p.product?.name || p.treatment?.treatmentPlan || '').toUpperCase()
-                                                                        const rowStyle = p.patientHasMedicine ? { textDecoration: 'line-through', opacity: 0.5 } : {}
+                                                                        const textColor = p.patientHasMedicine ? '#FF0000' : '#000'
 
                                                                         return (
-                                                                            <tr key={p.id} style={rowStyle}>
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '3%', fontWeight: 'bold' }}>{index + 1}</td>
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'left', color: '#0000FF', width: '15%', fontWeight: 'bold' }}>{medicineName}</td>
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>
-                                                                                {hasSpy4 && <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>}
-                                                                                {hasSpy6 && <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#008000', fontWeight: 'bold' }}></td>}
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', color: '#C80000', textTransform: 'uppercase', width: '8%', fontWeight: 'bold' }}>{p.timing || ''}</td>
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#800080', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.dosage || ''}</td>
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.additions || ''}</td>
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '8%', fontWeight: 'bold', textTransform: 'uppercase' }}>{p.presentation || ''}</td>
-                                                                                <td style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '6%', color: '#FF8C00', fontWeight: 'bold' }}>{(p.droppersToday?.toString() || '').toUpperCase()}</td>
-                                                                                {index === 0 && (
-                                                                                    <td rowSpan={visit.prescriptions.length} style={{ padding: '0.15rem 0.25rem', textAlign: 'center', width: '12%', verticalAlign: 'top' }}>
-                                                                                        <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '5px', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-                                                                                            <div style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '0.6rem', marginBottom: '2px' }}>NEXT VISIT</div>
-                                                                                            <div style={{ color: '#C80000', fontWeight: 'bold', fontSize: '0.8rem', marginBottom: '8px' }}>
-                                                                                                {visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : 'N/A'}
-                                                                                            </div>
-                                                                                            <div style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '0.6rem', marginBottom: '2px' }}>FOLLOW UP</div>
-                                                                                            <div style={{ color: '#008000', fontWeight: 'bold', fontSize: '0.8rem' }}>
-                                                                                                {visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                )}
+                                                                            <tr key={p.id}>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '3%', fontWeight: 'bold', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{index + 1}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', color: p.patientHasMedicine ? '#FF0000' : '#008000', width: '15%', fontWeight: 'bold', fontSize: '0.55rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{medicineName}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
+                                                                                {hasSpy4 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>}
+                                                                                {hasSpy6 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>}
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', color: p.patientHasMedicine ? '#FF0000' : '#C80000', textTransform: 'uppercase', width: '8%', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.timing || ''}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#800080', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.dosage || ''}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.additions || ''}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '8%', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.presentation || ''}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#FF8C00', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(p.droppersToday?.toString() || '').toUpperCase()}</td>
                                                                             </tr>
                                                                         )
                                                                     })
@@ -1980,12 +2080,12 @@ export default function VisitDetail() {
                                         </div>
 
                                         {/* Watermark Stamp - Positioned above footer on the right */}
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '2rem', marginBottom: '0.5rem' }}>
-                                            <img src="/watermark.png" alt="Watermark" style={{ width: '60px', height: 'auto', display: 'block', opacity: 0.8 }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '2rem', marginBottom: '0.5rem', marginTop: '1.5rem' }}>
+                                            <img src="/watermark.png" alt="Watermark" style={{ width: '90px', height: 'auto', display: 'block', opacity: 0.8 }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
                                         </div>
 
                                         {/* Footer Image */}
-                                        <div style={{ marginTop: 'auto', width: '100%', flexShrink: 0 }}>
+                                        <div style={{ marginTop: 'auto', width: '100%', flexShrink: 0, marginBottom: '1.5rem' }}>
                                             <img src="/footer.png" alt="Footer" style={{ width: '100%', height: 'auto', display: 'block' }} onError={(e) => { e.currentTarget.style.display = 'none' }} />
                                         </div>
                                     </>
@@ -1996,36 +2096,38 @@ export default function VisitDetail() {
                                     <>
                                         <div style={{ padding: '0 1.5rem' }}>
                                             {/* Blue Separator Line - Full Width */}
-                                            <div style={{ borderBottom: '2px solid #0000FF', marginBottom: '1rem', marginLeft: '-1.5rem', marginRight: '-1.5rem' }}></div>
+                                            <div style={{ borderBottom: '2px solid #0000FF', marginBottom: '0.5rem', marginLeft: '-1.5rem', marginRight: '-1.5rem' }}></div>
 
                                             {/* Top Row: Particulars and Patient Info */}
-                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
                                                 
                                                 {/* Left Box: Particulars */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Particulars</span>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '0.75rem' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>OPDN:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.patient?.opdNo || visit.opdNo || ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>VISIT:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>PHONE:</span> <span style={{ fontWeight: 'bold', color: '#800080', marginLeft: '4px' }}>{visit.patient?.phone || visit.phone || ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>DOB:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.patient?.dob || visit.dob ? new Date(visit.patient?.dob || visit.dob).toLocaleDateString() : ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>GENDER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '4px' }}>{visit.patient?.gender || visit.gender || ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>DATE:</span> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '4px' }}>{new Date(visit.date).toLocaleDateString()}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>NEXT:</span> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '4px' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</span></div>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Particulars</span>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '0.75rem', lineHeight: '1.2', marginTop: '-4px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>OPDN:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '3px' }}>{visit.patient?.opdNo || visit.opdNo || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>VISIT:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '3px' }}>{visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>PHONE:</span> <span style={{ fontWeight: 'bold', color: '#800080', marginLeft: '3px' }}>{visit.patient?.phone || visit.phone || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>DOB:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '3px' }}>{visit.patient?.dob || visit.dob ? new Date(visit.patient?.dob || visit.dob).toLocaleDateString() : ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>GENDER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '3px' }}>{visit.patient?.gender || visit.gender || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>AGE:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '3px' }}>{visit.age || visit.patient?.age || 'N/A'}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>DATE:</span> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '3px' }}>{new Date(visit.date).toLocaleDateString()}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><a href={`#nextVisit`} style={{ fontSize: '0.55rem', fontWeight: 'bold', textDecoration: 'none', color: '#000', cursor: 'pointer' }}>F UP:</a> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '3px' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>NEXT VISIT:</span> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '3px' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</span></div>
                                                     </div>
                                                 </div>
 
                                                 {/* Right Box: Patient Info */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px', display: 'flex', gap: '5px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Patient Info</span>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', display: 'flex', gap: '5px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Patient Info</span>
                                                     
                                                     <div style={{ flex: 1 }}>
                                                         {/* Indicator Box Removed from Office Copy */}
                                                         
-                                                        <div style={{ fontSize: '0.75rem' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>NAME:</span> <span style={{ fontWeight: 'bold', color: '#FF0000', marginLeft: '4px' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</span></div>
-                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>FATHER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '4px' }}>{visit.patient?.fatherHusbandGuardianName || ''}</span></div>
-                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.patient?.address || visit.address || ''}</span></div>
+                                                        <div style={{ fontSize: '0.75rem', lineHeight: '1.2', marginTop: '-4px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>NAME:</span> <span style={{ fontWeight: 'bold', color: '#FF0000', marginLeft: '3px' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>FATHER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '3px' }}>{visit.patient?.fatherHusbandGuardianName || ''}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '3px' }}>{visit.patient?.address || visit.address || ''}</span></div>
                                                         </div>
                                                     </div>
 
@@ -2064,20 +2166,20 @@ export default function VisitDetail() {
                                             </div>
 
                                             {/* Middle Row: Medical Info */}
-                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
                                                 {/* Box 1: Parameters */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Parameters</span>
-                                                    <div style={{ fontSize: '0.75rem' }}>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Parameters</span>
+                                                    <div style={{ fontSize: '0.75rem', lineHeight: '1.2' }}>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>TEMP:</span> <span style={{ fontWeight: 'bold', color: '#800080', marginLeft: '4px' }}>{visit.temperament || ''}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>PULSE:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.pulseDiagnosis || ''}</span></div>
                                                     </div>
                                                 </div>
 
                                                 {/* Box 2: History & Complaints */}
-                                                <div style={{ flex: 2, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>History & Complaints</span>
-                                                    <div style={{ fontSize: '0.75rem' }}>
+                                                <div style={{ flex: 2, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>History & Complaints</span>
+                                                    <div style={{ fontSize: '0.75rem', lineHeight: '1.2' }}>
                                                         <div style={{ marginBottom: '2px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>HISTORY:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.historyReports || ''}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>COMPLAINTS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.majorComplaints || ''}</span></div>
                                                     </div>
@@ -2085,10 +2187,10 @@ export default function VisitDetail() {
                                             </div>
 
                                             {/* Bottom Row: Diagnosis & Cure */}
-                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '3px', position: 'relative', paddingTop: '12px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 5px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #ccc' }}>Diagnosis & Cure</span>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.75rem' }}>
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
+                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Diagnosis & Cure</span>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.75rem', lineHeight: '1.2' }}>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>IMPROVEMENTS:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.improvements || ''}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>PROV. DIAGNOSIS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.provisionalDiagnosis || ''}</span></div>
                                                     </div>
@@ -2096,7 +2198,7 @@ export default function VisitDetail() {
                                             </div>
 
                                             {/* Orange Separator with margins */}
-                                            <div style={{ borderBottom: '2px solid #FFA500', marginBottom: '1rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
+                                            <div style={{ borderBottom: '2px solid #FFA500', marginBottom: '0.5rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
 
                                             {/* Second Medicine Table with UNITS column */}
                                             <div style={{ marginBottom: '1rem' }}>
@@ -2108,34 +2210,35 @@ export default function VisitDetail() {
                                                     const hasAdd3 = visit.prescriptions?.some((p: any) => p.addition3)
 
                                                     return (
-                                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.65rem' }}>
+                                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.55rem' }}>
                                                             <tbody>
                                                                 {visit.prescriptions?.map((prescription: any, index: number) => {
                                                                     const product = products.find((p: any) => p.id === prescription.productId)
                                                                     const availableUnits = product?.units || 0
                                                                     const isLowStock = availableUnits <= 0
-                                                                    const rowStyle = prescription.patientHasMedicine ? { textDecoration: 'line-through', opacity: 0.5 } : {}
                                                                     const totalPrice = (product?.priceRupees || 0) * (prescription.quantity || 0)
+                                                                    const textColor = prescription.patientHasMedicine ? '#FF0000' : '#000'
+                                                                    
                                                                     return (
-                                                                        <tr key={index} style={rowStyle}>
-                                                                            <td style={{ padding: '0.25rem', textAlign: 'center', width: '60px', fontWeight: 'bold', color: '#000' }}>{totalPrice}</td>
-                                                                            <td style={{ padding: '0.25rem', textAlign: 'center', width: '30px', fontWeight: 'bold' }}>{index + 1}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '120px', color: '#0000FF', fontWeight: 'bold' }}>{product?.name?.toUpperCase() || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy1 || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy2 || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy3 || ''}</td>
-                                                                            {hasSpy4 && <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy4 || ''}</td>}
-                                                                            {hasSpy5 && <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy5 || ''}</td>}
-                                                                            {hasSpy6 && <td style={{ padding: '0.25rem', width: '40px', color: '#008000', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.spy6 || ''}</td>}
-                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#C80000', textTransform: 'uppercase', fontWeight: 'bold' }}>{prescription.timing || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#800080', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.dosage || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.addition1 || prescription.additions || ''}</td>
-                                                                            {hasAdd2 && <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.addition2 || ''}</td>}
-                                                                            {hasAdd3 && <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.addition3 || ''}</td>}
-                                                                            <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.procedure || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold', textTransform: 'uppercase' }}>{prescription.presentation || ''}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '60px', color: '#FF8C00', fontWeight: 'bold' }}>{(prescription.droppersToday?.toString() || '').toUpperCase()}</td>
-                                                                            <td style={{ padding: '0.25rem', width: '60px', fontWeight: 'bold' }}>{prescription.quantity || ''}</td>
+                                                                        <tr key={index}>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', color: textColor, fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{totalPrice.toFixed(2)}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '30px', fontWeight: 'bold', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{index + 1}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '120px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.55rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product?.name?.toUpperCase() || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy1 || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy2 || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy3 || ''}</td>
+                                                                            {hasSpy4 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy4 || ''}</td>}
+                                                                            {hasSpy5 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy5 || ''}</td>}
+                                                                            {hasSpy6 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy6 || ''}</td>}
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', color: prescription.patientHasMedicine ? '#FF0000' : '#C80000', textTransform: 'uppercase', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.timing || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', color: prescription.patientHasMedicine ? '#FF0000' : '#800080', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.dosage || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.addition1 || prescription.additions || ''}</td>
+                                                                            {hasAdd2 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.addition2 || ''}</td>}
+                                                                            {hasAdd3 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.addition3 || ''}</td>}
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.procedure || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.presentation || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', color: prescription.patientHasMedicine ? '#FF0000' : '#FF8C00', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(prescription.droppersToday?.toString() || '').toUpperCase()}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.quantity || ''}</td>
                                                                         </tr>
                                                                     )
                                                                 })}
@@ -2148,23 +2251,26 @@ export default function VisitDetail() {
                                             {/* Summary Row matching table columns */}
                                             <div style={{ display: 'flex', marginBottom: '1rem', marginTop: '1.5rem', fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: '#90EE90', padding: '0.5rem', borderRadius: '4px' }}>
                                                 {(() => {
-                                                    const totalUnits = visit.prescriptions?.reduce((sum: number, p: any) => {
+                                                    // Calculate total price excluding items where patientHasMedicine is true
+                                                    const totalPrice = visit.prescriptions?.reduce((sum: number, p: any) => {
+                                                        if (p.patientHasMedicine) return sum
                                                         const product = products.find((prod: any) => prod.id === p.productId)
-                                                        return sum + (product?.units || 0)
+                                                        const itemPrice = (product?.priceRupees || 0) * (p.quantity || 0)
+                                                        return sum + itemPrice
                                                     }, 0) || 0
+                                                    
                                                     const totalMedicines = visit.prescriptions?.length || 0
                                                     const daysDiff = visit.nextVisit && visit.date
                                                         ? Math.ceil((new Date(visit.nextVisit).getTime() - new Date(visit.date).getTime()) / (1000 * 60 * 60 * 24))
                                                         : 0
-                                                    const finalAmount = (visit.amount || 0) - (visit.discount || 0)
 
                                                     return (
                                                         <>
-                                                            <div style={{ width: '50px', textAlign: 'center' }}>{totalUnits}</div>
+                                                            <div style={{ width: '60px', textAlign: 'center' }}>{totalPrice.toFixed(2)}</div>
                                                             <div style={{ width: '30px', textAlign: 'center' }}>{totalMedicines}</div>
                                                             <div style={{ width: '120px', paddingLeft: '0.5rem' }}>{daysDiff} DAYS</div>
                                                             <div style={{ flex: 1 }}></div>
-                                                            <div style={{ width: '60px', textAlign: 'right' }}>₹{finalAmount.toFixed(2)}</div>
+                                                            <div style={{ width: '60px', textAlign: 'right' }}>₹{totalPrice.toFixed(2)}</div>
                                                         </>
                                                     )
                                                 })()}
@@ -2449,10 +2555,10 @@ export default function VisitDetail() {
                         visibility: hidden !important;
                     }
                 }
-                /* Screen view - exact letter width, show page boundary */
+                /* Screen view - exact A4 dimensions to match PDF output */
                 .prescription-container {
-                    width: 8.5in;
-                    min-height: 11in;
+                    width: 210mm;
+                    min-height: 297mm;
                     margin: 0 auto;
                     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
                     border-radius: 8px;

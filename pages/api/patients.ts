@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const user = await requireAuth(req, res)
     if(!user) return
     
-    const { firstName, lastName, phone, email, dob, date, age, address, gender, nextVisit, imageUrl, fatherHusbandGuardianName, doctorId: providedDoctorId } = req.body
+    const { firstName, lastName, phone, email, dob, date, age, address, gender, nextVisit, imageUrl, fatherHusbandGuardianName, weight, height, doctorId: providedDoctorId } = req.body
     
     // Determine doctorId: doctor role uses their own ID, admin/receptionist can specify, others null
     let doctorId = null
@@ -56,6 +56,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           nextVisit: nextVisit ? new Date(nextVisit) : undefined, 
           imageUrl,
           fatherHusbandGuardianName,
+          weight: weight ? Number(weight) : undefined,
+          height: height ? Number(height) : undefined,
           doctorId
         } 
       })
@@ -69,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const user = await requireAuth(req, res)
     if(!user) return
     
-    const { id, firstName, lastName, phone, email, dob, date, age, address, gender, nextVisit, imageUrl, fatherHusbandGuardianName, doctorId: providedDoctorId } = req.body
+    const { id, firstName, lastName, phone, email, dob, date, age, address, gender, nextVisit, imageUrl, fatherHusbandGuardianName, weight, height, doctorId: providedDoctorId } = req.body
     
     // Determine doctorId for update
     let doctorId = undefined
@@ -92,7 +94,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         gender, 
         nextVisit: nextVisit ? new Date(nextVisit) : undefined, 
         imageUrl,
-        fatherHusbandGuardianName
+        fatherHusbandGuardianName,
+        weight: weight ? Number(weight) : undefined,
+        height: height ? Number(height) : undefined
       }
       
       if (doctorId !== undefined) {

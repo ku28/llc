@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, memo } from 'react'
 import { createPortal } from 'react-dom'
 
 interface Option {
@@ -19,7 +19,7 @@ interface CustomSelectProps {
     disabled?: boolean  // Disable the select
 }
 
-export default function CustomSelect({
+function CustomSelect({
     value,
     onChange,
     options,
@@ -101,7 +101,7 @@ export default function CustomSelect({
         if (isOpen && optionsRef.current && optionsRef.current.children[highlightedIndex]) {
             const highlightedElement = optionsRef.current.children[highlightedIndex] as HTMLElement
             if (highlightedElement) {
-                highlightedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+                highlightedElement.scrollIntoView({ block: 'nearest', behavior: 'auto' })
             }
         }
     }, [highlightedIndex, isOpen])
@@ -365,3 +365,5 @@ export default function CustomSelect({
         </div>
     )
 }
+
+export default memo(CustomSelect)

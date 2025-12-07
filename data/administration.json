@@ -4,103 +4,239 @@
         "label": "Select administration"
     },
     {
-        "value": "ALT",
-        "label": "ALT"
+        "value": "ABDOMEN WHOLE",
+        "label": "ABDOMEN WHOLE"
     },
     {
-        "value": "OR",
-        "label": "OR"
+        "value": "ABDOMEN/SPINE",
+        "label": "ABDOMEN/SPINE"
     },
     {
-        "value": "APPLY",
-        "label": "APPLY"
+        "value": "ANCKLES",
+        "label": "ANCKLES"
     },
     {
-        "value": "POUR",
-        "label": "POUR"
+        "value": "ARMS",
+        "label": "ARMS"
     },
     {
-        "value": "BATH",
-        "label": "BATH"
+        "value": "BACK OF THE EAR",
+        "label": "BACK OF THE EAR"
     },
     {
-        "value": "SITZ BATH",
-        "label": "SITZ BATH"
+        "value": "BODY",
+        "label": "BODY"
     },
     {
-        "value": "MESSAGE",
-        "label": "MESSAGE"
+        "value": "BONES",
+        "label": "BONES"
     },
     {
-        "value": "GARGLE",
-        "label": "GARGLE"
+        "value": "BREAST",
+        "label": "BREAST"
     },
     {
-        "value": "STEAM",
-        "label": "STEAM"
+        "value": "CENTRE ABDOMEN",
+        "label": "CENTRE ABDOMEN"
     },
     {
-        "value": "HOT COMPRESS",
-        "label": "HOT COMPRESS"
+        "value": "CHEST",
+        "label": "CHEST"
     },
     {
-        "value": "COLD COMPRESS",
-        "label": "COLD COMPRESS"
+        "value": "CHEST/BACK/SINUS",
+        "label": "CHEST/BACK/SINUS"
     },
     {
-        "value": "COMPRESS",
-        "label": "COMPRESS"
+        "value": "CHIN",
+        "label": "CHIN"
     },
     {
-        "value": "DOUCHE",
-        "label": "DOUCHE"
+        "value": "COCCYX",
+        "label": "COCCYX"
     },
     {
-        "value": "SPRINKLE",
-        "label": "SPRINKLE"
+        "value": "EARS",
+        "label": "EARS"
     },
     {
-        "value": "SPRAY",
-        "label": "SPRAY"
+        "value": "EFFECTED AREA",
+        "label": "EFFECTED AREA"
     },
     {
-        "value": "WASH",
-        "label": "WASH"
+        "value": "EYES",
+        "label": "EYES"
     },
     {
-        "value": "SPONGE",
-        "label": "SPONGE"
+        "value": "FACE",
+        "label": "FACE"
     },
     {
-        "value": "INJECTION",
-        "label": "INJECTION"
+        "value": "FINGERS",
+        "label": "FINGERS"
     },
     {
-        "value": "ORAL",
-        "label": "ORAL"
+        "value": "FOOT",
+        "label": "FOOT"
     },
     {
-        "value": "EXTERNAL",
-        "label": "EXTERNAL"
+        "value": "FORE HEAD",
+        "label": "FORE HEAD"
     },
     {
-        "value": "RUB",
-        "label": "RUB"
+        "value": "GROIN",
+        "label": "GROIN"
     },
     {
-        "value": "SMELL",
-        "label": "SMELL"
+        "value": "GUMS",
+        "label": "GUMS"
     },
     {
-        "value": "NEBULISE",
-        "label": "NEBULISE"
+        "value": "HAIR",
+        "label": "HAIR"
     },
     {
-        "value": "CHEW",
-        "label": "CHEW"
+        "value": "HANDS",
+        "label": "HANDS"
     },
     {
-        "value": "LICK",
-        "label": "LICK"
+        "value": "HEAD",
+        "label": "HEAD"
+    },
+    {
+        "value": "HEAL",
+        "label": "HEAL"
+    },
+    {
+        "value": "HEART",
+        "label": "HEART"
+    },
+    {
+        "value": "HYPOCHONDRIA",
+        "label": "HYPOCHONDRIA"
+    },
+    {
+        "value": "JOINTS",
+        "label": "JOINTS"
+    },
+    {
+        "value": "KNEE JOINT",
+        "label": "KNEE JOINT"
+    },
+    {
+        "value": "LEGS",
+        "label": "LEGS"
+    },
+    {
+        "value": "LIPS",
+        "label": "LIPS"
+    },
+    {
+        "value": "LOCAL",
+        "label": "LOCAL"
+    },
+    {
+        "value": "LOWER ABDOMEN",
+        "label": "LOWER ABDOMEN"
+    },
+    {
+        "value": "LOWER BACK",
+        "label": "LOWER BACK"
+    },
+    {
+        "value": "MOUTH",
+        "label": "MOUTH"
+    },
+    {
+        "value": "MUSCLES",
+        "label": "MUSCLES"
+    },
+    {
+        "value": "NAVAL",
+        "label": "NAVAL"
+    },
+    {
+        "value": "NECK",
+        "label": "NECK"
+    },
+    {
+        "value": "NOSE",
+        "label": "NOSE"
+    },
+    {
+        "value": "PALM/PALMATER/HEAD",
+        "label": "PALM/PALMATER/HEAD"
+    },
+    {
+        "value": "PAROTID",
+        "label": "PAROTID"
+    },
+    {
+        "value": "PELVIC",
+        "label": "PELVIC"
+    },
+    {
+        "value": "PENIS",
+        "label": "PENIS"
+    },
+    {
+        "value": "PROSTAT",
+        "label": "PROSTAT"
+    },
+    {
+        "value": "SCALP",
+        "label": "SCALP"
+    },
+    {
+        "value": "SINUS",
+        "label": "SINUS"
+    },
+    {
+        "value": "SKIN",
+        "label": "SKIN"
+    },
+    {
+        "value": "SOLAR PLEXUS",
+        "label": "SOLAR PLEXUS"
+    },
+    {
+        "value": "TESTES",
+        "label": "TESTES"
+    },
+    {
+        "value": "THROAT",
+        "label": "THROAT"
+    },
+    {
+        "value": "TOES",
+        "label": "TOES"
+    },
+    {
+        "value": "TONGUE",
+        "label": "TONGUE"
+    },
+    {
+        "value": "TONSILS",
+        "label": "TONSILS"
+    },
+    {
+        "value": "TOOTH",
+        "label": "TOOTH"
+    },
+    {
+        "value": "UPPER ABDOMEN",
+        "label": "UPPER ABDOMEN"
+    },
+    {
+        "value": "UPPER BACK",
+        "label": "UPPER BACK"
+    },
+    {
+        "value": "WHOLE SPINE",
+        "label": "WHOLE SPINE"
+    },
+    {
+        "value": "WRIST",
+        "label": "WRIST"
     }
 ]
