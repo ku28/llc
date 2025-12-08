@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             
             const whereClause = {
                 ...getDoctorFilter(user, selectedDoctorId),
-                ...(includeDeleted ? {} : { deleted: { not: true } })
+                ...(includeDeleted ? {} : { OR: [{ deleted: false }, { deleted: null }] })
             }
             
             const items = await prisma.treatment.findMany({ 

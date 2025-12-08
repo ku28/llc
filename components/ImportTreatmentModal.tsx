@@ -21,9 +21,14 @@ interface TreatmentRow {
     spy1?: string
     spy2?: string
     spy3?: string
+    spy4?: string
+    spy5?: string
+    spy6?: string
     timing?: string
     dosage?: string
-    additions?: string
+    addition1?: string
+    addition2?: string
+    addition3?: string
     procedure?: string
     presentation?: string
     bottleSize?: string
@@ -126,9 +131,14 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
             spy1: row.spy1 || undefined,
             spy2: row.spy2 || undefined,
             spy3: row.spy3 || undefined,
+            spy4: row.spy4 || undefined,
+            spy5: row.spy5 || undefined,
+            spy6: row.spy6 || undefined,
             timing: row.timing || undefined,
             dosage: row.dosage || undefined,
-            additions: row.additions || undefined,
+            addition1: row.addition1 || undefined,
+            addition2: row.addition2 || undefined,
+            addition3: row.addition3 || undefined,
             procedure: row.procedure || undefined,
             presentation: row.presentation || undefined,
             bottleSize: row.bottleSize || undefined,
@@ -210,9 +220,14 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                                 spy1: row.spy1,
                                 spy2: row.spy2,
                                 spy3: row.spy3,
+                                spy4: row.spy4,
+                                spy5: row.spy5,
+                                spy6: row.spy6,
                                 timing: row.timing,
                                 dosage: row.dosage,
-                                additions: row.additions,
+                                addition1: row.addition1,
+                                addition2: row.addition2,
+                                addition3: row.addition3,
                                 procedure: row.procedure,
                                 presentation: row.presentation,
                                 bottleSize: row.bottleSize,
@@ -409,7 +424,7 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto p-6" style={{maxHeight: 'calc(90vh - 140px)'}}>
                     {step === 'select' && (
                         <div className="space-y-4">
                             <div className="text-center">
@@ -454,10 +469,13 @@ export default function ImportTreatmentModal({ isOpen, onClose, onImportSuccess 
                                     
                                     <li className="mt-2"><strong>💊 Medicine Fields (optional):</strong></li>
                                     <li className="ml-4">• <strong>productName</strong> - Medicine name (auto-creates if not found)</li>
-                                    <li className="ml-4">• <strong>quantity</strong> - Amount to prescribe</li>
                                     <li className="ml-4">• <strong>dosage</strong> - Dosage instructions</li>
                                     <li className="ml-4">• <strong>timing</strong> - When to take (e.g., "After meals")</li>
-                                    <li className="ml-4">• Spagyric: spy1-spy6 for medicine composition</li>
+                                    <li className="ml-4">• <strong>procedure</strong> - Procedure details</li>
+                                    <li className="ml-4">• <strong>presentation</strong> - Medicine presentation</li>
+                                    <li className="ml-4">• <strong>bottleSize</strong> - Bottle/package size</li>
+                                    <li className="ml-4">• Spagyric: <strong>spy1, spy2, spy3, spy4, spy5, spy6</strong> for medicine composition</li>
+                                    <li className="ml-4">• Additions: <strong>addition1, addition2, addition3</strong> for additional ingredients</li>
                                     
                                     <li className="mt-2"><strong>ℹ️ Important Notes:</strong></li>
                                     <li className="ml-4">• Plan numbers are <strong>per diagnosis</strong> (Fever Plan 1, Cold Plan 1, etc.)</li>

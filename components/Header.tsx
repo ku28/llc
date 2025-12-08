@@ -615,7 +615,7 @@ export default function Header({ onOpenTokenSidebar }: HeaderProps) {
                 data-active={router.pathname === '/analytics'}
                 className={`px-3 py-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors font-medium text-sm ${router.pathname === '/analytics' ? 'text-green-600 dark:text-green-400' : ''}`}
               >
-                Analytics
+                Analytics & Reports
               </Link>
             )}
           </nav>

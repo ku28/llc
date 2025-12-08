@@ -1,114 +1,153 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/router'
+import { useToast } from '../hooks/useToast'
+import ToastNotification from '../components/ToastNotification'
+import RefreshButton from '../components/RefreshButton'
+import CustomSelect from '../components/CustomSelect'
 import { useDataCache } from '../contexts/DataCacheContext'
 import { useDoctor } from '../contexts/DoctorContext'
-import RefreshButton from '../components/RefreshButton'
+import * as XLSX from 'xlsx'
 
 export default function AnalyticsPage() {
-    const [products, setProducts] = useState<any[]>([])
+    const [loading, setLoading] = useState(false)
+    const [activeReport, setActiveReport] = useState<string | null>(null)
+    const [reportData, setReportData] = useState<any>(null)
+    const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
+    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+    const [partyId, setPartyId] = useState('')
+    const [partyType, setPartyType] = useState<'customer' | 'supplier'>('customer')
+    const [customers, setCustomers] = useState<any[]>([])
     const [suppliers, setSuppliers] = useState<any[]>([])
+    const [products, setProducts] = useState<any[]>([])
     const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
     const [invoices, setInvoices] = useState<any[]>([])
-    const [transactions, setTransactions] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
-    const [user, setUser] = useState<any>(null)
+    const [dataLoading, setDataLoading] = useState(true)
+    const router = useRouter()
+    const { toasts, removeToast, showSuccess, showError } = useToast()
     const { getCache, setCache } = useDataCache()
     const { selectedDoctorId } = useDoctor()
 
-    // Fetch user data
-    useEffect(() => {
-        const cachedUser = sessionStorage.getItem('currentUser')
-        if (cachedUser) {
-            setUser(JSON.parse(cachedUser))
-        } else {
-            fetch('/api/auth/me').then(r => r.json()).then(d => {
-                setUser(d.user)
-                sessionStorage.setItem('currentUser', JSON.stringify(d.user))
-            })
-        }
-    }, [])
-
     const fetchAllData = useCallback(async () => {
-        setLoading(true)
+        setDataLoading(true)
         try {
-            // Build query params with doctorId
             const params = new URLSearchParams()
             if (selectedDoctorId) {
                 params.append('doctorId', selectedDoctorId.toString())
             }
             const queryString = params.toString() ? `?${params.toString()}` : ''
-            
-            const [productsRes, suppliersRes, posRes, invoicesRes, txnRes] = await Promise.all([
+
+            const [customersRes, suppliersRes, productsRes, posRes, invoicesRes] = await Promise.all([
+                fetch('/api/patients'),
+                fetch('/api/suppliers'),
                 fetch(`/api/products/public${queryString}`),
-                fetch(`/api/suppliers${queryString}`),
                 fetch(`/api/purchase-orders${queryString}`),
-                fetch(`/api/customer-invoices${queryString}`),
-                fetch(`/api/stock-transactions?limit=1000${selectedDoctorId ? `&doctorId=${selectedDoctorId}` : ''}`)
+                fetch(`/api/customer-invoices${queryString}`)
             ])
 
-            const [productsData, suppliersData, posData, invoicesData, txnData] = await Promise.all([
-                productsRes.json(),
+            const [customersData, suppliersData, productsData, posData, invoicesData] = await Promise.all([
+                customersRes.json(),
                 suppliersRes.json(),
+                productsRes.json(),
                 posRes.json(),
-                invoicesRes.json(),
-                txnRes.json()
+                invoicesRes.json()
             ])
 
             const analyticsData = {
-                products: Array.isArray(productsData) ? productsData : [],
+                customers: Array.isArray(customersData) ? customersData : [],
                 suppliers: Array.isArray(suppliersData) ? suppliersData : [],
+                products: Array.isArray(productsData) ? productsData : [],
                 purchaseOrders: Array.isArray(posData) ? posData : [],
-                invoices: Array.isArray(invoicesData) ? invoicesData : [],
-                transactions: Array.isArray(txnData) ? txnData : []
+                invoices: Array.isArray(invoicesData) ? invoicesData : []
             }
-            
-            setProducts(analyticsData.products)
+
+            setCustomers(analyticsData.customers)
             setSuppliers(analyticsData.suppliers)
+            setProducts(analyticsData.products)
             setPurchaseOrders(analyticsData.purchaseOrders)
             setInvoices(analyticsData.invoices)
-            setTransactions(analyticsData.transactions)
-            
-            // Cache with doctor-specific key
+
             const cacheKey = `analytics_${selectedDoctorId || 'all'}`
             setCache(cacheKey, analyticsData)
         } catch (error) {
             console.error('Error fetching analytics data:', error)
         } finally {
-            setLoading(false)
+            setDataLoading(false)
         }
     }, [selectedDoctorId, setCache])
 
-    useEffect(() => {        
-        // Check cache first with doctor-specific key
+    useEffect(() => {
         const cacheKey = `analytics_${selectedDoctorId || 'all'}`
         const cachedAnalytics = getCache<any>(cacheKey)
         if (cachedAnalytics) {
-            setProducts(cachedAnalytics.products || [])
+            setCustomers(cachedAnalytics.customers || [])
             setSuppliers(cachedAnalytics.suppliers || [])
+            setProducts(cachedAnalytics.products || [])
             setPurchaseOrders(cachedAnalytics.purchaseOrders || [])
             setInvoices(cachedAnalytics.invoices || [])
-            setTransactions(cachedAnalytics.transactions || [])
-            setLoading(false)
+            setDataLoading(false)
+            // Fetch in background to refresh data without showing loading state
+            const refreshData = async () => {
+                try {
+                    const params = new URLSearchParams()
+                    if (selectedDoctorId) {
+                        params.append('doctorId', selectedDoctorId.toString())
+                    }
+                    const queryString = params.toString() ? `?${params.toString()}` : ''
+
+                    const [customersRes, suppliersRes, productsRes, posRes, invoicesRes] = await Promise.all([
+                        fetch('/api/patients'),
+                        fetch('/api/suppliers'),
+                        fetch(`/api/products/public${queryString}`),
+                        fetch(`/api/purchase-orders${queryString}`),
+                        fetch(`/api/customer-invoices${queryString}`)
+                    ])
+
+                    const [customersData, suppliersData, productsData, posData, invoicesData] = await Promise.all([
+                        customersRes.json(),
+                        suppliersRes.json(),
+                        productsRes.json(),
+                        posRes.json(),
+                        invoicesRes.json()
+                    ])
+
+                    const analyticsData = {
+                        customers: Array.isArray(customersData) ? customersData : [],
+                        suppliers: Array.isArray(suppliersData) ? suppliersData : [],
+                        products: Array.isArray(productsData) ? productsData : [],
+                        purchaseOrders: Array.isArray(posData) ? posData : [],
+                        invoices: Array.isArray(invoicesData) ? invoicesData : []
+                    }
+
+                    setCustomers(analyticsData.customers)
+                    setSuppliers(analyticsData.suppliers)
+                    setProducts(analyticsData.products)
+                    setPurchaseOrders(analyticsData.purchaseOrders)
+                    setInvoices(analyticsData.invoices)
+                    setCache(cacheKey, analyticsData)
+                } catch (error) {
+                    console.error('Error refreshing analytics data:', error)
+                }
+            }
+            refreshData()
+        } else {
+            // No cache, fetch with loading state
+            fetchAllData()
         }
-        
-        // Fetch in background
-        fetchAllData()
-        
-        // Cleanup on unmount
+
         return () => {
-            setProducts([])
+            setCustomers([])
             setSuppliers([])
+            setProducts([])
             setPurchaseOrders([])
             setInvoices([])
-            setTransactions([])
         }
-    }, [selectedDoctorId, fetchAllData])
-    
-    // Listen for doctor change events
+    }, [selectedDoctorId, getCache])
+
     useEffect(() => {
         const handleDoctorChange = () => {
             fetchAllData()
         }
-        
+
         window.addEventListener('doctor-changed', handleDoctorChange)
         return () => window.removeEventListener('doctor-changed', handleDoctorChange)
     }, [fetchAllData])
@@ -116,393 +155,566 @@ export default function AnalyticsPage() {
     // Calculate metrics
     const totalProducts = products.length
     const totalStockValue = products.reduce((sum, p) => sum + (p.quantity * (p.priceRupees || 0)), 0)
-    const lowStockProducts = products.filter(p => p.quantity > 0 && p.quantity <= (p.category?.reorderLevel || 10))
-    const outOfStockProducts = products.filter(p => p.quantity === 0)
-
     const activeSuppliers = suppliers.filter(s => s.status === 'active').length
-    const totalSupplierOutstanding = suppliers.reduce((sum, s) => sum + (s.outstandingBalance || 0), 0)
-
-    const pendingPOs = purchaseOrders.filter(po => po.status === 'pending').length
     const totalPurchaseValue = purchaseOrders.reduce((sum, po) => sum + (po.totalAmount || 0), 0)
-
-    const unpaidInvoices = invoices.filter(inv => inv.status === 'unpaid' || inv.status === 'partial').length
     const totalInvoiceValue = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0)
     const totalReceivables = invoices.reduce((sum, inv) => sum + (inv.balanceAmount || 0), 0)
+    const pendingPOs = purchaseOrders.filter(po => po.status === 'pending').length
+    const unpaidInvoices = invoices.filter(inv => inv.status === 'unpaid' || inv.status === 'partial').length
 
-    // Top selling products
-    const topSellers = [...products]
-        .sort((a, b) => (b.totalSales || 0) - (a.totalSales || 0))
-        .slice(0, 10)
+    const generateReport = async (reportType: string) => {
+        setLoading(true)
+        setActiveReport(reportType)
+        try {
+            let url = ''
+            const params = new URLSearchParams()
 
-    // Slow moving products
-    const slowMovers = [...products]
-        .filter(p => p.quantity > 0)
-        .sort((a, b) => (a.totalSales || 0) - (b.totalSales || 0))
-        .slice(0, 10)
+            switch (reportType) {
+                case 'gst':
+                    params.append('startDate', startDate)
+                    params.append('endDate', endDate)
+                    url = `/api/reports/gst-report?${params.toString()}`
+                    break
+                case 'party-ledger':
+                    if (!partyId) {
+                        showError('Please select a party')
+                        setLoading(false)
+                        return
+                    }
+                    params.append('partyId', partyId)
+                    params.append('partyType', partyType)
+                    url = `/api/reports/party-ledger?${params.toString()}`
+                    break
+            }
 
-    // Recent transactions
-    const recentTransactions = [...transactions]
-        .sort((a, b) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime())
-        .slice(0, 10)
+            const response = await fetch(url)
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to generate report')
+            }
+
+            setReportData(data)
+            showSuccess('Report generated successfully!')
+        } catch (error: any) {
+            console.error('Error generating report:', error)
+            showError(error.message || 'Failed to generate report')
+            setReportData(null)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const exportToExcel = () => {
+        if (!reportData || !activeReport) return
+
+        let dataToExport: any[] = []
+        let fileName = ''
+
+        switch (activeReport) {
+            case 'gst':
+                fileName = `GST_Report_${startDate}_to_${endDate}.xlsx`
+                const wb = XLSX.utils.book_new()
+
+                // Summary sheet
+                const summaryData = [
+                    ['GST Report Summary'],
+                    ['Period', `${startDate} to ${endDate}`],
+                    [''],
+                    ['Total Invoices', reportData.summary.totalInvoices],
+                    ['Total Sales', reportData.summary.totalSales],
+                    ['Total Tax', reportData.summary.totalTax],
+                    ['Total Discount', reportData.summary.totalDiscount],
+                    ['Net Sales', reportData.summary.netSales]
+                ]
+                const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
+                XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary')
+
+                // Tax breakdown sheet
+                const taxData = [['Tax Rate', 'Taxable Amount', 'CGST', 'SGST', 'IGST', 'Total Tax']]
+                reportData.taxBreakdown.forEach((item: any) => {
+                    taxData.push([
+                        `${item.taxRate}%`,
+                        item.taxableAmount,
+                        item.cgst,
+                        item.sgst,
+                        item.igst,
+                        item.totalTax
+                    ])
+                })
+                const taxSheet = XLSX.utils.aoa_to_sheet(taxData)
+                XLSX.utils.book_append_sheet(wb, taxSheet, 'Tax Breakdown')
+
+                // HSN summary sheet
+                const hsnData = [['HSN Code', 'Description', 'Quantity', 'Value', 'Tax Amount']]
+                reportData.hsnSummary.forEach((item: any) => {
+                    hsnData.push([
+                        item.hsnCode,
+                        item.description,
+                        item.quantity,
+                        item.value,
+                        item.taxAmount
+                    ])
+                })
+                const hsnSheet = XLSX.utils.aoa_to_sheet(hsnData)
+                XLSX.utils.book_append_sheet(wb, hsnSheet, 'HSN Summary')
+
+                XLSX.writeFile(wb, fileName)
+                return
+
+            case 'party-ledger':
+                fileName = `Party_Ledger_${reportData.partyInfo.name}.xlsx`
+                dataToExport = [
+                    ['Party Ledger'],
+                    ['Party Name', reportData.partyInfo.name],
+                    ['Phone', reportData.partyInfo.phone || ''],
+                    ['Email', reportData.partyInfo.email || ''],
+                    [''],
+                    ['Opening Balance', reportData.openingBalance],
+                    [''],
+                    ['Date', 'Type', 'Reference', 'Debit', 'Credit', 'Balance'],
+                    ...reportData.entries.map((entry: any) => [
+                        new Date(entry.date).toLocaleDateString(),
+                        entry.type,
+                        entry.reference,
+                        entry.debit,
+                        entry.credit,
+                        entry.balance
+                    ]),
+                    [''],
+                    ['Closing Balance', reportData.closingBalance]
+                ]
+                break
+
+            default:
+                showError('Export not available for this report')
+                return
+        }
+
+        if (dataToExport.length > 0) {
+            const ws = XLSX.utils.aoa_to_sheet(dataToExport)
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, 'Report')
+            XLSX.writeFile(wb, fileName)
+            showSuccess('Report exported successfully!')
+        }
+    }
 
     return (
         <>
-            <div>
-                <div className="section-header">
-                    <h2 className="section-title">Analytics & Insights</h2>
-                    <RefreshButton onRefresh={fetchAllData} />
-                </div>
+            <ToastNotification toasts={toasts} removeToast={removeToast} />
 
-                {/* Key Metrics Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    {/* Inventory Metrics */}
-                    <div className="relative rounded-xl border border-blue-200/30 dark:border-blue-700/30 bg-gradient-to-br from-white via-blue-50/30 to-blue-50/20 dark:from-gray-900 dark:via-blue-950/20 dark:to-gray-900 shadow-lg shadow-blue-500/5 backdrop-blur-sm p-4 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-400/5 via-transparent to-blue-500/5 pointer-events-none"></div>
-                        <div className="relative flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted mb-1">Total Products</p>
-                                {loading ? (
-                                    <div className="animate-pulse h-8 bg-blue-200 dark:bg-blue-700 rounded w-16"></div>
-                                ) : (
-                                    <p className="text-2xl font-bold">{totalProducts}</p>
-                                )}
-                            </div>
-                            <span className="text-4xl">📦</span>
+            <div className="p-4 sm:p-6">
+                <div className="max-w-7xl mx-auto">
+                    <div className="mb-6 flex items-center justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Analytics & Reports</h1>
+                            <p className="text-gray-600 dark:text-gray-400 mt-1">View key metrics and generate comprehensive financial reports</p>
                         </div>
-                        {!loading && (
-                            <div className="relative mt-3 text-sm">
-                                <span className="text-green-600 dark:text-green-400 font-semibold">{products.filter(p => p.quantity > (p.category?.reorderLevel || 10)).length}</span> in stock • 
-                                <span className="text-yellow-600 dark:text-yellow-400 font-semibold ml-2">{lowStockProducts.length}</span> low • 
-                                <span className="text-red-600 dark:text-red-400 font-semibold ml-2">{outOfStockProducts.length}</span> out
-                            </div>
-                        )}
+                        <RefreshButton onRefresh={fetchAllData} />
                     </div>
 
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none"></div>
-                        <div className="relative flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted mb-1">Stock Value</p>
-                                {loading ? (
-                                    <div className="animate-pulse h-8 bg-emerald-200 dark:bg-emerald-700 rounded w-24"></div>
-                                ) : (
-                                    <p className="text-2xl font-bold">₹{totalStockValue.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
-                                )}
-                            </div>
-                            <span className="text-4xl">💰</span>
-                        </div>
-                        {!loading && (
-                            <div className="relative mt-2 text-xs text-muted">
-                                Current inventory valuation
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Supplier Metrics */}
-                    <div className="relative rounded-xl border border-purple-200/30 dark:border-purple-700/30 bg-gradient-to-br from-white via-purple-50/30 to-purple-50/20 dark:from-gray-900 dark:via-purple-950/20 dark:to-gray-900 shadow-lg shadow-purple-500/5 backdrop-blur-sm p-4 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-400/5 via-transparent to-purple-500/5 pointer-events-none"></div>
-                        <div className="relative flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted mb-1">Active Suppliers</p>
-                                {loading ? (
-                                    <div className="animate-pulse h-8 bg-purple-200 dark:bg-purple-700 rounded w-16"></div>
-                                ) : (
-                                    <p className="text-2xl font-bold">{activeSuppliers}</p>
-                                )}
-                            </div>
-                            <span className="text-4xl">🏭</span>
-                        </div>
-                        {!loading && (
-                            <div className="relative mt-3 text-sm">
-                                <span className="font-semibold">{pendingPOs}</span> pending orders
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="relative rounded-xl border border-orange-200/30 dark:border-orange-700/30 bg-gradient-to-br from-white via-orange-50/30 to-orange-50/20 dark:from-gray-900 dark:via-orange-950/20 dark:to-gray-900 shadow-lg shadow-orange-500/5 backdrop-blur-sm p-4 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-orange-400/5 via-transparent to-orange-500/5 pointer-events-none"></div>
-                        <div className="relative flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted mb-1">Accounts Receivable</p>
-                                {loading ? (
-                                    <div className="animate-pulse h-8 bg-orange-200 dark:bg-orange-700 rounded w-24"></div>
-                                ) : (
-                                    <p className="text-2xl font-bold">₹{totalReceivables.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
-                                )}
-                            </div>
-                            <span className="text-4xl">📊</span>
-                        </div>
-                        {!loading && (
-                            <div className="relative mt-3 text-sm">
-                                <span className="font-semibold">{unpaidInvoices}</span> unpaid invoices
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Financial Summary */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                        <div className="relative">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <span>💸</span>
-                            <span>Purchase Summary</span>
-                        </h3>
-                        {loading ? (
-                            <div className="space-y-3">
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                            </div>
-                        ) : (
-                        <div className="space-y-3">
-                            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                <span className="text-sm">Total Purchase Orders</span>
-                                <span className="font-semibold">{purchaseOrders.length}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                <span className="text-sm">Pending Orders</span>
-                                <span className="font-semibold text-yellow-600">{pendingPOs}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900 rounded-lg">
-                                <span className="text-sm font-semibold">Total Purchase Value</span>
-                                <span className="font-bold text-blue-600 dark:text-blue-400">₹{totalPurchaseValue.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900 rounded-lg">
-                                <span className="text-sm font-semibold">Supplier Outstanding</span>
-                                <span className="font-bold text-red-600 dark:text-red-400">₹{totalSupplierOutstanding.toLocaleString()}</span>
-                            </div>
-                        </div>
-                        )}
-                        </div>
-                    </div>
-
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                        <div className="relative">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <span>💵</span>
-                            <span>Sales Summary</span>
-                        </h3>
-                        {loading ? (
-                            <div className="space-y-3">
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                            </div>
-                        ) : (
-                        <div className="space-y-3">
-                            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                <span className="text-sm">Total Invoices</span>
-                                <span className="font-semibold">{invoices.length}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                <span className="text-sm">Unpaid/Partial</span>
-                                <span className="font-semibold text-red-600">{unpaidInvoices}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900 rounded-lg">
-                                <span className="text-sm font-semibold">Total Revenue</span>
-                                <span className="font-bold text-green-600 dark:text-green-400">₹{totalInvoiceValue.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900 rounded-lg">
-                                <span className="text-sm font-semibold">Amount Due</span>
-                                <span className="font-bold text-orange-600 dark:text-orange-400">₹{totalReceivables.toLocaleString()}</span>
-                            </div>
-                        </div>
-                        )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Stock Alerts */}
-                {(lowStockProducts.length > 0 || outOfStockProducts.length > 0) && (
-                    <div className="card mb-6 bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-800">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
-                            <span>⚠️</span>
-                            <span>Stock Alerts</span>
-                        </h3>
-                        
-                        {outOfStockProducts.length > 0 && (
-                            <div className="mb-4">
-                                <h4 className="font-semibold text-red-600 dark:text-red-400 mb-2">Out of Stock ({outOfStockProducts.length})</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                    {outOfStockProducts.slice(0, 6).map(p => (
-                                        <div key={p.id} className="p-2 bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded text-sm">
-                                            <div className="font-semibold">{p.name}</div>
-                                            <div className="text-xs text-muted">{p.category?.name || 'Uncategorized'}</div>
-                                        </div>
-                                    ))}
+                    {/* Key Metrics Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        {/* Total Products */}
+                        <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-white dark:from-gray-800 dark:via-emerald-900/20 dark:to-gray-800 shadow-lg shadow-emerald-500/5 dark:shadow-emerald-500/10 p-6 hover:shadow-xl transition-all duration-300 cursor-pointer backdrop-blur-sm">
+                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-500/5 to-transparent dark:from-emerald-500/10 pointer-events-none"></div>
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
+                                        <span className="text-2xl">📦</span>
+                                    </div>
                                 </div>
-                                {outOfStockProducts.length > 6 && (
-                                    <div className="text-xs text-muted mt-2">+ {outOfStockProducts.length - 6} more products</div>
+                                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Total Products</h3>
+                                {dataLoading ? (
+                                    <div className="flex items-center gap-2 h-9">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
+                                        <span className="text-sm text-gray-500">Loading...</span>
+                                    </div>
+                                ) : (
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{totalProducts}</p>
                                 )}
                             </div>
-                        )}
+                        </div>
 
-                        {lowStockProducts.length > 0 && (
-                            <div>
-                                <h4 className="font-semibold text-yellow-600 dark:text-yellow-400 mb-2">Low Stock ({lowStockProducts.length})</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                    {lowStockProducts.slice(0, 6).map(p => (
-                                        <div key={p.id} className="p-2 bg-yellow-50 dark:bg-yellow-900 border border-yellow-200 dark:border-yellow-800 rounded text-sm">
-                                            <div className="font-semibold">{p.name}</div>
-                                            <div className="text-xs text-muted">
-                                                Stock: {p.quantity} / Threshold: {p.category?.reorderLevel || 10}
+                        {/* Stock Value */}
+                        <div className="relative rounded-xl border border-blue-200/30 dark:border-blue-700/30 bg-gradient-to-br from-white via-blue-50/30 to-white dark:from-gray-800 dark:via-blue-900/20 dark:to-gray-800 shadow-lg shadow-blue-500/5 dark:shadow-blue-500/10 p-6 hover:shadow-xl transition-all duration-300 cursor-pointer backdrop-blur-sm">
+                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500/5 to-transparent dark:from-blue-500/10 pointer-events-none"></div>
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                                        <span className="text-2xl">💰</span>
+                                    </div>
+                                </div>
+                                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Stock Value</h3>
+                                {dataLoading ? (
+                                    <div className="flex items-center gap-2 h-9">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                        <span className="text-sm text-gray-500">Loading...</span>
+                                    </div>
+                                ) : (
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">₹{totalStockValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Active Suppliers */}
+                        <div className="relative rounded-xl border border-purple-200/30 dark:border-purple-700/30 bg-gradient-to-br from-white via-purple-50/30 to-white dark:from-gray-800 dark:via-purple-900/20 dark:to-gray-800 shadow-lg shadow-purple-500/5 dark:shadow-purple-500/10 p-6 hover:shadow-xl transition-all duration-300 cursor-pointer backdrop-blur-sm">
+                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/5 to-transparent dark:from-purple-500/10 pointer-events-none"></div>
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
+                                        <span className="text-2xl">🏭</span>
+                                    </div>
+                                </div>
+                                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Active Suppliers</h3>
+                                {dataLoading ? (
+                                    <div className="flex items-center gap-2 h-9">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                                        <span className="text-sm text-gray-500">Loading...</span>
+                                    </div>
+                                ) : (
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{activeSuppliers}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Accounts Receivable */}
+                        <div className="relative rounded-xl border border-orange-200/30 dark:border-orange-700/30 bg-gradient-to-br from-white via-orange-50/30 to-white dark:from-gray-800 dark:via-orange-900/20 dark:to-gray-800 shadow-lg shadow-orange-500/5 dark:shadow-orange-500/10 p-6 hover:shadow-xl transition-all duration-300 cursor-pointer backdrop-blur-sm">
+                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-500/5 to-transparent dark:from-orange-500/10 pointer-events-none"></div>
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
+                                        <span className="text-2xl">📊</span>
+                                    </div>
+                                </div>
+                                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Accounts Receivable</h3>
+                                {dataLoading ? (
+                                    <div className="flex items-center gap-2 h-9">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div>
+                                        <span className="text-sm text-gray-500">Loading...</span>
+                                    </div>
+                                ) : (
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">₹{totalReceivables.toFixed(2)}</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+
+
+
+                    {/* Reports Section */}
+                    <div className="mb-6">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Financial Reports</h2>
+                        <p className="text-gray-600 dark:text-gray-400 mb-2">Generate and export detailed financial reports</p>
+                    </div>
+
+                    {/* Date Range Filter */}
+                    <div className="relative rounded-xl border border-indigo-200/30 dark:border-indigo-700/30 bg-gradient-to-br from-white via-indigo-50/30 to-white dark:from-gray-800 dark:via-indigo-900/20 dark:to-gray-800 shadow-lg shadow-indigo-500/5 dark:shadow-indigo-500/10 p-6 mb-8 backdrop-blur-sm">
+                        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-500/5 to-transparent dark:from-indigo-500/10 pointer-events-none"></div>
+                        <div className="relative">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                Report Period
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Date</label>
+                                    <input
+                                        type="date"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Date</label>
+                                    <input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent transition-all"
+                                    />
+                                </div>
+                                <div className="flex items-end">
+                                    <button
+                                        onClick={() => {
+                                            setStartDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
+                                            setEndDate(new Date().toISOString().split('T')[0])
+                                        }}
+                                        className="w-full px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all font-medium shadow-md"
+                                    >
+                                        This Month
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Report Cards Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">{/* GST Report */}
+                        <div className="relative rounded-xl border border-blue-200/30 dark:border-blue-700/30 bg-gradient-to-br from-white via-blue-50/30 to-white dark:from-gray-800 dark:via-blue-900/20 dark:to-gray-800 shadow-lg shadow-blue-500/5 dark:shadow-blue-500/10 p-6 hover:shadow-xl transition-all duration-300 cursor-pointer backdrop-blur-sm"
+                            onClick={() => !loading && generateReport('gst')}>
+                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500/5 to-transparent dark:from-blue-500/10 pointer-events-none"></div>
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                                        <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                    {loading && activeReport === 'gst' && (
+                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                                    )}
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">GST Report</h3>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Tax summary and compliance report</p>
+                                <button className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-medium shadow-md disabled:opacity-50 disabled:cursor-not-allowed" onClick={(e) => { e.stopPropagation(); generateReport('gst'); }} disabled={loading}>
+                                    {loading && activeReport === 'gst' ? 'Generating...' : 'Generate Report'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Party Ledger */}
+                        <div className="relative rounded-xl border border-orange-200/30 dark:border-orange-700/30 bg-gradient-to-br from-white via-orange-50/30 to-white dark:from-gray-800 dark:via-orange-900/20 dark:to-gray-800 shadow-lg shadow-orange-500/5 dark:shadow-orange-500/10 p-6 hover:shadow-xl transition-all duration-300 backdrop-blur-sm">{/* Note: Not clickable at top level due to form inputs inside */}
+                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-500/5 to-transparent dark:from-orange-500/10 pointer-events-none"></div>
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
+                                        <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                        </svg>
+                                    </div>
+                                    {loading && activeReport === 'party-ledger' && (
+                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-600"></div>
+                                    )}
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Party Ledger</h3>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Customer/Supplier account statements</p>
+
+                                <div className="space-y-2">
+                                    <CustomSelect
+                                        value={partyType}
+                                        onChange={(value: string) => {
+                                            setPartyType(value as 'customer' | 'supplier')
+                                            setPartyId('')
+                                        }}
+                                        options={[
+                                            { value: 'customer', label: 'Customer' },
+                                            { value: 'supplier', label: 'Supplier' }
+                                        ]}
+                                        placeholder="Select Party Type"
+                                        className="text-sm"
+                                    />
+                                    <CustomSelect
+                                        value={partyId}
+                                        onChange={(value: string) => setPartyId(value)}
+                                        options={(partyType === 'customer' ? customers : suppliers).map((party: any) => ({
+                                            value: party.id,
+                                            label: partyType === 'customer'
+                                                ? `${party.firstName} ${party.lastName || ''}`.trim()
+                                                : party.name
+                                        }))}
+                                        placeholder={`Select ${partyType}`}
+                                        className="text-sm"
+                                    />
+                                    <button
+                                        onClick={() => generateReport('party-ledger')}
+                                        disabled={!partyId || loading}
+                                        className="w-full px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium shadow-md"
+                                    >
+                                        {loading && activeReport === 'party-ledger' ? 'Generating...' : 'Generate Ledger'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Report Display */}
+                    {reportData && (
+                        <div className="relative rounded-xl border border-gray-200/30 dark:border-gray-700/30 bg-gradient-to-br from-white via-gray-50/30 to-white dark:from-gray-800 dark:via-gray-900/20 dark:to-gray-800 shadow-lg shadow-gray-500/5 dark:shadow-gray-500/10 p-6 backdrop-blur-sm">
+                            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-gray-500/5 to-transparent dark:from-gray-500/10 pointer-events-none"></div>
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                        <svg className="w-7 h-7 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Report Results
+                                    </h2>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={exportToExcel}
+                                            className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-medium flex items-center gap-2 shadow-md"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            Export to Excel
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setReportData(null)
+                                                setActiveReport(null)
+                                            }}
+                                            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all font-medium shadow-md"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* GST Report Display */}
+                                {activeReport === 'gst' && (
+                                    <div className="space-y-6">
+                                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-6 border border-blue-200 dark:border-blue-800">
+                                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Summary</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Invoices</p>
+                                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{reportData.summary?.totalInvoices || 0}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Sales</p>
+                                                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">₹{(reportData.summary?.totalSales || 0).toFixed(2)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Tax</p>
+                                                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">₹{(reportData.summary?.totalTax || 0).toFixed(2)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Discount</p>
+                                                    <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">₹{(reportData.summary?.totalDiscount || 0).toFixed(2)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Net Sales</p>
+                                                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹{(reportData.summary?.netSales || 0).toFixed(2)}</p>
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
-                                {lowStockProducts.length > 6 && (
-                                    <div className="text-xs text-muted mt-2">+ {lowStockProducts.length - 6} more products</div>
+
+                                        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">Tax Breakdown</h3>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full">
+                                                    <thead className="bg-gray-100 dark:bg-gray-900">
+                                                        <tr>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Tax Rate</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Taxable Amount</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">CGST</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">SGST</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">IGST</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Total Tax</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                        {reportData.taxBreakdown?.map((item: any, index: number) => (
+                                                            <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                                                                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{item.taxRate}%</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₹{item.taxableAmount.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₹{item.cgst.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₹{item.sgst.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₹{item.igst.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600 dark:text-blue-400">₹{item.totalTax.toFixed(2)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">HSN Summary</h3>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full">
+                                                    <thead className="bg-gray-100 dark:bg-gray-900">
+                                                        <tr>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">HSN Code</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Description</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Quantity</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Value</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Tax Amount</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                        {reportData.hsnSummary?.map((item: any, index: number) => (
+                                                            <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                                                                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{item.hsnCode}</td>
+                                                                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.description}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">{item.quantity}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₹{item.value.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600 dark:text-blue-400">₹{item.taxAmount.toFixed(2)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Party Ledger Report Display */}
+                                {activeReport === 'party-ledger' && (
+                                    <div className="space-y-6">
+                                        <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-lg p-6 border border-orange-200 dark:border-orange-800">
+                                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Party Information</h3>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Name</p>
+                                                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{reportData.partyInfo?.name}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                                                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{reportData.partyInfo?.phone || 'N/A'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Opening Balance</p>
+                                                    <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">₹{(reportData.openingBalance || 0).toFixed(2)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Closing Balance</p>
+                                                    <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">₹{(reportData.closingBalance || 0).toFixed(2)}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">Transaction History</h3>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full">
+                                                    <thead className="bg-gray-100 dark:bg-gray-900">
+                                                        <tr>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Type</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Reference</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Debit</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Credit</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Balance</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                        {reportData.entries?.map((entry: any, index: number) => (
+                                                            <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                                                                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{new Date(entry.date).toLocaleDateString()}</td>
+                                                                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{entry.type}</td>
+                                                                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{entry.reference}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-red-600 dark:text-red-400">₹{entry.debit.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-green-600 dark:text-green-400">₹{entry.credit.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900 dark:text-white">₹{entry.balance.toFixed(2)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Top & Slow Movers */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                        <div className="relative">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <span>🏆</span>
-                            <span>Top Selling Products</span>
-                        </h3>
-                        {loading ? (
-                            <div className="space-y-2">
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                            </div>
-                        ) : topSellers.length === 0 ? (
-                            <p className="text-muted text-sm">No sales data yet</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {topSellers.map((p, index) => (
-                                    <div key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                        <div className="text-2xl font-bold text-gray-400 w-8">#{index + 1}</div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-semibold truncate">{p.name}</div>
-                                            <div className="text-xs text-muted">{p.category?.name || 'Uncategorized'}</div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="font-bold text-green-600 dark:text-green-400">{p.totalSales || 0}</div>
-                                            <div className="text-xs text-muted">units sold</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        </div>
-                    </div>                    <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                        <div className="relative">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                            <span>🐌</span>
-                            <span>Slow Moving Products</span>
-                        </h3>
-                        {loading ? (
-                            <div className="space-y-2">
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                                <div className="animate-pulse h-16 bg-emerald-200 dark:bg-emerald-700 rounded-lg"></div>
-                            </div>
-                        ) : slowMovers.length === 0 ? (
-                            <p className="text-muted text-sm">No products in stock</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {slowMovers.map((p, index) => (
-                                    <div key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                        <div className="text-2xl font-bold text-gray-400 w-8">#{index + 1}</div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="font-semibold truncate">{p.name}</div>
-                                            <div className="text-xs text-muted">{p.category?.name || 'Uncategorized'}</div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="font-bold text-blue-600 dark:text-blue-400">{p.quantity}</div>
-                                            <div className="text-xs text-muted">in stock</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Recent Stock Movements */}
-                <div className="relative rounded-xl border border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-br from-white via-emerald-50/30 to-green-50/20 dark:from-gray-900 dark:via-emerald-950/20 dark:to-gray-900 shadow-lg shadow-emerald-500/5 backdrop-blur-sm p-4 overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/5 via-transparent to-green-500/5 pointer-events-none rounded-xl"></div>
-                    <div className="relative">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <span>🔄</span>
-                        <span>Recent Inventory Movements</span>
-                    </h3>
-                    {loading ? (
-                        <div className="space-y-2">
-                            <div className="animate-pulse h-12 bg-emerald-200 dark:bg-emerald-700 rounded"></div>
-                            <div className="animate-pulse h-16 bg-emerald-100 dark:bg-emerald-800 rounded"></div>
-                            <div className="animate-pulse h-16 bg-emerald-100 dark:bg-emerald-800 rounded"></div>
-                            <div className="animate-pulse h-16 bg-emerald-100 dark:bg-emerald-800 rounded"></div>
-                            <div className="animate-pulse h-16 bg-emerald-100 dark:bg-emerald-800 rounded"></div>
-                            <div className="animate-pulse h-16 bg-emerald-100 dark:bg-emerald-800 rounded"></div>
-                        </div>
-                    ) : recentTransactions.length === 0 ? (
-                        <p className="text-muted text-sm">No recent transactions</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-gray-50 dark:bg-gray-800 border-b dark:border-gray-700">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left font-semibold">Date</th>
-                                        <th className="px-4 py-3 text-left font-semibold">Product</th>
-                                        <th className="px-4 py-3 text-center font-semibold">Type</th>
-                                        <th className="px-4 py-3 text-right font-semibold">Quantity</th>
-                                        <th className="px-4 py-3 text-right font-semibold">Balance</th>
-                                        <th className="px-4 py-3 text-left font-semibold">Reference</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                    {recentTransactions.map(txn => (
-                                        <tr key={txn.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                            <td className="px-4 py-3 text-xs">
-                                                {new Date(txn.transactionDate).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-4 py-3 font-medium">{txn.product?.name || 'Unknown'}</td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className={`px-2 py-1 text-xs rounded ${
-                                                    txn.transactionType === 'IN' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
-                                                    txn.transactionType === 'OUT' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' :
-                                                    'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
-                                                }`}>
-                                                    {txn.transactionType}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-semibold">
-                                                {txn.transactionType === 'IN' || txn.transactionType === 'RETURN' ? '+' : '-'}
-                                                {txn.quantity}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-blue-600 dark:text-blue-400 font-semibold">
-                                                {txn.balanceQuantity}
-                                            </td>
-                                            <td className="px-4 py-3 text-xs text-muted">
-                                                {txn.referenceType ? `${txn.referenceType} #${txn.referenceId}` : txn.notes?.substring(0, 30)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
                         </div>
                     )}
-                    </div>
                 </div>
             </div>
         </>

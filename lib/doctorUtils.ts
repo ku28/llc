@@ -26,7 +26,7 @@ export function shouldFilterByDoctor(user: any): boolean {
 
 // Get doctor filter for Prisma queries
 // Now includes ALL data types: patients, visits, products, suppliers, etc.
-export function getDoctorFilter(user: any, selectedDoctorId: number | null): { doctorId?: number | null } {
+export function getDoctorFilter(user: any, selectedDoctorId: number | null): { doctorId?: number | null } | { OR?: any[] } {
   const effectiveDoctorId = getEffectiveDoctorId(user, selectedDoctorId)
   
   // If no doctor filtering needed (staff, reception), return empty object
@@ -40,7 +40,8 @@ export function getDoctorFilter(user: any, selectedDoctorId: number | null): { d
   }
   
   // Filter by specific doctor (applies to all tables with doctorId)
-  return { doctorId: effectiveDoctorId }
+  // Also include records with null doctorId for backwards compatibility
+  return { OR: [{ doctorId: effectiveDoctorId }, { doctorId: null }] }
 }
 
 // Get doctorId for creating new records

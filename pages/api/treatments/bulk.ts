@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import prisma from '../../../lib/prisma'
 import { requireDoctorOrAdmin } from '../../../lib/auth'
+import { getDoctorIdForCreate } from '../../../lib/doctorUtils'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     const user = await requireDoctorOrAdmin(req, res)
@@ -151,9 +152,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                 spy1: p.spy1 || null,
                                 spy2: p.spy2 || null,
                                 spy3: p.spy3 || null,
+                                spy4: p.spy4 || null,
+                                spy5: p.spy5 || null,
+                                spy6: p.spy6 || null,
                                 timing: p.timing || null,
                                 dosage: p.dosage || null,
-                                additions: p.additions || null,
+                                addition1: p.addition1 || null,
+                                addition2: p.addition2 || null,
+                                addition3: p.addition3 || null,
                                 procedure: p.procedure || null,
                                 presentation: p.presentation || null,
                                 bottleSize: p.bottleSize || null,
@@ -200,6 +206,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                 treatmentPlan,
                                 administration,
                                 notes,
+                                doctorId: getDoctorIdForCreate(user),
                                 treatmentProducts: {
                                     create: productsWithIds
                                 }
