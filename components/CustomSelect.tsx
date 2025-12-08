@@ -256,6 +256,30 @@ function CustomSelect({
                     disabled={disabled}
                     style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
                 />
+                {value && !disabled && (
+                    <svg
+                        className="clear-button"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onChange('')
+                            setInputValue('')
+                            setIsOpen(false)
+                        }}
+                        title="Clear selection"
+                    >
+                        <circle cx="8" cy="8" r="7" fill="currentColor" opacity="0.1" />
+                        <path
+                            d="M5 5L11 11M11 5L5 11"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                        />
+                    </svg>
+                )}
                 <svg
                     className={`arrow ${isOpen ? 'open' : ''}`}
                     width="16"

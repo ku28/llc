@@ -644,6 +644,21 @@ a:hover {
   box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
 }
 
+.custom-select-input-wrapper .clear-button {
+  position: absolute;
+  right: 2.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  transition: color 0.2s ease;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.custom-select-input-wrapper .clear-button:hover {
+  color: #ef4444;
+}
+
 .custom-select-input-wrapper .arrow {
   position: absolute;
   right: 0.75rem;

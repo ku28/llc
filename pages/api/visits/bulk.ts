@@ -251,8 +251,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             visits.forEach((visit: any) => {
                 const normalizedName = visit.patientName ? normalizePatientName(visit.patientName) : null
 
-                // Use name as primary key, fallback to phone or opdNo
-                const patientKey = normalizedName || normalizePhone(visit.phone) || `unknown_${visit.opdNo}`
+                // Use name strictly as primary key, fallback to opdNo only if no name
+                const patientKey = normalizedName || `unknown_${visit.opdNo}`
 
                 if (!patientGroups.has(patientKey)) {
                     patientGroups.set(patientKey, [])
@@ -349,10 +349,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 const normalizedPhone = normalizePhone(firstVisit.phone)
                 const normalizedName = firstVisit.patientName ? normalizePatientName(firstVisit.patientName) : null
 
-                // Try to find existing patient
-                if (normalizedPhone && patientPhoneMap.has(normalizedPhone)) {
-                    patient = patientPhoneMap.get(normalizedPhone)
-                } else if (normalizedName && patientNameMap.has(normalizedName)) {
+                // Try to find existing patient by name only (not by phone to avoid confusion)
+                if (normalizedName && patientNameMap.has(normalizedName)) {
                     patient = patientNameMap.get(normalizedName)
                 }
 

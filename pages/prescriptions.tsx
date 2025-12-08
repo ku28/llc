@@ -31,6 +31,22 @@ export default function PrescriptionsPage() {
     const { visitId, edit } = router.query
     const isEditMode = edit === 'true' && visitId
     const { toasts, removeToast, showSuccess, showError, showInfo } = useToast()
+    
+    // Enhanced options with placeholder "Select..." option at the top
+    const genderOptionsWithPlaceholder = [{ value: '', label: 'Select Gender' }, ...genderOptions]
+    const temperamentOptionsWithPlaceholder = [{ value: '', label: 'Select Temperament' }, ...temperamentOptions]
+    const pulseDiagnosisOptionsWithPlaceholder = [{ value: '', label: 'Select Pulse Diagnosis' }, ...pulseDiagnosisOptions]
+    const pulseDiagnosis2OptionsWithPlaceholder = [{ value: '', label: 'Select Pulse Diagnosis 2' }, ...pulseDiagnosis2Options]
+    const componentsWithPlaceholder = [{ value: '', label: 'Select Component' }, ...components]
+    const timingWithPlaceholder = [{ value: '', label: 'Select Timing' }, ...timing]
+    const doseQuantityWithPlaceholder = [{ value: '', label: 'Select Dose Quantity' }, ...doseQuantity]
+    const doseTimingWithPlaceholder = [{ value: '', label: 'Select Dose Timing' }, ...doseTiming]
+    const dilutionWithPlaceholder = [{ value: '', label: 'Select Dilution' }, ...dilution]
+    const additionsWithPlaceholder = [{ value: '', label: 'Select Addition' }, ...additions]
+    const procedureWithPlaceholder = [{ value: '', label: 'Select Procedure' }, ...procedure]
+    const presentationWithPlaceholder = [{ value: '', label: 'Select Presentation' }, ...presentation]
+    const administrationWithPlaceholder = [{ value: '', label: 'Select Administration' }, ...administration]
+    const bottlePricingWithPlaceholder = [{ value: '', label: 'Select Bottle Size' }, ...bottlePricing]
 
     const [user, setUser] = useState<any>(null)
     const [patients, setPatients] = useState<any[]>([])
@@ -161,6 +177,13 @@ export default function PrescriptionsPage() {
     const [selectedProvDiagnosis, setSelectedProvDiagnosis] = useState<string>('')
     const [freeTextDiagnosis, setFreeTextDiagnosis] = useState<string>('')
     const [showAddPlanButton, setShowAddPlanButton] = useState(false)
+    
+    // Prescription selection and repeat functionality
+    const [selectedPrescriptions, setSelectedPrescriptions] = useState<Set<number>>(new Set())
+    const [showRepeatInput, setShowRepeatInput] = useState(false)
+    const [repeatCount, setRepeatCount] = useState<string>('')
+    const [showRepeatInputForRow, setShowRepeatInputForRow] = useState<number | null>(null)
+    const [repeatCountForRow, setRepeatCountForRow] = useState<string>('')
 
     // Step configuration
     const steps = [
@@ -1502,6 +1525,88 @@ export default function PrescriptionsPage() {
         setPrescriptions(lastState)
         showSuccess('Undo successful')
     }
+    
+    // Toggle prescription selection
+    function togglePrescriptionSelection(index: number) {
+        const newSelected = new Set(selectedPrescriptions)
+        if (newSelected.has(index)) {
+            newSelected.delete(index)
+        } else {
+            newSelected.add(index)
+        }
+        setSelectedPrescriptions(newSelected)
+    }
+    
+    // Toggle select all prescriptions
+    function toggleSelectAll() {
+        if (selectedPrescriptions.size === prescriptions.length) {
+            setSelectedPrescriptions(new Set())
+        } else {
+            setSelectedPrescriptions(new Set(prescriptions.map((_, i) => i)))
+        }
+    }
+    
+    // Remove selected prescriptions
+    function removeSelectedPrescriptions() {
+        if (selectedPrescriptions.size === 0) {
+            showError('No prescriptions selected')
+            return
+        }
+        
+        const newPrescriptions = prescriptions.filter((_, i) => !selectedPrescriptions.has(i))
+        setPrescriptions(newPrescriptions)
+        setSelectedPrescriptions(new Set())
+        showSuccess(`Removed ${selectedPrescriptions.size} prescription(s)`)
+    }
+    
+    // Repeat selected prescriptions
+    function repeatSelectedPrescriptions() {
+        if (selectedPrescriptions.size === 0) {
+            showError('No prescriptions selected')
+            return
+        }
+        
+        const count = parseInt(repeatCount)
+        if (!count || count < 1) {
+            showError('Please enter a valid positive number')
+            return
+        }
+        
+        const selectedIndices = Array.from(selectedPrescriptions).sort((a, b) => a - b)
+        const itemsToRepeat = selectedIndices.map(i => ({ ...prescriptions[i] }))
+        
+        const newPrescriptions = [...prescriptions]
+        for (let i = 0; i < count; i++) {
+            newPrescriptions.push(...itemsToRepeat.map(item => ({ ...item })))
+        }
+        
+        setPrescriptions(newPrescriptions)
+        setSelectedPrescriptions(new Set())
+        setShowRepeatInput(false)
+        setRepeatCount('')
+        showSuccess(`Repeated ${selectedIndices.length} prescription(s) ${count} time(s)`)
+    }
+    
+    // Repeat single row
+    function repeatSingleRow(index: number) {
+        const count = parseInt(repeatCountForRow)
+        if (!count || count < 1) {
+            showError('Please enter a valid positive number')
+            return
+        }
+        
+        const itemToRepeat = { ...prescriptions[index] }
+        const newPrescriptions = [...prescriptions]
+        
+        for (let i = 0; i < count; i++) {
+            newPrescriptions.push({ ...itemToRepeat })
+        }
+        
+        setPrescriptions(newPrescriptions)
+        setShowRepeatInputForRow(null)
+        setRepeatCountForRow('')
+        showSuccess(`Repeated prescription ${count} time(s)`)
+    }
 
     // Step navigation functions
     const nextStep = () => {
@@ -2029,7 +2134,7 @@ export default function PrescriptionsPage() {
                                             <CustomSelect
                                                 value={form.gender}
                                                 onChange={(val) => setForm({ ...form, gender: val })}
-                                                options={genderOptions}
+                                                options={genderOptionsWithPlaceholder}
                                                 placeholder="Select gender"
                                                 allowCustom={true}
                                                 onOpenChange={setIsGenderOpen}
@@ -2124,7 +2229,7 @@ export default function PrescriptionsPage() {
                                     <CustomSelect
                                         value={form.temperament}
                                         onChange={(val) => setForm({ ...form, temperament: val })}
-                                        options={temperamentOptions}
+                                        options={temperamentOptionsWithPlaceholder}
                                         placeholder="Select temperament"
                                         allowCustom={true}
                                         onOpenChange={setIsTemperamentOpen}
@@ -2135,7 +2240,7 @@ export default function PrescriptionsPage() {
                                     <CustomSelect
                                         value={form.pulseDiagnosis}
                                         onChange={(val) => setForm({ ...form, pulseDiagnosis: val })}
-                                        options={pulseDiagnosisOptions}
+                                        options={pulseDiagnosisOptionsWithPlaceholder}
                                         placeholder="Select pulse diagnosis"
                                         allowCustom={true}
                                         onOpenChange={setIsPulseDiagnosisOpen}
@@ -2146,7 +2251,7 @@ export default function PrescriptionsPage() {
                                     <CustomSelect
                                         value={form.pulseDiagnosis2}
                                         onChange={(val) => setForm({ ...form, pulseDiagnosis2: val })}
-                                        options={pulseDiagnosis2Options}
+                                        options={pulseDiagnosis2OptionsWithPlaceholder}
                                         placeholder="Select pulse diagnosis 2"
                                         allowCustom={true}
                                         onOpenChange={setIsPulseDiagnosis2Open}
@@ -2534,30 +2639,113 @@ export default function PrescriptionsPage() {
 
                         {/* Prescriptions Card */}
                         {currentStep === 5 && (
-                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-white dark:bg-gray-900 shadow-lg p-6">
-                            <div className="relative flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400">Prescriptions</h3>
-                                <div className="flex gap-2">
+                        <div className="relative rounded-2xl border border-emerald-200/30 dark:border-emerald-700/30 bg-white dark:bg-gray-900 shadow-lg p-4 sm:p-6">
+                            <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                                <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 flex items-center gap-3">
                                     {prescriptions.length > 0 && (
-                                        <button 
-                                            type="button" 
-                                            onClick={undoAllStack.length > 0 ? undoRestoreAll : restoreDefaultValuesForAll}
-                                            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 shadow-sm hover:shadow-md ${
-                                                undoAllStack.length > 0 
-                                                    ? 'text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700'
-                                                    : 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700'
-                                            }`}
-                                            title={undoAllStack.length > 0 ? 'Undo the last Restore Default on All action' : 'Restore default values (Qty: 15, Timing: BM, Dose: 10|TDS|WTR) for all medicines'}
-                                        >
-                                            <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                {undoAllStack.length > 0 ? (
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                                                ) : (
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                                )}
-                                            </svg>
-                                            <span className="hidden sm:inline">{undoAllStack.length > 0 ? 'Undo All' : 'Restore Default on All'}</span>
-                                        </button>
+                                        <label className="relative group/checkbox cursor-pointer flex-shrink-0">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedPrescriptions.size === prescriptions.length && prescriptions.length > 0}
+                                                onChange={toggleSelectAll}
+                                                className="peer sr-only"
+                                            />
+                                            <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                            <div className="absolute inset-0 rounded-md bg-emerald-400 opacity-0 peer-checked:opacity-20 blur-md transition-opacity duration-200 pointer-events-none"></div>
+                                        </label>
+                                    )}
+                                    <span>Prescriptions {selectedPrescriptions.size > 0 && <span className="px-2 py-0.5 ml-2 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-bold">({selectedPrescriptions.size} selected)</span>}</span>
+                                </h3>
+                                <div className="flex gap-2 flex-wrap">
+                                    {prescriptions.length > 0 && (
+                                        <>                                            
+                                            {/* Remove Selected Button */}
+                                            {selectedPrescriptions.size > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={removeSelectedPrescriptions}
+                                                    className="px-3 sm:px-4 py-2 text-sm font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-700 rounded-lg transition-colors shadow-sm hover:shadow-md"
+                                                    title={`Remove ${selectedPrescriptions.size} selected prescription(s)`}
+                                                >
+                                                    <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                    <span className="hidden sm:inline">Remove Selected ({selectedPrescriptions.size})</span>
+                                                    <span className="sm:hidden">Remove ({selectedPrescriptions.size})</span>
+                                                </button>
+                                            )}
+                                            
+                                            {/* Repeat Selected Button */}
+                                            {selectedPrescriptions.size > 0 && (
+                                                <>
+                                                    {!showRepeatInput ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowRepeatInput(true)}
+                                                            className="px-3 sm:px-4 py-2 text-sm font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700 rounded-lg transition-colors shadow-sm hover:shadow-md"
+                                                            title={`Repeat ${selectedPrescriptions.size} selected prescription(s)`}
+                                                        >
+                                                            <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                            </svg>
+                                                            <span className="hidden sm:inline">Repeat Selected</span>
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                value={repeatCount}
+                                                                onChange={(e) => setRepeatCount(e.target.value)}
+                                                                placeholder="Times"
+                                                                className="w-20 px-2 py-2 text-sm border border-purple-300 dark:border-purple-700 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-800"
+                                                                autoFocus
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={repeatSelectedPrescriptions}
+                                                                className="px-3 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                                                                title="Confirm repeat"
+                                                            >
+                                                                ✓
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { setShowRepeatInput(false); setRepeatCount(''); }}
+                                                                className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                                                                title="Cancel"
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                            
+                                            <button 
+                                                type="button" 
+                                                onClick={undoAllStack.length > 0 ? undoRestoreAll : restoreDefaultValuesForAll}
+                                                className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 shadow-sm hover:shadow-md ${
+                                                    undoAllStack.length > 0 
+                                                        ? 'text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700'
+                                                        : 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-700'
+                                                }`}
+                                                title={undoAllStack.length > 0 ? 'Undo the last Restore Default on All action' : 'Restore default values (Qty: 15, Timing: BM, Dose: 10|TDS|WTR) for all medicines'}
+                                            >
+                                                <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    {undoAllStack.length > 0 ? (
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                    ) : (
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                    )}
+                                                </svg>
+                                                <span className="hidden sm:inline">{undoAllStack.length > 0 ? 'Undo All' : 'Restore Default on All'}</span>
+                                            </button>
+                                        </>
                                     )}
                                     <button type="button" onClick={addEmptyPrescription} className="px-3 sm:px-4 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-700 rounded-lg transition-colors shadow-sm hover:shadow-md" title="Add empty prescription row">
                                         <svg className="w-4 h-4 inline sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2623,6 +2811,26 @@ export default function PrescriptionsPage() {
                                                     </div>
                                                 )}
                                                 
+                                                {/* Selection Checkbox */}
+                                                {!isDeleted && (
+                                                    <div className="absolute top-4 left-4 z-10">
+                                                        <label className="relative group/checkbox cursor-pointer flex-shrink-0">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedPrescriptions.has(i)}
+                                                                onChange={() => togglePrescriptionSelection(i)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="peer sr-only"
+                                                            />
+                                                            <div className="w-6 h-6 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                                <svg className="w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                                </svg>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                )}
+                                                
                                                 {/* Futuristic glow effect on hover */}
                                                 {!isDeleted && (
                                                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-400/0 via-green-400/0 to-emerald-500/0 group-hover:from-emerald-400/5 group-hover:via-green-400/5 group-hover:to-emerald-500/5 transition-all duration-300 pointer-events-none"></div>
@@ -2633,7 +2841,7 @@ export default function PrescriptionsPage() {
                                                         <span className="text-red-700 dark:text-red-300 font-semibold">⚠ DELETED TREATMENT PLAN - Read Only</span>
                                                     </div>
                                                 )}
-                                                <div className="relative p-4">
+                                                <div className={`relative ${!isDeleted ? 'pl-12' : ''} p-4`}>
                                                     {/* Row 1: Medicine Name (Left) + 3x3 SPY Grid (Right) */}
                                                     <div className="flex flex-col lg:flex-row gap-4 mb-3">
                                                         {/* LEFT: Medicine Info */}
@@ -2684,10 +2892,7 @@ export default function PrescriptionsPage() {
                                                                                                 <CustomSelect
                                                                                                     value={pr.bottleSize || ''}
                                                                                                     onChange={(val) => !isDeleted && updatePrescription(i, { bottleSize: val })}
-                                                                                                    options={bottlePricing.map(bp => ({
-                                                                                                        value: bp.value,
-                                                                                                        label: bp.label
-                                                                                                    }))}
+                                                                                                    options={bottlePricingWithPlaceholder}
                                                                                                     placeholder="Bottle Size"
                                                                                                     className="text-xs h-8"
                                                                                                 />
@@ -2740,7 +2945,7 @@ export default function PrescriptionsPage() {
                                                                                 onChange={(val) => {
                                                                                     updatePrescription(i, { [spyKey]: formatComponent(val.toUpperCase(), parsedSpy.volume) })
                                                                                 }}
-                                                                                options={components}
+                                                                                options={componentsWithPlaceholder}
                                                                                 placeholder={`SPY${num}`}
                                                                                 allowCustom={true}
                                                                                 className="flex-1 text-xs h-8"
@@ -2789,7 +2994,7 @@ export default function PrescriptionsPage() {
                                                                                     onChange={(val) => {
                                                                                         updatePrescription(i, { [spyKey]: formatComponent(val.toUpperCase(), parsedSpy.volume) })
                                                                                     }}
-                                                                                    options={components}
+                                                                                    options={componentsWithPlaceholder}
                                                                                     placeholder={`SPY${num}`}
                                                                                     allowCustom={true}
                                                                                     className="flex-1 text-xs h-8"
@@ -2837,7 +3042,7 @@ export default function PrescriptionsPage() {
                                                                                 <CustomSelect
                                                                                     value={parsedAddition.name}
                                                                                     onChange={(val) => updatePrescription(i, { [additionKey]: formatComponent(val.toUpperCase(), parsedAddition.volume) })}
-                                                                                    options={additions}
+                                                                                    options={additionsWithPlaceholder}
                                                                                     placeholder={`Add ${num}`}
                                                                                     allowCustom={true}
                                                                                     className="flex-1 text-xs h-8"
@@ -2869,33 +3074,33 @@ export default function PrescriptionsPage() {
                                                             </div>
                                                             <div className="flex-1 min-w-[96px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Timing</label>
-                                                                <CustomSelect value={pr.timing || ''} onChange={(val) => updatePrescription(i, { timing: val })} options={timing} placeholder="Time" allowCustom={true} className="text-xs h-8" />
+                                                                <CustomSelect value={pr.timing || ''} onChange={(val) => updatePrescription(i, { timing: val })} options={timingWithPlaceholder} placeholder="Time" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[80px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Dose</label>
-                                                                <CustomSelect value={parsedDosageValues.quantity} onChange={(val) => { updatePrescription(i, { dosage: formatDosage(val, parsedDosageValues.timing, parsedDosageValues.dilution) }) }} options={doseQuantity} placeholder="Dose" allowCustom={true} className="text-xs h-8" />
+                                                                <CustomSelect value={parsedDosageValues.quantity} onChange={(val) => { updatePrescription(i, { dosage: formatDosage(val, parsedDosageValues.timing, parsedDosageValues.dilution) }) }} options={doseQuantityWithPlaceholder} placeholder="Dose" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[80px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Frequency</label>
-                                                                <CustomSelect value={parsedDosageValues.timing} onChange={(val) => { updatePrescription(i, { dosage: formatDosage(parsedDosageValues.quantity, val, parsedDosageValues.dilution) }) }} options={doseTiming} placeholder="Time" allowCustom={true} className="text-xs h-8" />
+                                                                <CustomSelect value={parsedDosageValues.timing} onChange={(val) => { updatePrescription(i, { dosage: formatDosage(parsedDosageValues.quantity, val, parsedDosageValues.dilution) }) }} options={doseTimingWithPlaceholder} placeholder="Time" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[80px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Along With</label>
-                                                                <CustomSelect value={parsedDosageValues.dilution} onChange={(val) => { updatePrescription(i, { dosage: formatDosage(parsedDosageValues.quantity, parsedDosageValues.timing, val) }) }} options={dilution} placeholder="Dil" allowCustom={true} className="text-xs h-8" />
+                                                                <CustomSelect value={parsedDosageValues.dilution} onChange={(val) => { updatePrescription(i, { dosage: formatDosage(parsedDosageValues.quantity, parsedDosageValues.timing, val) }) }} options={dilutionWithPlaceholder} placeholder="Dil" allowCustom={true} className="text-xs h-8" />
                                                             </div>
 
                                                             {/* Procedure, Presentation, Administration */}
                                                             <div className="flex-1 min-w-[112px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Instruction</label>
-                                                                <CustomSelect value={pr.procedure || ''} onChange={(val) => updatePrescription(i, { procedure: val.toUpperCase() })} options={procedure} placeholder="Proc" allowCustom={true} className="text-xs h-8" />
+                                                                <CustomSelect value={pr.procedure || ''} onChange={(val) => updatePrescription(i, { procedure: val.toUpperCase() })} options={procedureWithPlaceholder} placeholder="Proc" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[112px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Presentation</label>
-                                                                <CustomSelect value={pr.presentation || ''} onChange={(val) => updatePrescription(i, { presentation: val.toUpperCase() })} options={presentation} placeholder="Pres" allowCustom={true} className="text-xs h-8" />
+                                                                <CustomSelect value={pr.presentation || ''} onChange={(val) => updatePrescription(i, { presentation: val.toUpperCase() })} options={presentationWithPlaceholder} placeholder="Pres" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                             <div className="flex-1 min-w-[128px]">
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Site</label>
-                                                                <CustomSelect value={pr.administration || ''} onChange={(val) => updatePrescription(i, { administration: val.toUpperCase() })} options={administration} placeholder="Admin" allowCustom={true} className="text-xs h-8" />
+                                                                <CustomSelect value={pr.administration || ''} onChange={(val) => updatePrescription(i, { administration: val.toUpperCase() })} options={administrationWithPlaceholder} placeholder="Admin" allowCustom={true} className="text-xs h-8" />
                                                             </div>
                                                         </div>
 
@@ -2919,7 +3124,7 @@ export default function PrescriptionsPage() {
                                                             </label>
 
                                                             {!isDeleted && (
-                                                                <>
+                                                                <div className="flex items-center gap-2 flex-wrap">
                                                                     <button
                                                                         type="button"
                                                                         onClick={undoStack.some(u => u.index === i) ? undoRestore : () => restoreDefaultValues(i)}
@@ -2939,6 +3144,50 @@ export default function PrescriptionsPage() {
                                                                         </svg>
                                                                         {undoStack.some(u => u.index === i) ? 'Undo' : 'Restore Default'}
                                                                     </button>
+                                                                    
+                                                                    {/* Repeat Row Button */}
+                                                                    {showRepeatInputForRow !== i ? (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setShowRepeatInputForRow(i)}
+                                                                            className="px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-white hover:bg-purple-500 dark:hover:bg-purple-600 border border-purple-300 dark:border-purple-700 rounded-lg transition-all duration-300 hover:shadow-md"
+                                                                            title="Repeat this prescription"
+                                                                        >
+                                                                            <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                            </svg>
+                                                                            Repeat
+                                                                        </button>
+                                                                    ) : (
+                                                                        <div className="flex items-center gap-1">
+                                                                            <input
+                                                                                type="number"
+                                                                                min="1"
+                                                                                value={repeatCountForRow}
+                                                                                onChange={(e) => setRepeatCountForRow(e.target.value)}
+                                                                                placeholder="Times"
+                                                                                className="w-16 px-2 py-1.5 text-sm border border-purple-300 dark:border-purple-700 rounded-lg focus:ring-2 focus:ring-purple-500 dark:bg-gray-800"
+                                                                                autoFocus
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => repeatSingleRow(i)}
+                                                                                className="px-2 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                                                                                title="Confirm repeat"
+                                                                            >
+                                                                                ✓
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => { setShowRepeatInputForRow(null); setRepeatCountForRow(''); }}
+                                                                                className="px-2 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                                                                                title="Cancel"
+                                                                            >
+                                                                                ✕
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                    
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => { const copy = [...prescriptions]; copy.splice(i, 1); setPrescriptions(copy); }}
@@ -2946,7 +3195,7 @@ export default function PrescriptionsPage() {
                                                                     >
                                                                         Remove
                                                                     </button>
-                                                                </>
+                                                                </div>
                                                             )}
                                                         </div>
                                                     </div>

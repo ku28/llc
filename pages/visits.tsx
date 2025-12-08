@@ -1033,12 +1033,11 @@ export default function VisitsPage() {
                         )
                     }
                     
-                    // Group visits by patient (using normalized name + phone for better grouping)
+                    // Group visits by patient (using normalized name strictly)
                     const groupedByPatient = filteredVisits.reduce((acc: any, v: any) => {
-                        // Create a composite key using normalized name and phone
-                        const normalizedPhone = v.patient?.phone?.replace(/\D/g, '') || ''
+                        // Create a key using normalized name only (not phone)
                         const normalizedName = `${v.patient?.firstName || ''} ${v.patient?.lastName || ''}`.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s]/g, '')
-                        const patientKey = normalizedPhone ? `phone-${normalizedPhone}` : normalizedName ? `name-${normalizedName}` : `patient-${v.patient?.id || 'unknown'}`
+                        const patientKey = normalizedName ? `name-${normalizedName}` : `patient-${v.patient?.id || 'unknown'}`
                         
                         if (!acc[patientKey]) {
                             acc[patientKey] = {
