@@ -242,8 +242,8 @@ export default function ImportVisitsModal({ isOpen, onClose, onImportSuccess }: 
                 const qty = row[qtyKey]
                 const productName = row[`DL-${num}`] // DL = Medicine name (corrected mapping)
                 
-                // Only add prescription if at least product name exists
-                if (productName) {
+                // Only add prescription if product name exists and is not 0 or '0'
+                if (productName && productName !== 0 && String(productName).trim() !== '0' && String(productName).trim() !== '') {
                     prescriptions.push({
                         quantity: qty ? Number(qty) : 1,
                         productName: String(productName).trim(),

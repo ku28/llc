@@ -157,7 +157,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
             // Try direct number
             const num = Number(str)
-            return isNaN(num) || num === 0 ? null : num
+            if (isNaN(num) || num === 0) return null
+            return num
         }
 
         // Helper to parse age from formats like "30 YR", "25YR", "5 MONTHS", etc.
@@ -171,6 +172,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             const ageMatch = str.match(/(\d+)\s*(YR|YEARS?|Y|M|MONTHS?)?/)
             if (ageMatch) {
                 const num = parseInt(ageMatch[1])
+                if (num === 0) return null
+                
                 const unit = ageMatch[2]
 
                 // If unit is months or M, convert to years (but return null if less than 1 year for DOB calculation)
@@ -184,7 +187,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
             // Try direct number
             const num = Number(str)
-            return isNaN(num) || num === 0 ? null : num
+            if (isNaN(num) || num === 0) return null
+            return num
         }
 
         // Helper to calculate DOB from age
@@ -385,8 +389,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                             gender: visitForPatientCreation.gender || null,
                             dob: finalDob,
                             age: finalAge,
+                            weight: parseWeight(visitForPatientCreation.weight),
+                            height: parseHeight(visitForPatientCreation.height),
                             doctorId: doctorId,
-                            date: visitDate
+                            date: visitDate,
+                            createdAt: visitDate // Set creation date to first visit date
                         }
                     })
 
@@ -611,7 +618,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                             }
                             
                             for (const prData of prescriptions) {
-                                if (!prData.productName) continue // Skip empty prescriptions
+                                // Skip prescriptions with no product name or invalid names (0, '0', empty)
+                                if (!prData.productName || 
+                                    prData.productName === 0 || 
+                                    String(prData.productName).trim() === '0' || 
+                                    String(prData.productName).trim() === '') {
+                                    continue
+                                }
 
                                 // Normalize product name: trim, lowercase, remove extra spaces and special chars
                                 const normalizedProductName = prData.productName
