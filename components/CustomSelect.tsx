@@ -269,7 +269,6 @@ function CustomSelect({
                             setInputValue('')
                             setIsOpen(false)
                         }}
-                        title="Clear selection"
                     >
                         <circle cx="8" cy="8" r="7" fill="currentColor" opacity="0.1" />
                         <path
