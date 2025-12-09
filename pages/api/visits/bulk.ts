@@ -221,6 +221,106 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             return normalized.length > 0 ? normalized : null
         }
 
+        // Helper function to calculate Levenshtein distance (for spelling mistake tolerance)
+        const levenshteinDistance = (str1: string, str2: string): number => {
+            const m = str1.length
+            const n = str2.length
+            const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0))
+
+            for (let i = 0; i <= m; i++) dp[i][0] = i
+            for (let j = 0; j <= n; j++) dp[0][j] = j
+
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    if (str1[i - 1] === str2[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1]
+                    } else {
+                        dp[i][j] = Math.min(
+                            dp[i - 1][j] + 1,    // deletion
+                            dp[i][j - 1] + 1,    // insertion
+                            dp[i - 1][j - 1] + 1 // substitution
+                        )
+                    }
+                }
+            }
+
+            return dp[m][n]
+        }
+
+        // Smart fuzzy product matching function
+        const findMatchingProduct = (productName: string, productMap: Map<string, any>): any => {
+            // Normalize the input product name
+            const normalizedInput = productName
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, ' ')
+                .replace(/[^\w\s]/g, '')
+
+            // Step 1: Try exact match
+            if (productMap.has(normalizedInput)) {
+                console.log(`✓ Exact match found for: ${productName}`)
+                return productMap.get(normalizedInput)
+            }
+
+            // Step 2: Try partial match starting from the last word
+            const inputWords = normalizedInput.split(' ')
+            
+            // Start from the last word and work backwards
+            for (let i = inputWords.length - 1; i >= 0; i--) {
+                const partialName = inputWords.slice(i).join(' ')
+                
+                // Check if any existing product ends with this partial name
+                for (const [existingName, product] of productMap.entries()) {
+                    if (existingName.endsWith(partialName) && partialName.length >= 3) {
+                        console.log(`✓ Partial match (from end): "${productName}" → "${product.name}"`)
+                        return product
+                    }
+                }
+            }
+
+            // Step 3: Try fuzzy matching with spelling mistake tolerance
+            const SIMILARITY_THRESHOLD = 0.85 // 85% similarity required
+            let bestMatch: any = null
+            let bestSimilarity = 0
+
+            for (const [existingName, product] of productMap.entries()) {
+                // Calculate similarity as 1 - (distance / max_length)
+                const maxLength = Math.max(normalizedInput.length, existingName.length)
+                const distance = levenshteinDistance(normalizedInput, existingName)
+                const similarity = 1 - (distance / maxLength)
+
+                if (similarity > bestSimilarity && similarity >= SIMILARITY_THRESHOLD) {
+                    bestSimilarity = similarity
+                    bestMatch = product
+                }
+
+                // Also check if one name contains the other (for compound names)
+                if (normalizedInput.length >= 4 && existingName.includes(normalizedInput)) {
+                    const containsSimilarity = normalizedInput.length / existingName.length
+                    if (containsSimilarity >= 0.6 && containsSimilarity > bestSimilarity) {
+                        bestSimilarity = containsSimilarity
+                        bestMatch = product
+                    }
+                }
+                
+                if (existingName.length >= 4 && normalizedInput.includes(existingName)) {
+                    const containsSimilarity = existingName.length / normalizedInput.length
+                    if (containsSimilarity >= 0.6 && containsSimilarity > bestSimilarity) {
+                        bestSimilarity = containsSimilarity
+                        bestMatch = product
+                    }
+                }
+            }
+
+            if (bestMatch) {
+                console.log(`✓ Fuzzy match (${Math.round(bestSimilarity * 100)}% similar): "${productName}" → "${bestMatch.name}"`)
+                return bestMatch
+            }
+
+            console.log(`✗ No match found for: ${productName} (will create new)`)
+            return null
+        }
+
         try {
             const BATCH_SIZE = 100 // Increased from 50 for better performance
             const results: any[] = []
@@ -303,7 +403,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 }
             })
 
-            const productNameMap = new Map(existingProducts.map((p: any) => [
+            const productNameMap = new Map<string, any>(existingProducts.map((p: any) => [
                 p.name.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s]/g, ''),
                 p
             ]))
@@ -624,15 +724,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     continue
                                 }
 
-                                // Normalize product name: trim, lowercase, remove extra spaces and special chars
-                                const normalizedProductName = prData.productName
-                                    .trim()
-                                    .toLowerCase()
-                                    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-                                    .replace(/[^\w\s]/g, '') // Remove special characters
-
-                                // Try to find the product using pre-fetched map with normalized name
-                                let product: any = productNameMap.get(normalizedProductName)
+                                // Use smart fuzzy matching to find existing product
+                                let product: any = findMatchingProduct(prData.productName, productNameMap)
 
                                 // If product not found, create it with appropriate category based on name
                                 if (!product) {
@@ -640,9 +733,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     const categoryName = getCategoryFromName(prData.productName)
                                     const category = await getOrCreateCategory(categoryName)
                                     
+                                    const trimmedProductName = prData.productName.trim()
+                                    console.log(`→ Creating new product: ${trimmedProductName}`)
+                                    
                                     product = await prisma.product.create({
                                         data: {
-                                            name: prData.productName.trim(), // Use original name but trimmed
+                                            name: trimmedProductName, // Use original name but trimmed
                                             priceRupees: 0,
                                             quantity: 0,
                                             totalPurchased: 100, // Default total purchased for imported products
@@ -652,6 +748,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                                     })
 
                                     // Add to map with normalized name for subsequent lookups
+                                    const normalizedProductName = trimmedProductName
+                                        .toLowerCase()
+                                        .replace(/\s+/g, ' ')
+                                        .replace(/[^\w\s]/g, '')
                                     productNameMap.set(normalizedProductName, product)
                                 }
 

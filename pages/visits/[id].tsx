@@ -12,6 +12,7 @@ export default function VisitDetail() {
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
     const [copyType, setCopyType] = useState<'PATIENT' | 'OFFICE'>('PATIENT')
     const [showDownloadDropdown, setShowDownloadDropdown] = useState(false)
+    const [showDownloadSubmenu, setShowDownloadSubmenu] = useState<'PATIENT' | 'OFFICE' | 'BOTH' | null>(null)
     const [showPrintDropdown, setShowPrintDropdown] = useState(false)
     const [showPrintSubmenu, setShowPrintSubmenu] = useState<'PATIENT' | 'OFFICE' | 'BOTH' | null>(null)
     const [showReportsDropdown, setShowReportsDropdown] = useState(false)
@@ -1100,7 +1101,7 @@ export default function VisitDetail() {
         }
     }
 
-    const downloadPreviewAsPDF = async (customFileName?: string, skipLoadingState?: boolean) => {
+    const downloadPreviewAsPDF = async (customFileName?: string, skipLoadingState?: boolean, paperType: 'letterhead' | 'plain' = 'plain') => {
         if (!prescriptionRef.current || !visit) return
 
         if (!skipLoadingState) setIsGeneratingPDF(true)
@@ -1108,6 +1109,11 @@ export default function VisitDetail() {
         try {
             const element = prescriptionRef.current
             
+            if (paperType === 'letterhead') {
+                element.classList.add('print-letterhead')
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
+
             // Force element to exact A4 pixel width during capture
             const originalWidth = element.style.width
             element.style.width = '794px' // 210mm at 96 DPI
@@ -1138,6 +1144,10 @@ export default function VisitDetail() {
             
             // Restore original width
             element.style.width = originalWidth
+
+            if (paperType === 'letterhead') {
+                element.classList.remove('print-letterhead')
+            }
 
             // Create standard A4 PDF
             const pdf = new jsPDF({
@@ -1174,26 +1184,29 @@ export default function VisitDetail() {
         }
     }
 
-    const downloadPatientCopy = async () => {
+    const downloadPatientCopy = async (paperType: 'letterhead' | 'plain') => {
         setShowDownloadDropdown(false)
+        setShowDownloadSubmenu(null)
         const originalCopyType = copyType
         setCopyType('PATIENT')
         await new Promise(resolve => setTimeout(resolve, 100))
-        await downloadPreviewAsPDF()
+        await downloadPreviewAsPDF(undefined, undefined, paperType)
         setCopyType(originalCopyType)
     }
 
-    const downloadOfficeCopy = async () => {
+    const downloadOfficeCopy = async (paperType: 'letterhead' | 'plain') => {
         setShowDownloadDropdown(false)
+        setShowDownloadSubmenu(null)
         const originalCopyType = copyType
         setCopyType('OFFICE')
         await new Promise(resolve => setTimeout(resolve, 100))
-        await downloadPreviewAsPDF()
+        await downloadPreviewAsPDF(undefined, undefined, paperType)
         setCopyType(originalCopyType)
     }
 
-    const downloadBothCopies = async () => {
+    const downloadBothCopies = async (paperType: 'letterhead' | 'plain') => {
         setShowDownloadDropdown(false)
+        setShowDownloadSubmenu(null)
         if (!prescriptionRef.current || !visit) return
 
         setIsGeneratingPDF(true)
@@ -1209,6 +1222,11 @@ export default function VisitDetail() {
             // Capture patient copy
             setCopyType('PATIENT')
             await new Promise(resolve => setTimeout(resolve, 300))
+
+            if (paperType === 'letterhead') {
+                prescriptionRef.current.classList.add('print-letterhead')
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
 
             const canvas1 = await html2canvas(prescriptionRef.current, {
                 scale: 2,
@@ -1230,9 +1248,18 @@ export default function VisitDetail() {
                 }
             })
 
+            if (paperType === 'letterhead') {
+                prescriptionRef.current.classList.remove('print-letterhead')
+            }
+
             // Capture office copy
             setCopyType('OFFICE')
             await new Promise(resolve => setTimeout(resolve, 300))
+
+            if (paperType === 'letterhead') {
+                prescriptionRef.current.classList.add('print-letterhead')
+                await new Promise(resolve => setTimeout(resolve, 100))
+            }
 
             const canvas2 = await html2canvas(prescriptionRef.current, {
                 scale: 2,
@@ -1253,9 +1280,10 @@ export default function VisitDetail() {
                     }
                 }
             })
-            
-            // Restore width
-            prescriptionRef.current.style.width = originalWidth
+
+            if (paperType === 'letterhead') {
+                prescriptionRef.current.classList.remove('print-letterhead')
+            }
             
             // Restore width
             prescriptionRef.current.style.width = originalWidth
@@ -1727,7 +1755,10 @@ export default function VisitDetail() {
                         <div className="relative">
                             <button
                                 onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
-                                onBlur={() => setTimeout(() => setShowDownloadDropdown(false), 200)}
+                                onBlur={() => setTimeout(() => {
+                                    setShowDownloadDropdown(false)
+                                    setShowDownloadSubmenu(null)
+                                }, 200)}
                                 disabled={isGeneratingPDF}
                                 className="px-2 sm:px-3 py-1.5 bg-green-600 dark:bg-green-700 text-white text-sm rounded-md hover:bg-green-700 dark:hover:bg-green-600 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                                 title="Download PDF"
@@ -1755,24 +1786,86 @@ export default function VisitDetail() {
                             </button>
                             {showDownloadDropdown && (
                                 <div className="absolute right-0 mt-1 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg z-50">
-                                    <button
-                                        onMouseDown={(e) => { e.preventDefault(); downloadPatientCopy(); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all"
-                                    >
-                                        Download Patient Copy
-                                    </button>
-                                    <button
-                                        onMouseDown={(e) => { e.preventDefault(); downloadOfficeCopy(); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all"
-                                    >
-                                        Download Office Copy
-                                    </button>
-                                    <button
-                                        onMouseDown={(e) => { e.preventDefault(); downloadBothCopies(); }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
-                                    >
-                                        Download Both
-                                    </button>
+                                    {/* Patient Copy with Submenu */}
+                                    <div className="relative">
+                                        <button
+                                            onMouseEnter={() => setShowDownloadSubmenu('PATIENT')}
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
+                                        >
+                                            <span>Download Patient Copy</span>
+                                            <span>▶</span>
+                                        </button>
+                                        {showDownloadSubmenu === 'PATIENT' && (
+                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
+                                                <button
+                                                    onMouseDown={(e) => { e.preventDefault(); downloadPatientCopy('letterhead'); }}
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
+                                                >
+                                                    Letterhead Paper
+                                                </button>
+                                                <button
+                                                    onMouseDown={(e) => { e.preventDefault(); downloadPatientCopy('plain'); }}
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
+                                                >
+                                                    Plain Paper
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Office Copy with Submenu */}
+                                    <div className="relative">
+                                        <button
+                                            onMouseEnter={() => setShowDownloadSubmenu('OFFICE')}
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
+                                        >
+                                            <span>Download Office Copy</span>
+                                            <span>▶</span>
+                                        </button>
+                                        {showDownloadSubmenu === 'OFFICE' && (
+                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
+                                                <button
+                                                    onMouseDown={(e) => { e.preventDefault(); downloadOfficeCopy('letterhead'); }}
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
+                                                >
+                                                    Letterhead Paper
+                                                </button>
+                                                <button
+                                                    onMouseDown={(e) => { e.preventDefault(); downloadOfficeCopy('plain'); }}
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
+                                                >
+                                                    Plain Paper
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Both Copies with Submenu */}
+                                    <div className="relative">
+                                        <button
+                                            onMouseEnter={() => setShowDownloadSubmenu('BOTH')}
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between rounded-b-md"
+                                        >
+                                            <span>Download Both</span>
+                                            <span>▶</span>
+                                        </button>
+                                        {showDownloadSubmenu === 'BOTH' && (
+                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
+                                                <button
+                                                    onMouseDown={(e) => { e.preventDefault(); downloadBothCopies('letterhead'); }}
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
+                                                >
+                                                    Letterhead Paper
+                                                </button>
+                                                <button
+                                                    onMouseDown={(e) => { e.preventDefault(); downloadBothCopies('plain'); }}
+                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
+                                                >
+                                                    Plain Paper
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1915,9 +2008,11 @@ export default function VisitDetail() {
                                             <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
 
                                                 {/* Particulars Box (Left) */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Particulars</span>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '9px', gap: '2px', lineHeight: '1.1', marginTop: '-4px' }}>
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', borderSpacing: '2px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
+                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Particulars</span>
+                                                    </div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '9px', gap: '2px', lineHeight: '1.1', marginTop: '0px' }}>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OPDN</span> <span style={{ color: 'blue', fontWeight: 'bold', marginLeft: '4px' }}>{visit.opdNo || 'N/A'}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>VISIT</span> <span style={{ marginLeft: '4px' }}>{visit.visitNumber || '1'}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>SEX</span> <span style={{ marginLeft: '4px' }}>{visit.gender || visit.patient?.gender || 'N/A'}</span></div>
@@ -1932,14 +2027,16 @@ export default function VisitDetail() {
                                                 </div>
 
                                                 {/* Right Box: Patient Info */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', display: 'flex', gap: '5px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-8px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Patient Info</span>
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', display: 'flex', gap: '5px', borderSpacing: '2px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
+                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Patient Info</span>
+                                                    </div>
                                                     
-                                                    <div style={{ flex: 1 }}>
+                                                    <div style={{ flex: 1, marginTop: '10px' }}>
                                                         {/* Indicator Box - Added to Patient Copy */}
                                                         <div style={{ width: '30px', height: '15px', background: visit.improvements ? 'green' : 'red', marginBottom: '3px', border: '1px solid #000' }}></div>
 
-                                                        <div style={{ fontSize: '0.75rem', lineHeight: '1.1', marginTop: '-4px' }}>
+                                                        <div style={{ fontSize: '0.75rem', lineHeight: '1.1', marginTop: '0px' }}>
                                                             <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>NAME:</span> <span style={{ fontWeight: 'bold', color: '#FF0000', marginLeft: '4px' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</span></div>
                                                             <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>FATHER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '4px' }}>{visit.patient?.fatherHusbandGuardianName || ''}</span></div>
                                                             <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.patient?.address || visit.address || ''}</span></div>
@@ -1947,7 +2044,7 @@ export default function VisitDetail() {
                                                     </div>
 
                                                     {/* Patient Image */}
-                                                    <div style={{ width: '60px', height: '75px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0 }}>
+                                                    <div style={{ width: '60px', height: '75px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0, marginTop: '10px' }}>
                                                         {visit.patient?.imageUrl ? (
                                                             <img
                                                                 src={visit.patient.imageUrl}
@@ -1981,55 +2078,69 @@ export default function VisitDetail() {
                                             </div>
 
                                             {/* EH Parameters Row */}
+                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '10px 0 5px 0' }}>
+                                                <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>EH Parameters</span>
+                                            </div>
                                             <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>EH Parameters</span>
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
                                                     <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>TEMP</span> <span style={{ marginLeft: '4px' }}>{visit.temperament}</span></div>
                                                 </div>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '12px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>EH Parameters</span>
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '12px', borderSpacing: '2px' }}>
                                                     <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-1</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis}</span></div>
                                                 </div>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '12px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>EH Parameters</span>
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '12px', borderSpacing: '2px' }}>
                                                     <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-2</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis2}</span></div>
                                                 </div>
                                             </div>
 
                                             {/* History & Reports */}
-                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', marginBottom: '5px', minHeight: '40px', borderSpacing: '2px' }}>
-                                                <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Prev Info</span>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '-4px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HISTORY & REPORTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.historyReports}</span></div>
+                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '10px 0 5px 0' }}>
+                                                <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Prev Info</span>
+                                            </div>
+                                            <div style={{ padding: '8px', position: 'relative', paddingTop: '15px', marginBottom: '5px', minHeight: '40px', borderSpacing: '2px' }}>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '0px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HISTORY & REPORTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.historyReports}</span></div>
                                             </div>
 
                                             {/* Chief Complaints */}
-                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', marginBottom: '5px', minHeight: '30px', borderSpacing: '2px' }}>
-                                                <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Sign & Symptoms</span>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '-4px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>CHIEF COMPLAINTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.majorComplaints}</span></div>
+                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '10px 0 5px 0' }}>
+                                                <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Sign & Symptoms</span>
+                                            </div>
+                                            <div style={{ padding: '8px', position: 'relative', paddingTop: '15px', marginBottom: '5px', minHeight: '30px', borderSpacing: '2px' }}>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '0px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>CHIEF COMPLAINTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.majorComplaints}</span></div>
                                             </div>
 
-                                            {/* Investigations & Prov Diagnosis */}
+                                            {/* Investigations & Prov Diagnosis - Split into two boxes */}
                                             <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', minHeight: '22px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Investigations Order</span>
-                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', lineHeight: '1.1', marginTop: '-4px' }}>{visit.investigations}</div>
+                                                {/* Investigations */}
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', minHeight: '22px', borderSpacing: '2px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
+                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Investigations</span>
+                                                    </div>
+                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', lineHeight: '1.1', marginTop: '0px' }}>{visit.investigations}</div>
                                                 </div>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', minHeight: '22px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Prov Diagnosis</span>
-                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', lineHeight: '1.1', marginTop: '-4px' }}>{visit.provisionalDiagnosis || visit.diagnoses}</div>
+                                                {/* Diagnosis */}
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', minHeight: '22px', borderSpacing: '2px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
+                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Diagnosis</span>
+                                                    </div>
+                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', lineHeight: '1.1', marginTop: '0px' }}>{visit.provisionalDiagnosis || visit.diagnoses}</div>
                                                 </div>
                                             </div>
 
                                             {/* Improvements */}
-                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', marginBottom: '5px', minHeight: '22px', borderSpacing: '2px' }}>
-                                                <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Cure</span>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '-4px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>IMPROVEMENTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.improvements}</span></div>
+                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '10px 0 5px 0' }}>
+                                                <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Cure</span>
+                                            </div>
+                                            <div style={{ padding: '8px', position: 'relative', paddingTop: '15px', marginBottom: '5px', minHeight: '22px', borderSpacing: '2px' }}>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '0px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>IMPROVEMENTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.improvements}</span></div>
                                             </div>
 
                                             {/* Discuss */}
-                                            <div style={{ border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', marginBottom: '5px', minHeight: '22px', borderSpacing: '2px' }}>
-                                                <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Discuss</span>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', marginTop: '-4px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.discussion}</span></div>
+                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '10px 0 5px 0' }}>
+                                                <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Discuss</span>
+                                            </div>
+                                            <div style={{ padding: '8px', position: 'relative', paddingTop: '15px', marginBottom: '5px', minHeight: '22px', borderSpacing: '2px' }}>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', marginTop: '0px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.discussion}</span></div>
                                             </div>
 
                                             {/* Prescription Table */}
@@ -2054,17 +2165,17 @@ export default function VisitDetail() {
                                                                         return (
                                                                             <tr key={p.id}>
                                                                                 <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '3%', fontWeight: 'bold', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{index + 1}</td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', color: p.patientHasMedicine ? '#FF0000' : '#008000', width: '15%', fontWeight: 'bold', fontSize: '0.55rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{medicineName}</td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
-                                                                                {hasSpy4 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>}
-                                                                                {hasSpy6 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>}
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', color: p.patientHasMedicine ? '#FF0000' : '#C80000', textTransform: 'uppercase', width: '8%', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.timing || ''}</td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#800080', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.dosage || ''}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', color: textColor, width: '15%', fontWeight: 'bold', fontSize: '0.55rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{medicineName}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
+                                                                                {hasSpy4 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>}
+                                                                                {hasSpy6 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>}
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', color: textColor, textTransform: 'uppercase', width: '8%', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.timing || ''}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.dosage || ''}</td>
                                                                                 <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.additions || ''}</td>
                                                                                 <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '8%', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.presentation || ''}</td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: p.patientHasMedicine ? '#FF0000' : '#FF8C00', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(p.droppersToday?.toString() || '').toUpperCase()}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(p.droppersToday?.toString() || '').toUpperCase()}</td>
                                                                             </tr>
                                                                         )
                                                                     })
@@ -2102,9 +2213,11 @@ export default function VisitDetail() {
                                             <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
                                                 
                                                 {/* Left Box: Particulars */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Particulars</span>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '0.75rem', lineHeight: '1.2', marginTop: '-4px' }}>
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', borderSpacing: '2px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
+                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Particulars</span>
+                                                    </div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '0.75rem', lineHeight: '1.2', marginTop: '0px' }}>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>OPDN:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '3px' }}>{visit.patient?.opdNo || visit.opdNo || ''}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>VISIT:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '3px' }}>{visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>PHONE:</span> <span style={{ fontWeight: 'bold', color: '#800080', marginLeft: '3px' }}>{visit.patient?.phone || visit.phone || ''}</span></div>
@@ -2118,13 +2231,15 @@ export default function VisitDetail() {
                                                 </div>
 
                                                 {/* Right Box: Patient Info */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', display: 'flex', gap: '5px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Patient Info</span>
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', display: 'flex', gap: '5px', borderSpacing: '2px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
+                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Patient Info</span>
+                                                    </div>
                                                     
-                                                    <div style={{ flex: 1 }}>
+                                                    <div style={{ flex: 1, marginTop: '10px' }}>
                                                         {/* Indicator Box Removed from Office Copy */}
                                                         
-                                                        <div style={{ fontSize: '0.75rem', lineHeight: '1.2', marginTop: '-4px' }}>
+                                                        <div style={{ fontSize: '0.75rem', lineHeight: '1.2', marginTop: '0px' }}>
                                                             <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>NAME:</span> <span style={{ fontWeight: 'bold', color: '#FF0000', marginLeft: '3px' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</span></div>
                                                             <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>FATHER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '3px' }}>{visit.patient?.fatherHusbandGuardianName || ''}</span></div>
                                                             <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '3px' }}>{visit.patient?.address || visit.address || ''}</span></div>
@@ -2132,7 +2247,7 @@ export default function VisitDetail() {
                                                     </div>
 
                                                     {/* Patient Image */}
-                                                    <div style={{ width: '60px', height: '75px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0 }}>
+                                                    <div style={{ width: '60px', height: '75px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0, marginTop: '10px' }}>
                                                         {visit.patient?.imageUrl ? (
                                                             <img
                                                                 src={visit.patient.imageUrl}
@@ -2168,8 +2283,10 @@ export default function VisitDetail() {
                                             {/* Middle Row: Medical Info */}
                                             <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
                                                 {/* Box 1: Parameters */}
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Parameters</span>
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', borderSpacing: '2px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
+                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Parameters</span>
+                                                    </div>
                                                     <div style={{ fontSize: '0.75rem', lineHeight: '1.2' }}>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>TEMP:</span> <span style={{ fontWeight: 'bold', color: '#800080', marginLeft: '4px' }}>{visit.temperament || ''}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>PULSE:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.pulseDiagnosis || ''}</span></div>
@@ -2177,8 +2294,10 @@ export default function VisitDetail() {
                                                 </div>
 
                                                 {/* Box 2: History & Complaints */}
-                                                <div style={{ flex: 2, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>History & Complaints</span>
+                                                <div style={{ flex: 2, padding: '8px', position: 'relative', paddingTop: '15px', borderSpacing: '2px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
+                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>History & Complaints</span>
+                                                    </div>
                                                     <div style={{ fontSize: '0.75rem', lineHeight: '1.2' }}>
                                                         <div style={{ marginBottom: '2px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>HISTORY:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.historyReports || ''}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>COMPLAINTS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.majorComplaints || ''}</span></div>
@@ -2188,8 +2307,10 @@ export default function VisitDetail() {
 
                                             {/* Bottom Row: Diagnosis & Cure */}
                                             <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
-                                                <div style={{ flex: 1, border: '3px double #DAA520', borderRadius: '4px', padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
-                                                    <span style={{ position: 'absolute', top: '-6px', right: '10px', background: 'linear-gradient(to bottom, #fff, #f0e68c)', padding: '0 8px', fontWeight: 'bold', fontSize: '10px', color: '#000', border: '1px solid #DAA520' }}>Diagnosis & Cure</span>
+                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', borderSpacing: '2px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
+                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Diagnosis & Cure</span>
+                                                    </div>
                                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.75rem', lineHeight: '1.2' }}>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>IMPROVEMENTS:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.improvements || ''}</span></div>
                                                         <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>PROV. DIAGNOSIS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.provisionalDiagnosis || ''}</span></div>
@@ -2223,21 +2344,21 @@ export default function VisitDetail() {
                                                                         <tr key={index}>
                                                                             <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', color: textColor, fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{totalPrice.toFixed(2)}</td>
                                                                             <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '30px', fontWeight: 'bold', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{index + 1}</td>
-                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '120px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', fontSize: '0.55rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product?.name?.toUpperCase() || ''}</td>
-                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy1 || ''}</td>
-                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy2 || ''}</td>
-                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy3 || ''}</td>
-                                                                            {hasSpy4 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy4 || ''}</td>}
-                                                                            {hasSpy5 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy5 || ''}</td>}
-                                                                            {hasSpy6 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: prescription.patientHasMedicine ? '#FF0000' : '#008000', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy6 || ''}</td>}
-                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', color: prescription.patientHasMedicine ? '#FF0000' : '#C80000', textTransform: 'uppercase', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.timing || ''}</td>
-                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', color: prescription.patientHasMedicine ? '#FF0000' : '#800080', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.dosage || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '120px', color: textColor, fontWeight: 'bold', fontSize: '0.55rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product?.name?.toUpperCase() || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: textColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy1 || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: textColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy2 || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: textColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy3 || ''}</td>
+                                                                            {hasSpy4 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: textColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy4 || ''}</td>}
+                                                                            {hasSpy5 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: textColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy5 || ''}</td>}
+                                                                            {hasSpy6 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '40px', color: textColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.spy6 || ''}</td>}
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', color: textColor, textTransform: 'uppercase', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.timing || ''}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', color: textColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.dosage || ''}</td>
                                                                             <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.addition1 || prescription.additions || ''}</td>
                                                                             {hasAdd2 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.addition2 || ''}</td>}
                                                                             {hasAdd3 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.addition3 || ''}</td>}
                                                                             <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.procedure || ''}</td>
                                                                             <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.presentation || ''}</td>
-                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', color: prescription.patientHasMedicine ? '#FF0000' : '#FF8C00', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(prescription.droppersToday?.toString() || '').toUpperCase()}</td>
+                                                                            <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(prescription.droppersToday?.toString() || '').toUpperCase()}</td>
                                                                             <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '60px', fontWeight: 'bold', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{prescription.quantity || ''}</td>
                                                                         </tr>
                                                                     )
