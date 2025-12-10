@@ -313,8 +313,8 @@ export default function AnalyticsPage() {
                     ['Product', 'Opening Stock', 'Purchases', 'Sales', 'Closing Stock', 'Stock Value']
                 ]
 
-                if (productLedgerData?.entries) {
-                    productLedgerData.entries.forEach((entry: any) => {
+                if (reportData?.entries) {
+                    reportData.entries.forEach((entry: any) => {
                         productSummary.push([
                             entry.productName,
                             entry.openingStock,
