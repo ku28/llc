@@ -15,6 +15,7 @@ export default function AnalyticsPage() {
     const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
     const [partyId, setPartyId] = useState('')
+    const [partyType, setPartyType] = useState<'customer' | 'supplier'>('customer')
     const [customers, setCustomers] = useState<any[]>([])
     const [suppliers, setSuppliers] = useState<any[]>([])
     const [products, setProducts] = useState<any[]>([])
