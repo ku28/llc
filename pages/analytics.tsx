@@ -15,7 +15,6 @@ export default function AnalyticsPage() {
     const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0])
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
     const [partyId, setPartyId] = useState('')
-    const [partyType, setPartyType] = useState<'customer' | 'supplier'>('customer')
     const [customers, setCustomers] = useState<any[]>([])
     const [suppliers, setSuppliers] = useState<any[]>([])
     const [products, setProducts] = useState<any[]>([])
@@ -183,7 +182,20 @@ export default function AnalyticsPage() {
                     }
                     params.append('partyId', partyId)
                     params.append('partyType', partyType)
+                    params.append('startDate', startDate)
+                    params.append('endDate', endDate)
                     url = `/api/reports/party-ledger?${params.toString()}`
+                    break
+                case 'product-ledger':
+                    if (!partyId) {
+                        showError('Please select a product')
+                        setLoading(false)
+                        return
+                    }
+                    params.append('productId', partyId)
+                    params.append('startDate', startDate)
+                    params.append('endDate', endDate)
+                    url = `/api/reports/product-ledger?${params.toString()}`
                     break
             }
 
@@ -285,6 +297,39 @@ export default function AnalyticsPage() {
                     ['Closing Balance', reportData.closingBalance]
                 ]
                 break
+
+            case 'product-ledger':
+            case 'all-products':
+                fileName = `Product_Ledger_${new Date().toISOString().split('T')[0]}.xlsx`
+                const productWb = XLSX.utils.book_new()
+
+                // Create summary sheet
+                const productSummary = [
+                    ['Product Ledger Report'],
+                    ['Period', `${startDate} to ${endDate}`],
+                    ['Generated', new Date().toLocaleString()],
+                    [''],
+                    ['Product', 'Opening Stock', 'Purchases', 'Sales', 'Closing Stock', 'Stock Value']
+                ]
+
+                if (productLedgerData?.entries) {
+                    productLedgerData.entries.forEach((entry: any) => {
+                        productSummary.push([
+                            entry.productName,
+                            entry.openingStock,
+                            entry.purchases,
+                            entry.sales,
+                            entry.closingStock,
+                            entry.stockValue
+                        ])
+                    })
+                }
+
+                const productSummarySheet = XLSX.utils.aoa_to_sheet(productSummary)
+                XLSX.utils.book_append_sheet(productWb, productSummarySheet, 'Product Ledger')
+
+                XLSX.writeFile(productWb, fileName)
+                return
 
             default:
                 showError('Export not available for this report')
@@ -478,55 +523,51 @@ export default function AnalyticsPage() {
                             </div>
                         </div>
 
-                        {/* Party Ledger */}
+                        {/* Product Ledger */}
                         <div className="relative rounded-xl border border-orange-200/30 dark:border-orange-700/30 bg-gradient-to-br from-white via-orange-50/30 to-white dark:from-gray-800 dark:via-orange-900/20 dark:to-gray-800 shadow-lg shadow-orange-500/5 dark:shadow-orange-500/10 p-6 hover:shadow-xl transition-all duration-300 backdrop-blur-sm">{/* Note: Not clickable at top level due to form inputs inside */}
                             <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-orange-500/5 to-transparent dark:from-orange-500/10 pointer-events-none"></div>
                             <div className="relative">
                                 <div className="flex items-center justify-between mb-4">
-                                    <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
-                                        <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                        </svg>
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
+                                            <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                            </svg>
+                                        </div>
+                                        {loading && activeReport === 'product-ledger' && (
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-600"></div>
+                                        )}
                                     </div>
-                                    {loading && activeReport === 'party-ledger' && (
-                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-600"></div>
-                                    )}
+                                    <button
+                                        onClick={() => router.push('/product-analytics')}
+                                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all text-sm font-medium shadow-md whitespace-nowrap flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                        </svg>
+                                        All Products
+                                    </button>
                                 </div>
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Party Ledger</h3>
-                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Customer/Supplier account statements</p>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Product Ledger</h3>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">View individual product statements</p>
 
                                 <div className="space-y-2">
                                     <CustomSelect
-                                        value={partyType}
-                                        onChange={(value: string) => {
-                                            setPartyType(value as 'customer' | 'supplier')
-                                            setPartyId('')
-                                        }}
-                                        options={[
-                                            { value: 'customer', label: 'Customer' },
-                                            { value: 'supplier', label: 'Supplier' }
-                                        ]}
-                                        placeholder="Select Party Type"
-                                        className="text-sm"
-                                    />
-                                    <CustomSelect
                                         value={partyId}
                                         onChange={(value: string) => setPartyId(value)}
-                                        options={(partyType === 'customer' ? customers : suppliers).map((party: any) => ({
-                                            value: party.id,
-                                            label: partyType === 'customer'
-                                                ? `${party.firstName} ${party.lastName || ''}`.trim()
-                                                : party.name
+                                        options={products.map((product: any) => ({
+                                            value: product.id,
+                                            label: product.name
                                         }))}
-                                        placeholder={`Select ${partyType}`}
+                                        placeholder="Select Product"
                                         className="text-sm"
                                     />
                                     <button
-                                        onClick={() => generateReport('party-ledger')}
+                                        onClick={() => generateReport('product-ledger')}
                                         disabled={!partyId || loading}
                                         className="w-full px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium shadow-md"
                                     >
-                                        {loading && activeReport === 'party-ledger' ? 'Generating...' : 'Generate Ledger'}
+                                        {loading && activeReport === 'product-ledger' ? 'Generating...' : 'Generate Ledger'}
                                     </button>
                                 </div>
                             </div>
@@ -712,11 +753,118 @@ export default function AnalyticsPage() {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Product Ledger Report Display */}
+                                {activeReport === 'product-ledger' && (
+                                    <div className="space-y-6">
+                                        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-lg p-6 border border-purple-200 dark:border-purple-800">
+                                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Product Information</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Product Name</p>
+                                                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{reportData.productInfo?.name}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Category</p>
+                                                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{reportData.productInfo?.category || 'N/A'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Current Stock</p>
+                                                    <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">{reportData.productInfo?.currentStock || 0}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Price/Unit</p>
+                                                    <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">₹{(reportData.productInfo?.pricePerUnit || 0).toFixed(2)}</p>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-purple-200 dark:border-purple-700">
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Opening Stock</p>
+                                                    <p className="text-lg font-semibold text-gray-900 dark:text-white">{reportData.openingStock || 0}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Purchases</p>
+                                                    <p className="text-lg font-semibold text-green-600 dark:text-green-400">{reportData.totalPurchases || 0}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Sales</p>
+                                                    <p className="text-lg font-semibold text-red-600 dark:text-red-400">{reportData.totalSales || 0}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">Stock Value</p>
+                                                    <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">₹{(reportData.stockValue || 0).toFixed(2)}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">Transaction History</h3>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full">
+                                                    <thead className="bg-gray-100 dark:bg-gray-900">
+                                                        <tr>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Date</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Type</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Reference</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Party</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Inward</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Outward</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Rate</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Amount</th>
+                                                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Balance</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                        {reportData.entries?.map((entry: any, index: number) => (
+                                                            <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                                                                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{new Date(entry.date).toLocaleDateString()}</td>
+                                                                <td className="px-4 py-3 text-sm">
+                                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                                        entry.type === 'Purchase' 
+                                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                                                                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                                                    }`}>
+                                                                        {entry.type}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{entry.reference}</td>
+                                                                <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{entry.party}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-green-600 dark:text-green-400 font-semibold">{entry.inward || '-'}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-red-600 dark:text-red-400 font-semibold">{entry.outward || '-'}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">₹{entry.rate.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm text-right text-blue-600 dark:text-blue-400 font-semibold">₹{entry.amount.toFixed(2)}</td>
+                                                                <td className="px-4 py-3 text-sm text-right font-bold text-gray-900 dark:text-white">{entry.balance}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
                 </div>
             </div>
+
+            <style jsx>{`
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: rgba(0, 0, 0, 0.1);
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: linear-gradient(to bottom, #8b5cf6, #6366f1);
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: linear-gradient(to bottom, #7c3aed, #4f46e5);
+                }
+            `}</style>
         </>
     )
 }

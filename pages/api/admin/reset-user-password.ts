@@ -1,0 +1,62 @@
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { getSessionUser } from '../../../lib/auth'
+import prisma from '../../../lib/prisma'
+import bcrypt from 'bcryptjs'
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    // Verify authentication
+    const authUser = await getSessionUser(req)
+
+    if (!authUser) {
+        return res.status(401).json({ error: 'Not authenticated' })
+    }
+
+    // Check if user is admin
+    if (authUser.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied. Admin role required.' })
+    }
+
+    if (req.method === 'POST') {
+        try {
+            const { userId } = req.body
+
+            if (!userId) {
+                return res.status(400).json({ error: 'User ID is required' })
+            }
+
+            // Prevent resetting own password
+            if (userId === authUser.id) {
+                return res.status(400).json({ error: 'You cannot reset your own password' })
+            }
+
+            // Generate temporary password
+            const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase()
+            const hashedPassword = await bcrypt.hash(tempPassword, 10)
+
+            const user = await prisma.user.update({
+                where: { id: userId },
+                data: { passwordHash: hashedPassword },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true
+                }
+            })
+
+            // TODO: Send email with temporary password
+            // For now, return it in the response (in production, this should be emailed)
+            console.log(`Temporary password for ${user.email}: ${tempPassword}`)
+
+            return res.status(200).json({ 
+                message: 'Password reset successfully. Temporary password has been generated.',
+                tempPassword, // Remove this in production and send via email
+                user 
+            })
+        } catch (error) {
+            console.error('Error resetting password:', error)
+            return res.status(500).json({ error: 'Failed to reset password' })
+        }
+    }
+
+    return res.status(405).json({ error: 'Method not allowed' })
+}
