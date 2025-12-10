@@ -1108,9 +1108,16 @@ export default function VisitsPage() {
                                             {/* Patient Image Circle */}
                                             <div className="flex-shrink-0">
                                                 <img 
-                                                    src={patient?.imageUrl || process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || ''} 
+                                                    src={patient?.imageUrl && patient.imageUrl.trim() !== '' ? patient.imageUrl : process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE} 
                                                     alt="Patient" 
                                                     className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                                                    onError={(e) => {
+                                                        const target = e.target as HTMLImageElement;
+                                                        const defaultImg = process.env.NEXT_PUBLIC_DEFAULT_PATIENT_IMAGE || '/default-patient.png';
+                                                        if (target.src !== defaultImg) {
+                                                            target.src = defaultImg;
+                                                        }
+                                                    }}
                                                 />
                                             </div>
                                             

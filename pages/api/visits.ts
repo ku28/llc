@@ -85,7 +85,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             lastName: true,
                             phone: true,
                             gender: true,
-                            email: true
+                            email: true,
+                            imageUrl: true
                         }
                     }
                 }

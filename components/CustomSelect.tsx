@@ -142,10 +142,12 @@ function CustomSelect({
         }
     }, [isOpen])
 
-    // Filter options based on input value
-    const filteredOptions = options.filter(option => 
-        option.value !== '' && option.label.toLowerCase().includes(inputValue.toLowerCase())
-    )
+    // Filter options based on input value and sort alphabetically
+    const filteredOptions = options
+        .filter(option => 
+            option.value !== '' && option.label.toLowerCase().includes(inputValue.toLowerCase())
+        )
+        .sort((a, b) => a.label.localeCompare(b.label))
 
     // Handle keyboard navigation
     const handleKeyDown = (e: React.KeyboardEvent) => {

@@ -1755,10 +1755,6 @@ export default function VisitDetail() {
                         <div className="relative">
                             <button
                                 onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
-                                onBlur={() => setTimeout(() => {
-                                    setShowDownloadDropdown(false)
-                                    setShowDownloadSubmenu(null)
-                                }, 200)}
                                 disabled={isGeneratingPDF}
                                 className="px-2 sm:px-3 py-1.5 bg-green-600 dark:bg-green-700 text-white text-sm rounded-md hover:bg-green-700 dark:hover:bg-green-600 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                                 title="Download PDF"
@@ -1785,88 +1781,94 @@ export default function VisitDetail() {
                                 )}
                             </button>
                             {showDownloadDropdown && (
-                                <div className="absolute right-0 mt-1 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg z-50">
-                                    {/* Patient Copy with Submenu */}
-                                    <div className="relative">
-                                        <button
-                                            onMouseEnter={() => setShowDownloadSubmenu('PATIENT')}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
-                                        >
-                                            <span>Download Patient Copy</span>
-                                            <span>▶</span>
-                                        </button>
-                                        {showDownloadSubmenu === 'PATIENT' && (
-                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); downloadPatientCopy('letterhead'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
-                                                >
-                                                    Letterhead Paper
-                                                </button>
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); downloadPatientCopy('plain'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
-                                                >
-                                                    Plain Paper
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => { setShowDownloadDropdown(false); setShowDownloadSubmenu(null); }}></div>
+                                    <div className="absolute right-0 mt-1 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg z-50">
+                                        {/* Patient Copy with Submenu */}
+                                        <div className="relative">
+                                            <button
+                                                onMouseEnter={() => setShowDownloadSubmenu('PATIENT')}
+                                                onClick={(e) => { e.stopPropagation(); setShowDownloadSubmenu(showDownloadSubmenu === 'PATIENT' ? null : 'PATIENT'); }}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
+                                            >
+                                                <span>Download Patient Copy</span>
+                                                <span>▶</span>
+                                            </button>
+                                            {showDownloadSubmenu === 'PATIENT' && (
+                                                <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); downloadPatientCopy('letterhead'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
+                                                    >
+                                                        Letterhead Paper
+                                                    </button>
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); downloadPatientCopy('plain'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
+                                                    >
+                                                        Plain Paper
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
 
-                                    {/* Office Copy with Submenu */}
-                                    <div className="relative">
-                                        <button
-                                            onMouseEnter={() => setShowDownloadSubmenu('OFFICE')}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
-                                        >
-                                            <span>Download Office Copy</span>
-                                            <span>▶</span>
-                                        </button>
-                                        {showDownloadSubmenu === 'OFFICE' && (
-                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); downloadOfficeCopy('letterhead'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
-                                                >
-                                                    Letterhead Paper
-                                                </button>
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); downloadOfficeCopy('plain'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
-                                                >
-                                                    Plain Paper
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+                                        {/* Office Copy with Submenu */}
+                                        <div className="relative">
+                                            <button
+                                                onMouseEnter={() => setShowDownloadSubmenu('OFFICE')}
+                                                onClick={(e) => { e.stopPropagation(); setShowDownloadSubmenu(showDownloadSubmenu === 'OFFICE' ? null : 'OFFICE'); }}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
+                                            >
+                                                <span>Download Office Copy</span>
+                                                <span>▶</span>
+                                            </button>
+                                            {showDownloadSubmenu === 'OFFICE' && (
+                                                <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); downloadOfficeCopy('letterhead'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
+                                                    >
+                                                        Letterhead Paper
+                                                    </button>
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); downloadOfficeCopy('plain'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
+                                                    >
+                                                        Plain Paper
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
 
-                                    {/* Both Copies with Submenu */}
-                                    <div className="relative">
-                                        <button
-                                            onMouseEnter={() => setShowDownloadSubmenu('BOTH')}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between rounded-b-md"
-                                        >
-                                            <span>Download Both</span>
-                                            <span>▶</span>
-                                        </button>
-                                        {showDownloadSubmenu === 'BOTH' && (
-                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); downloadBothCopies('letterhead'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
-                                                >
-                                                    Letterhead Paper
-                                                </button>
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); downloadBothCopies('plain'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
-                                                >
-                                                    Plain Paper
-                                                </button>
-                                            </div>
-                                        )}
+                                        {/* Both Copies with Submenu */}
+                                        <div className="relative">
+                                            <button
+                                                onMouseEnter={() => setShowDownloadSubmenu('BOTH')}
+                                                onClick={(e) => { e.stopPropagation(); setShowDownloadSubmenu(showDownloadSubmenu === 'BOTH' ? null : 'BOTH'); }}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between rounded-b-md"
+                                            >
+                                                <span>Download Both</span>
+                                                <span>▶</span>
+                                            </button>
+                                            {showDownloadSubmenu === 'BOTH' && (
+                                                <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); downloadBothCopies('letterhead'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
+                                                    >
+                                                        Letterhead Paper
+                                                    </button>
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); downloadBothCopies('plain'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
+                                                    >
+                                                        Plain Paper
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                </>
                             )}
                         </div>
 
@@ -1874,10 +1876,6 @@ export default function VisitDetail() {
                         <div className="relative">
                             <button
                                 onClick={() => setShowPrintDropdown(!showPrintDropdown)}
-                                onBlur={() => setTimeout(() => {
-                                    setShowPrintDropdown(false)
-                                    setShowPrintSubmenu(null)
-                                }, 200)}
                                 className="px-2 sm:px-3 py-1.5 bg-emerald-600/90 dark:bg-emerald-700/90 text-white text-sm rounded-md hover:bg-emerald-700 dark:hover:bg-emerald-600 transition-all shadow-sm flex items-center gap-1.5 backdrop-blur-sm"
                                 title="Print"
                                 aria-label="Print"
@@ -1891,88 +1889,94 @@ export default function VisitDetail() {
                                 </svg>
                             </button>
                             {showPrintDropdown && (
-                                <div className="absolute right-0 mt-1 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg z-50">
-                                    {/* Patient Copy with Submenu */}
-                                    <div className="relative">
-                                        <button
-                                            onMouseEnter={() => setShowPrintSubmenu('PATIENT')}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
-                                        >
-                                            <span>Print Patient Copy</span>
-                                            <span>▶</span>
-                                        </button>
-                                        {showPrintSubmenu === 'PATIENT' && (
-                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); handlePrintLetterhead('PATIENT'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
-                                                >
-                                                    Letterhead Paper
-                                                </button>
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); handlePrintPlain('PATIENT'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
-                                                >
-                                                    Plain Paper
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => { setShowPrintDropdown(false); setShowPrintSubmenu(null); }}></div>
+                                    <div className="absolute right-0 mt-1 w-48 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg z-50">
+                                        {/* Patient Copy with Submenu */}
+                                        <div className="relative">
+                                            <button
+                                                onMouseEnter={() => setShowPrintSubmenu('PATIENT')}
+                                                onClick={(e) => { e.stopPropagation(); setShowPrintSubmenu(showPrintSubmenu === 'PATIENT' ? null : 'PATIENT'); }}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
+                                            >
+                                                <span>Print Patient Copy</span>
+                                                <span>▶</span>
+                                            </button>
+                                            {showPrintSubmenu === 'PATIENT' && (
+                                                <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); handlePrintLetterhead('PATIENT'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
+                                                    >
+                                                        Letterhead Paper
+                                                    </button>
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); handlePrintPlain('PATIENT'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
+                                                    >
+                                                        Plain Paper
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
 
-                                    {/* Office Copy with Submenu */}
-                                    <div className="relative">
-                                        <button
-                                            onMouseEnter={() => setShowPrintSubmenu('OFFICE')}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
-                                        >
-                                            <span>Print Office Copy</span>
-                                            <span>▶</span>
-                                        </button>
-                                        {showPrintSubmenu === 'OFFICE' && (
-                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); handlePrintLetterhead('OFFICE'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
-                                                >
-                                                    Letterhead Paper
-                                                </button>
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); handlePrintPlain('OFFICE'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
-                                                >
-                                                    Plain Paper
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+                                        {/* Office Copy with Submenu */}
+                                        <div className="relative">
+                                            <button
+                                                onMouseEnter={() => setShowPrintSubmenu('OFFICE')}
+                                                onClick={(e) => { e.stopPropagation(); setShowPrintSubmenu(showPrintSubmenu === 'OFFICE' ? null : 'OFFICE'); }}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between"
+                                            >
+                                                <span>Print Office Copy</span>
+                                                <span>▶</span>
+                                            </button>
+                                            {showPrintSubmenu === 'OFFICE' && (
+                                                <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); handlePrintLetterhead('OFFICE'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
+                                                    >
+                                                        Letterhead Paper
+                                                    </button>
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); handlePrintPlain('OFFICE'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
+                                                    >
+                                                        Plain Paper
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
 
-                                    {/* Both Copies with Submenu */}
-                                    <div className="relative">
-                                        <button
-                                            onMouseEnter={() => setShowPrintSubmenu('BOTH')}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between rounded-b-md"
-                                        >
-                                            <span>Print Both</span>
-                                            <span>▶</span>
-                                        </button>
-                                        {showPrintSubmenu === 'BOTH' && (
-                                            <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); handlePrintBoth('letterhead'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
-                                                >
-                                                    Letterhead Paper
-                                                </button>
-                                                <button
-                                                    onMouseDown={(e) => { e.preventDefault(); handlePrintBoth('plain'); }}
-                                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
-                                                >
-                                                    Plain Paper
-                                                </button>
-                                            </div>
-                                        )}
+                                        {/* Both Copies with Submenu */}
+                                        <div className="relative">
+                                            <button
+                                                onMouseEnter={() => setShowPrintSubmenu('BOTH')}
+                                                onClick={(e) => { e.stopPropagation(); setShowPrintSubmenu(showPrintSubmenu === 'BOTH' ? null : 'BOTH'); }}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all flex items-center justify-between rounded-b-md"
+                                            >
+                                                <span>Print Both</span>
+                                                <span>▶</span>
+                                            </button>
+                                            {showPrintSubmenu === 'BOTH' && (
+                                                <div className="absolute left-full top-0 ml-1 w-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border border-emerald-200 dark:border-emerald-700 rounded-md shadow-lg">
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); handlePrintBoth('letterhead'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-t-md"
+                                                    >
+                                                        Letterhead Paper
+                                                    </button>
+                                                    <button
+                                                        onMouseDown={(e) => { e.preventDefault(); handlePrintBoth('plain'); }}
+                                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all rounded-b-md"
+                                                    >
+                                                        Plain Paper
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                </>
                             )}
                         </div>
 
@@ -2005,46 +2009,54 @@ export default function VisitDetail() {
                                         <div style={{ padding: '0 1.5rem', position: 'relative', zIndex: 1, flex: '1 0 auto' }}>
 
                                             {/* Top Section: Particulars and Basic Info */}
-                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                                            <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
 
                                                 {/* Particulars Box (Left) */}
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', borderSpacing: '2px' }}>
-                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
-                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Particulars</span>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '8px', borderSpacing: '1px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '2px' }}>
+                                                        <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Particulars</span>
                                                     </div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '9px', gap: '2px', lineHeight: '1.1', marginTop: '0px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>OPDN</span> <span style={{ color: 'blue', fontWeight: 'bold', marginLeft: '4px' }}>{visit.opdNo || 'N/A'}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>VISIT</span> <span style={{ marginLeft: '4px' }}>{visit.visitNumber || '1'}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>SEX</span> <span style={{ marginLeft: '4px' }}>{visit.gender || visit.patient?.gender || 'N/A'}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>AGE</span> <span style={{ marginLeft: '4px' }}>{visit.age || visit.patient?.age || 'N/A'}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DOB</span> <span style={{ marginLeft: '4px' }}>{visit.dob || visit.patient?.dob ? new Date(visit.dob || visit.patient?.dob).toLocaleDateString('en-GB') : ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PHONE</span> <span style={{ marginLeft: '4px' }}>{visit.phone || visit.patient?.phone}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><a href={`#nextVisit`} style={{ fontWeight: 'bold', textDecoration: 'underline', color: '#000', cursor: 'pointer' }}>F UP</a> <span style={{ marginLeft: '4px', color: '#C80000', fontWeight: 'bold' }}>{visit.followUpCount ? `#${visit.followUpCount}` : ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>NEXT VISIT</span> <span style={{ marginLeft: '4px', color: '#C80000', fontWeight: 'bold' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HT</span> <span style={{ marginLeft: '4px' }}>{visit.height}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>WT</span> <span style={{ marginLeft: '4px' }}>{visit.weight}</span></div>
+                                                    
+                                                    {/* Indicator Box - Moved to Particulars */}
+                                                    <div style={{ width: '30px', height: '15px', background: visit.improvements ? 'green' : 'red', marginBottom: '2px', border: '1px solid #000' }}></div>
+
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', fontSize: '10px', gap: '1px', lineHeight: '1.1', marginTop: '0px' }}>
+                                                        {/* Column 1 */}
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>SEX:</span> <span style={{ marginLeft: '4px' }}>{visit.gender || visit.patient?.gender || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>DOB:</span> <span style={{ marginLeft: '4px' }}>{visit.dob || visit.patient?.dob ? new Date(visit.dob || visit.patient?.dob).toLocaleDateString('en-GB') : <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>HT:</span> <span style={{ marginLeft: '4px' }}>{visit.height || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>WT:</span> <span style={{ marginLeft: '4px' }}>{visit.weight || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                        </div>
+                                                        {/* Column 2 */}
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>VISIT:</span> <span style={{ marginLeft: '4px' }}>{visit.visitNumber || '1'}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>AGE:</span> <span style={{ marginLeft: '4px' }}>{visit.age || visit.patient?.age || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><a href={`#nextVisit`} style={{ fontWeight: 'bold', color: '#000', cursor: 'pointer' }}>FOLLOW UP:</a> <span style={{ marginLeft: '4px', color: '#C80000', fontWeight: 'bold' }}>{visit.followUpCount ? `#${visit.followUpCount}` : <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>NEXT V:</span> <span style={{ marginLeft: '4px', color: '#C80000', fontWeight: 'bold' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString('en-GB') : <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
                                                 {/* Right Box: Patient Info */}
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', display: 'flex', gap: '5px', borderSpacing: '2px' }}>
-                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
-                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Patient Info</span>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '8px', display: 'flex', gap: '5px', borderSpacing: '1px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '2px' }}>
+                                                        <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Patient Info</span>
                                                     </div>
                                                     
-                                                    <div style={{ flex: 1, marginTop: '10px' }}>
-                                                        {/* Indicator Box - Added to Patient Copy */}
-                                                        <div style={{ width: '30px', height: '15px', background: visit.improvements ? 'green' : 'red', marginBottom: '3px', border: '1px solid #000' }}></div>
-
-                                                        <div style={{ fontSize: '0.75rem', lineHeight: '1.1', marginTop: '0px' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>NAME:</span> <span style={{ fontWeight: 'bold', color: '#FF0000', marginLeft: '4px' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</span></div>
-                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>FATHER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '4px' }}>{visit.patient?.fatherHusbandGuardianName || ''}</span></div>
-                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.patient?.address || visit.address || ''}</span></div>
+                                                    <div style={{ flex: 1, marginTop: '5px' }}>
+                                                        <div style={{ fontSize: '10px', lineHeight: '1.1', marginTop: '0px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>OPDN:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.opdNo || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>NAME:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{(visit.patient?.firstName || visit.patient?.lastName) ? `${visit.patient?.firstName || ''} ${visit.patient?.lastName || ''}` : <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>F/H/G NAME:</span> <span style={{ color: '#000', marginLeft: '4px' }}>{visit.patient?.fatherHusbandGuardianName || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ color: '#000', marginLeft: '4px' }}>{visit.patient?.address || visit.address || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>PHONE NO:</span> <span style={{ color: '#000', marginLeft: '4px' }}>{visit.patient?.phone || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>OCCUPATION:</span> <span style={{ color: '#000', marginLeft: '4px' }}>{visit.patient?.occupation || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
                                                         </div>
                                                     </div>
 
                                                     {/* Patient Image */}
-                                                    <div style={{ width: '60px', height: '75px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0, marginTop: '10px' }}>
+                                                    <div style={{ width: '60px', height: '75px', border: '1px solid #ddd', overflow: 'hidden', flexShrink: 0, marginTop: '5px' }}>
                                                         {visit.patient?.imageUrl ? (
                                                             <img
                                                                 src={visit.patient.imageUrl}
@@ -2078,70 +2090,73 @@ export default function VisitDetail() {
                                             </div>
 
                                             {/* EH Parameters Row */}
-                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '10px 0 5px 0' }}>
-                                                <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>EH Parameters</span>
+                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '5px 0 2px 0' }}>
+                                                <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>EH Parameters</span>
                                             </div>
-                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '8px', borderSpacing: '2px' }}>
-                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>TEMP</span> <span style={{ marginLeft: '4px' }}>{visit.temperament}</span></div>
+                                            <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '5px', borderSpacing: '1px' }}>
+                                                    <div style={{ fontSize: '10px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold' }}>TEMP:</span> <span style={{ marginLeft: '4px' }}>{visit.temperament || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
                                                 </div>
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '12px', borderSpacing: '2px' }}>
-                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-1</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis}</span></div>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '5px', borderSpacing: '1px' }}>
+                                                    <div style={{ fontSize: '10px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold' }}>PULSE-1:</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
                                                 </div>
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '12px', borderSpacing: '2px' }}>
-                                                    <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>PULSE-2</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis2}</span></div>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '5px', borderSpacing: '1px' }}>
+                                                    <div style={{ fontSize: '10px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1' }}><span style={{ fontWeight: 'bold' }}>PULSE-2:</span> <span style={{ marginLeft: '4px' }}>{visit.pulseDiagnosis2 || <span style={{ color: '#FF0000' }}>N/A</span>}</span></div>
                                                 </div>
                                             </div>
 
                                             {/* History & Reports */}
-                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '10px 0 5px 0' }}>
-                                                <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Prev Info</span>
+                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '5px 0 2px 0' }}>
+                                                <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Prev Info</span>
                                             </div>
-                                            <div style={{ padding: '8px', position: 'relative', paddingTop: '15px', marginBottom: '5px', minHeight: '40px', borderSpacing: '2px' }}>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '0px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>HISTORY & REPORTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.historyReports}</span></div>
+                                            <div style={{ padding: '4px', position: 'relative', paddingTop: '8px', marginBottom: '15px', borderSpacing: '1px' }}>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '0px' }}><span style={{ fontWeight: 'bold' }}>HISTORY & REPORTS:</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: visit.historyReports ? '#0000FF' : '#FF0000', fontSize: '12px', marginLeft: '4px' }}>{visit.historyReports || 'N/A'}</span></div>
                                             </div>
 
                                             {/* Chief Complaints */}
-                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '10px 0 5px 0' }}>
-                                                <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Sign & Symptoms</span>
+                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '5px 0 2px 0' }}>
+                                                <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Sign & Symptoms</span>
                                             </div>
-                                            <div style={{ padding: '8px', position: 'relative', paddingTop: '15px', marginBottom: '5px', minHeight: '30px', borderSpacing: '2px' }}>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '0px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>CHIEF COMPLAINTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.majorComplaints}</span></div>
+                                            <div style={{ padding: '4px', position: 'relative', paddingTop: '8px', marginBottom: '15px', borderSpacing: '1px' }}>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '0px' }}><span style={{ fontWeight: 'bold' }}>CHIEF COMPLAINTS:</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: visit.majorComplaints ? '#0000FF' : '#FF0000', fontSize: '12px', marginLeft: '4px' }}>{visit.majorComplaints || 'N/A'}</span></div>
                                             </div>
 
                                             {/* Investigations & Prov Diagnosis - Split into two boxes */}
-                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                                            <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
                                                 {/* Investigations */}
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', minHeight: '22px', borderSpacing: '2px' }}>
-                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
-                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Investigations</span>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '8px', borderSpacing: '1px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '2px' }}>
+                                                        <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Investigations</span>
                                                     </div>
-                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', lineHeight: '1.1', marginTop: '0px' }}>{visit.investigations}</div>
+                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: visit.investigations ? '#0000FF' : '#FF0000', fontSize: '12px', lineHeight: '1.1', marginTop: '0px', wordWrap: 'break-word' }}>{visit.investigations || 'N/A'}</div>
                                                 </div>
                                                 {/* Diagnosis */}
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', minHeight: '22px', borderSpacing: '2px' }}>
-                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
-                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Diagnosis</span>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '8px', borderSpacing: '1px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '2px' }}>
+                                                        <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Diagnosis</span>
                                                     </div>
-                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', lineHeight: '1.1', marginTop: '0px' }}>{visit.provisionalDiagnosis || visit.diagnoses}</div>
+                                                    <div style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: (visit.provisionalDiagnosis || visit.diagnoses) ? '#0000FF' : '#FF0000', fontSize: '12px', lineHeight: '1.1', marginTop: '0px', wordWrap: 'break-word' }}>{visit.provisionalDiagnosis || visit.diagnoses || 'N/A'}</div>
                                                 </div>
                                             </div>
 
                                             {/* Improvements */}
-                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '10px 0 5px 0' }}>
-                                                <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Cure</span>
+                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '5px 0 2px 0' }}>
+                                                <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Cure</span>
                                             </div>
-                                            <div style={{ padding: '8px', position: 'relative', paddingTop: '15px', marginBottom: '5px', minHeight: '22px', borderSpacing: '2px' }}>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '0px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>IMPROVEMENTS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.improvements}</span></div>
+                                            <div style={{ padding: '4px', position: 'relative', paddingTop: '8px', marginBottom: '15px', borderSpacing: '1px' }}>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', lineHeight: '1.1', marginTop: '0px' }}><span style={{ fontWeight: 'bold' }}>IMPROVEMENTS:</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: visit.improvements ? '#0000FF' : '#FF0000', fontSize: '12px', marginLeft: '4px' }}>{visit.improvements || 'N/A'}</span></div>
                                             </div>
 
                                             {/* Discuss */}
-                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '10px 0 5px 0' }}>
-                                                <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Discuss</span>
+                                            <div style={{ position: 'relative', borderBottom: '1px solid #FF8C00', margin: '5px 0 2px 0' }}>
+                                                <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Discuss</span>
                                             </div>
-                                            <div style={{ padding: '8px', position: 'relative', paddingTop: '15px', marginBottom: '5px', minHeight: '22px', borderSpacing: '2px' }}>
-                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', marginTop: '0px' }}><span style={{ fontWeight: 'bold', textDecoration: 'underline' }}>DISCUSS</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: '#0000FF', fontSize: '12px', marginLeft: '4px' }}>{visit.discussion}</span></div>
+                                            <div style={{ padding: '4px', position: 'relative', paddingTop: '8px', marginBottom: '15px', borderSpacing: '1px' }}>
+                                                <div style={{ fontSize: '9px', display: 'flex', alignItems: 'flex-start', marginTop: '0px' }}><span style={{ fontWeight: 'bold' }}>DISCUSS:</span> <span style={{ fontFamily: 'Brush Script MT, cursive', fontStyle: 'italic', color: visit.discussion ? '#0000FF' : '#FF0000', fontSize: '12px', marginLeft: '4px' }}>{visit.discussion || 'N/A'}</span></div>
                                             </div>
+
+                                            {/* Orange Separator */}
+                                            <div style={{ borderBottom: '0.5px solid #FF8C00', marginBottom: '0.5rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
 
                                             {/* Prescription Table */}
                                             <div className="mb-2" style={{ marginTop: '0.25rem' }}>
@@ -2150,7 +2165,7 @@ export default function VisitDetail() {
                                                     const hasSpy6 = visit.prescriptions?.some((p: any) => p.spy6) || false
 
                                                     return (
-                                                        <table className="w-full" style={{ fontSize: '0.55rem', borderCollapse: 'collapse' }}>
+                                                        <table className="w-full" style={{ fontSize: '0.65rem', borderCollapse: 'collapse' }}>
                                                             <tbody>
                                                                 {!visit.prescriptions || visit.prescriptions.length === 0 ? (
                                                                     <tr>
@@ -2164,18 +2179,18 @@ export default function VisitDetail() {
 
                                                                         return (
                                                                             <tr key={p.id}>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '3%', fontWeight: 'bold', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{index + 1}</td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', color: textColor, width: '15%', fontWeight: 'bold', fontSize: '0.55rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{medicineName}</td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
-                                                                                {hasSpy4 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>}
-                                                                                {hasSpy6 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>}
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', color: textColor, textTransform: 'uppercase', width: '8%', fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.timing || ''}</td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.dosage || ''}</td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.additions || ''}</td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '8%', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.5rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.presentation || ''}</td>
-                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.5rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(p.droppersToday?.toString() || '').toUpperCase()}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '3%', fontWeight: 'bold', fontSize: '0.6rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{index + 1}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'left', color: textColor, width: '15%', fontWeight: 'bold', fontSize: '0.65rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{medicineName}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.6rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.6rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.6rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>
+                                                                                {hasSpy4 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.6rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>}
+                                                                                {hasSpy6 && <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.6rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}></td>}
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', color: textColor, textTransform: 'uppercase', width: '8%', fontWeight: 'bold', fontSize: '0.6rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.timing || ''}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.6rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.dosage || ''}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.6rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.additions || ''}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '8%', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '0.6rem', color: textColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.presentation || ''}</td>
+                                                                                <td style={{ padding: '0.1rem 0.2rem', textAlign: 'center', width: '6%', color: textColor, fontWeight: 'bold', fontSize: '0.6rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{(p.droppersToday?.toString() || '').toUpperCase()}</td>
                                                                             </tr>
                                                                         )
                                                                     })
@@ -2185,9 +2200,6 @@ export default function VisitDetail() {
                                                     )
                                                 })()}
                                             </div>
-
-                                            {/* Orange Separator after table */}
-                                            <div style={{ borderBottom: '2px solid #FF8C00', marginBottom: '1rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}></div>
                                         </div>
 
                                         {/* Watermark Stamp - Positioned above footer on the right */}
@@ -2210,39 +2222,39 @@ export default function VisitDetail() {
                                             <div style={{ borderBottom: '2px solid #0000FF', marginBottom: '0.5rem', marginLeft: '-1.5rem', marginRight: '-1.5rem' }}></div>
 
                                             {/* Top Row: Particulars and Patient Info */}
-                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                                                 
                                                 {/* Left Box: Particulars */}
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', borderSpacing: '2px' }}>
-                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
-                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Particulars</span>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '8px', borderSpacing: '1px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '2px' }}>
+                                                        <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Particulars</span>
                                                     </div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', fontSize: '0.75rem', lineHeight: '1.2', marginTop: '0px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>OPDN:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '3px' }}>{visit.patient?.opdNo || visit.opdNo || ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>VISIT:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '3px' }}>{visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>PHONE:</span> <span style={{ fontWeight: 'bold', color: '#800080', marginLeft: '3px' }}>{visit.patient?.phone || visit.phone || ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>DOB:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '3px' }}>{visit.patient?.dob || visit.dob ? new Date(visit.patient?.dob || visit.dob).toLocaleDateString() : ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>GENDER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '3px' }}>{visit.patient?.gender || visit.gender || ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>AGE:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '3px' }}>{visit.age || visit.patient?.age || 'N/A'}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>DATE:</span> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '3px' }}>{new Date(visit.date).toLocaleDateString()}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><a href={`#nextVisit`} style={{ fontSize: '0.55rem', fontWeight: 'bold', textDecoration: 'none', color: '#000', cursor: 'pointer' }}>F UP:</a> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '3px' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>NEXT VISIT:</span> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '3px' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</span></div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', fontSize: '10px', lineHeight: '1.1', marginTop: '0px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>OPDN:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '3px' }}>{visit.patient?.opdNo || visit.opdNo || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>VISIT:</span> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '3px' }}>{visit.visitNumber || visit.visit_number || visit.followUpCount || '1'}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>PHONE:</span> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '3px' }}>{visit.patient?.phone || visit.phone || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>DOB:</span> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '3px' }}>{visit.patient?.dob || visit.dob ? new Date(visit.patient?.dob || visit.dob).toLocaleDateString() : ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>GENDER:</span> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '3px' }}>{visit.patient?.gender || visit.gender || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>AGE:</span> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '3px' }}>{visit.age || visit.patient?.age || 'N/A'}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>DATE:</span> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '3px' }}>{new Date(visit.date).toLocaleDateString()}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><a href={`#nextVisit`} style={{ fontWeight: 'bold', textDecoration: 'none', color: '#000', cursor: 'pointer' }}>F UP:</a> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '3px' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>NEXT VISIT:</span> <span style={{ fontWeight: 'bold', color: '#C80000', marginLeft: '3px' }}>{visit.nextVisit ? new Date(visit.nextVisit).toLocaleDateString() : ''}</span></div>
                                                     </div>
                                                 </div>
 
                                                 {/* Right Box: Patient Info */}
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', display: 'flex', gap: '5px', borderSpacing: '2px' }}>
-                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
-                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Patient Info</span>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '8px', display: 'flex', gap: '5px', borderSpacing: '1px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '2px' }}>
+                                                        <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Patient Info</span>
                                                     </div>
                                                     
-                                                    <div style={{ flex: 1, marginTop: '10px' }}>
+                                                    <div style={{ flex: 1, marginTop: '5px' }}>
                                                         {/* Indicator Box Removed from Office Copy */}
                                                         
-                                                        <div style={{ fontSize: '0.75rem', lineHeight: '1.2', marginTop: '0px' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>NAME:</span> <span style={{ fontWeight: 'bold', color: '#FF0000', marginLeft: '3px' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</span></div>
-                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>FATHER:</span> <span style={{ fontWeight: 'bold', color: '#FF8C00', marginLeft: '3px' }}>{visit.patient?.fatherHusbandGuardianName || ''}</span></div>
-                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.55rem', fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '3px' }}>{visit.patient?.address || visit.address || ''}</span></div>
+                                                        <div style={{ fontSize: '10px', lineHeight: '1.1', marginTop: '0px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>NAME:</span> <span style={{ color: '#0000FF', marginLeft: '3px' }}>{visit.patient?.firstName || ''} {visit.patient?.lastName || ''}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>F/H/G NAME:</span> <span style={{ color: '#000', marginLeft: '3px' }}>{visit.patient?.fatherHusbandGuardianName || ''}</span></div>
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>ADDRESS:</span> <span style={{ color: '#000', marginLeft: '3px' }}>{visit.patient?.address || visit.address || ''}</span></div>
                                                         </div>
                                                     </div>
 
@@ -2281,39 +2293,39 @@ export default function VisitDetail() {
                                             </div>
 
                                             {/* Middle Row: Medical Info */}
-                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                                                 {/* Box 1: Parameters */}
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', borderSpacing: '2px' }}>
-                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
-                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Parameters</span>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '8px', borderSpacing: '1px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '2px' }}>
+                                                        <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Parameters</span>
                                                     </div>
-                                                    <div style={{ fontSize: '0.75rem', lineHeight: '1.2' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>TEMP:</span> <span style={{ fontWeight: 'bold', color: '#800080', marginLeft: '4px' }}>{visit.temperament || ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>PULSE:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.pulseDiagnosis || ''}</span></div>
+                                                    <div style={{ fontSize: '10px', lineHeight: '1.1' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>TEMP:</span> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '4px' }}>{visit.temperament || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>PULSE:</span> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '4px' }}>{visit.pulseDiagnosis || ''}</span></div>
                                                     </div>
                                                 </div>
 
                                                 {/* Box 2: History & Complaints */}
-                                                <div style={{ flex: 2, padding: '8px', position: 'relative', paddingTop: '15px', borderSpacing: '2px' }}>
-                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
-                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>History & Complaints</span>
+                                                <div style={{ flex: 2, padding: '4px', position: 'relative', paddingTop: '8px', borderSpacing: '1px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '2px' }}>
+                                                        <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>History & Complaints</span>
                                                     </div>
-                                                    <div style={{ fontSize: '0.75rem', lineHeight: '1.2' }}>
-                                                        <div style={{ marginBottom: '2px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>HISTORY:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.historyReports || ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>COMPLAINTS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.majorComplaints || ''}</span></div>
+                                                    <div style={{ fontSize: '10px', lineHeight: '1.1' }}>
+                                                        <div style={{ marginBottom: '2px', display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>HISTORY:</span> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '4px' }}>{visit.historyReports || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>COMPLAINTS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.majorComplaints || ''}</span></div>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* Bottom Row: Diagnosis & Cure */}
-                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '5px' }}>
-                                                <div style={{ flex: 1, padding: '8px', position: 'relative', paddingTop: '15px', borderSpacing: '2px' }}>
-                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '5px' }}>
-                                                        <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 6px 5px 6px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Diagnosis & Cure</span>
+                                            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                                                <div style={{ flex: 1, padding: '4px', position: 'relative', paddingTop: '8px', borderSpacing: '1px' }}>
+                                                    <div style={{ position: 'absolute', top: '0', left: '0', right: '0', borderBottom: '1px solid #FF8C00', marginBottom: '2px' }}>
+                                                        <span style={{ position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(to right, #ffffff, #e1c699)', padding: '0 4px 2px 4px', color: '#000', fontWeight: 'bold', fontSize: '11px' }}>Diagnosis & Cure</span>
                                                     </div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.75rem', lineHeight: '1.2' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>IMPROVEMENTS:</span> <span style={{ fontWeight: 'bold', color: '#008000', marginLeft: '4px' }}>{visit.improvements || ''}</span></div>
-                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>PROV. DIAGNOSIS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.provisionalDiagnosis || ''}</span></div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '10px', lineHeight: '1.1' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>IMPROVEMENTS:</span> <span style={{ fontWeight: 'bold', color: '#000', marginLeft: '4px' }}>{visit.improvements || ''}</span></div>
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ fontWeight: 'bold' }}>PROV. DIAGNOSIS:</span> <span style={{ fontWeight: 'bold', color: '#0000FF', marginLeft: '4px' }}>{visit.provisionalDiagnosis || ''}</span></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2569,7 +2581,7 @@ export default function VisitDetail() {
                 
                 @media print {
                     @page {
-                        size: letter;
+                        size: A4;
                         margin: 0;
                     }
                     
@@ -2591,13 +2603,13 @@ export default function VisitDetail() {
                         position: fixed;
                         left: 0;
                         top: 0;
-                        width: 8.5in;
+                        width: 210mm;
+                        height: 297mm;
                         margin: 0;
                         padding: 0;
                         box-shadow: none;
                         border-radius: 0;
-                        transform: scale(0.68);
-                        transform-origin: top left;
+                        transform: none;
                     }
                     
                     .no-print {

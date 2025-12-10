@@ -29,10 +29,16 @@ function NewTreatmentPage() {
     const [allTreatments, setAllTreatments] = useState<any[]>([])
     const [uniqueDiagnoses, setUniqueDiagnoses] = useState<string[]>([])
     const [prefillMode, setPrefillMode] = useState(false)
-    const [planNumber, setPlanNumber] = useState('01')
+    const [planNumber, setPlanNumber] = useState('1')
+    const [isPlanNumberLocked, setIsPlanNumberLocked] = useState(true)
     const [selectedProductId, setSelectedProductId] = useState('')
     const [selectedMedicines, setSelectedMedicines] = useState<string[]>([])
     const [medicines, setMedicines] = useState<any[]>([])
+    const [selectedMedicineIndices, setSelectedMedicineIndices] = useState<Set<number>>(new Set())
+    const [showRepeatInput, setShowRepeatInput] = useState(false)
+    const [repeatCount, setRepeatCount] = useState<string>('')
+    const [showRepeatInputForRow, setShowRepeatInputForRow] = useState<{[key: number]: boolean}>({})
+    const [repeatCountForRow, setRepeatCountForRow] = useState<{[key: number]: string}>({})
     const [isBasicInfoDropdownOpen, setIsBasicInfoDropdownOpen] = useState(false)
     const [isOrganOpen, setIsOrganOpen] = useState(false)
     const [isSpecialityOpen, setIsSpecialityOpen] = useState(false)
@@ -74,7 +80,6 @@ function NewTreatmentPage() {
         diseaseAction: '',
         provDiagnosis: '',
         treatmentPlan: '',
-        administration: '',
         notes: ''
     }
 
@@ -99,13 +104,8 @@ function NewTreatmentPage() {
             )) as string[]
             setUniqueDiagnoses(diagnoses.sort())
 
-            // Calculate highest plan number
-            const planNumbers = treatments
-                .filter((t: any) => t.planNumber && !t.deleted)
-                .map((t: any) => parseInt(t.planNumber) || 0)
-            const maxPlanNumber = planNumbers.length > 0 ? Math.max(...planNumbers) : 0
-            const nextPlanNumber = String(maxPlanNumber + 1).padStart(2, '0')
-            setPlanNumber(nextPlanNumber)
+            // Plan number will be calculated when diagnosis is selected
+            setPlanNumber('01')
         })
     }, [])
 
@@ -129,7 +129,6 @@ function NewTreatmentPage() {
                 organ: organ?.toUpperCase() || '',
                 diseaseAction: diseaseAction?.toUpperCase() || '',
                 treatmentPlan: diagnosis.toUpperCase(),
-                administration: '',
                 notes: ''
             })
         }
@@ -137,6 +136,20 @@ function NewTreatmentPage() {
 
     function updateProvDiagnosis(newDiagnosis: string) {
         const upperDiagnosis = newDiagnosis.toUpperCase()
+        
+        // Calculate next plan number for this diagnosis
+        if (upperDiagnosis && allTreatments.length > 0) {
+            const diagnosisTreatments = allTreatments.filter((t: any) => 
+                t.provDiagnosis?.toUpperCase() === upperDiagnosis && !t.deleted
+            )
+            const planNumbers = diagnosisTreatments.map((t: any) => parseInt(t.planNumber) || 0)
+            const maxPlanNumber = planNumbers.length > 0 ? Math.max(...planNumbers) : 0
+            const nextPlanNumber = String(maxPlanNumber + 1)
+            setPlanNumber(nextPlanNumber)
+        } else {
+            setPlanNumber('1')
+        }
+        
         // Auto-fill other fields based on selected diagnosis
         if (upperDiagnosis && allTreatments.length > 0) {
             const matchingTreatment = allTreatments.find((t: any) =>
@@ -151,7 +164,6 @@ function NewTreatmentPage() {
                     organ: matchingTreatment.organ?.toUpperCase() || '',
                     diseaseAction: matchingTreatment.diseaseAction?.toUpperCase() || '',
                     treatmentPlan: upperDiagnosis,
-                    administration: form.administration.toUpperCase(),
                     notes: form.notes.toUpperCase()
                 })
                 return
@@ -215,6 +227,78 @@ function NewTreatmentPage() {
 
     function removeMedicine(index: number) {
         setMedicines(medicines.filter((_, i) => i !== index))
+        // Update selected indices after removal
+        const newSelected = new Set<number>()
+        selectedMedicineIndices.forEach(i => {
+            if (i < index) newSelected.add(i)
+            else if (i > index) newSelected.add(i - 1)
+        })
+        setSelectedMedicineIndices(newSelected)
+    }
+    
+    // Toggle medicine selection
+    function toggleMedicineSelection(index: number) {
+        const newSelected = new Set(selectedMedicineIndices)
+        if (newSelected.has(index)) {
+            newSelected.delete(index)
+        } else {
+            newSelected.add(index)
+        }
+        setSelectedMedicineIndices(newSelected)
+    }
+    
+    // Toggle select all medicines
+    function toggleSelectAll() {
+        if (selectedMedicineIndices.size === medicines.length) {
+            setSelectedMedicineIndices(new Set())
+        } else {
+            setSelectedMedicineIndices(new Set(medicines.map((_, i) => i)))
+        }
+    }
+    
+    // Remove selected medicines
+    function removeSelectedMedicines() {
+        if (selectedMedicineIndices.size === 0) return
+        const newMedicines = medicines.filter((_, i) => !selectedMedicineIndices.has(i))
+        setMedicines(newMedicines)
+        setSelectedMedicineIndices(new Set())
+    }
+    
+    // Repeat selected medicines
+    function repeatSelectedMedicines() {
+        if (selectedMedicineIndices.size === 0) return
+        const count = parseInt(repeatCount)
+        if (!count || count < 1) return
+        
+        const selectedIndices = Array.from(selectedMedicineIndices).sort((a, b) => a - b)
+        const itemsToRepeat = selectedIndices.map(i => ({ ...medicines[i] }))
+        
+        const newMedicines = [...medicines]
+        for (let i = 0; i < count; i++) {
+            newMedicines.push(...itemsToRepeat.map(item => ({ ...item })))
+        }
+        
+        setMedicines(newMedicines)
+        setSelectedMedicineIndices(new Set())
+        setShowRepeatInput(false)
+        setRepeatCount('')
+    }
+    
+    // Repeat single row
+    function repeatSingleRow(index: number) {
+        const count = parseInt(repeatCountForRow[index] || '')
+        if (!count || count < 1) return
+        
+        const itemToRepeat = { ...medicines[index] }
+        const newMedicines = [...medicines]
+        
+        for (let i = 0; i < count; i++) {
+            newMedicines.push({ ...itemToRepeat })
+        }
+        
+        setMedicines(newMedicines)
+        setShowRepeatInputForRow(prev => ({ ...prev, [index]: false }))
+        setRepeatCountForRow(prev => ({ ...prev, [index]: '' }))
     }
 
     function updateMedicine(index: number, field: string, value: any) {
@@ -242,7 +326,6 @@ function NewTreatmentPage() {
                 provDiagnosis: form.provDiagnosis.toUpperCase(),
                 planNumber: planNumber,
                 treatmentPlan: (form.treatmentPlan || form.provDiagnosis).toUpperCase(),
-                administration: form.administration.toUpperCase(),
                 notes: form.notes.toUpperCase(),
                 products: medicines.filter((p: any) => p.productId).map((p: any) => ({
                     productId: p.productId,
@@ -389,7 +472,7 @@ function NewTreatmentPage() {
                                 onChange={(val) => setForm({ ...form, speciality: val.toUpperCase() })}
                                 options={[
                                     { value: '', label: 'Select speciality' },
-                                    ...speciality.map(s => ({ value: s, label: s }))
+                                    ...speciality.sort((a, b) => a.localeCompare(b)).map(s => ({ value: s, label: s }))
                                 ]}
                                 placeholder="Select speciality"
                                 allowCustom={true}
@@ -437,7 +520,7 @@ function NewTreatmentPage() {
                                 onChange={(val) => setForm({ ...form, organ: val })}
                                 options={[
                                     { value: '', label: 'Select organ' },
-                                    ...organ.map(o => ({ value: o, label: o }))
+                                    ...organ.sort((a, b) => a.localeCompare(b)).map(o => ({ value: o, label: o }))
                                 ]}
                                 placeholder="Select organ"
                                 allowCustom={true}
@@ -453,7 +536,7 @@ function NewTreatmentPage() {
                                 onChange={(val) => setForm({ ...form, diseaseAction: val.toUpperCase() })}
                                 options={[
                                     { value: '', label: 'Select disease action' },
-                                    ...diseaseAction.map(d => ({ value: d, label: d }))
+                                    ...diseaseAction.sort((a, b) => a.localeCompare(b)).map(d => ({ value: d, label: d }))
                                 ]}
                                 placeholder="Select disease action"
                                 allowCustom={true}
@@ -482,15 +565,40 @@ function NewTreatmentPage() {
                         <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-emerald-300/50 dark:border-emerald-700/50">
                             <div className="flex items-center gap-3">
                                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Plan Number:</span>
-                                <span className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-sm font-bold shadow-md">
-                                    {planNumber}
-                                </span>
+                                {isPlanNumberLocked ? (
+                                    <span className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-md text-sm font-bold shadow-md">
+                                        {planNumber}
+                                    </span>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={planNumber}
+                                        onChange={(e) => setPlanNumber(e.target.value)}
+                                        className="px-3 py-1.5 border-2 border-emerald-500 rounded-md text-sm font-bold w-20 text-center"
+                                    />
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPlanNumberLocked(!isPlanNumberLocked)}
+                                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                                    title={isPlanNumberLocked ? "Unlock to edit" : "Lock plan number"}
+                                >
+                                    {isPlanNumberLocked ? (
+                                        <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                        </svg>
+                                    )}
+                                </button>
                             </div>
                         </div>
 
                         {/* Plan Details Form */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-                            <div className="sm:col-span-2 lg:col-span-3">
+                        <div className="grid grid-cols-1 gap-3 mb-4">
+                            <div>
                                 <label className="block text-sm font-medium mb-1.5">Treatment Plan Details</label>
                                 <input
                                     placeholder="TREATMENT PLAN DESCRIPTION"
@@ -498,18 +606,6 @@ function NewTreatmentPage() {
                                     onChange={e => setForm({ ...form, treatmentPlan: e.target.value.toUpperCase() })}
                                     className="p-2 border rounded-lg w-full text-sm uppercase"
                                     readOnly={prefillMode}
-                                />
-                            </div>
-                            <div className={isAdministrationOpen ? 'relative z-[10000]' : 'relative z-0'}>
-                                <label className="block text-sm font-medium mb-1.5">Administration</label>
-                                <CustomSelect
-                                    value={form.administration}
-                                    onChange={(val) => setForm({ ...form, administration: val.toUpperCase() })}
-                                    options={administration}
-                                    placeholder="Select administration"
-                                    allowCustom={true}
-                                    className="w-full"
-                                    onOpenChange={setIsAdministrationOpen}
                                 />
                             </div>
                         </div>
@@ -601,6 +697,82 @@ function NewTreatmentPage() {
                             </div>
 
                             {/* Added Medicines in Treatment */}
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    {medicines.length > 0 && (
+                                        <label className="relative group/checkbox cursor-pointer flex-shrink-0">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedMedicineIndices.size === medicines.length && medicines.length > 0}
+                                                onChange={toggleSelectAll}
+                                                className="peer sr-only"
+                                            />
+                                            <div className="w-5 h-5 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                        </label>
+                                    )}
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                        Medicines in Treatment {selectedMedicineIndices.size > 0 && <span className="px-2 py-0.5 ml-2 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-bold">({selectedMedicineIndices.size} selected)</span>}
+                                    </span>
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                    {selectedMedicineIndices.size > 0 && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={removeSelectedMedicines}
+                                                className="px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-700 rounded-lg transition-colors shadow-sm hover:shadow-md"
+                                                title={`Remove ${selectedMedicineIndices.size} selected`}
+                                            >
+                                                <svg className="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                                Remove ({selectedMedicineIndices.size})
+                                            </button>
+                                            {!showRepeatInput ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowRepeatInput(true)}
+                                                    className="px-3 py-1.5 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-700 rounded-lg transition-colors shadow-sm hover:shadow-md"
+                                                >
+                                                    <svg className="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                    </svg>
+                                                    Repeat
+                                                </button>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={repeatCount}
+                                                        onChange={(e) => setRepeatCount(e.target.value)}
+                                                        placeholder="Times"
+                                                        className="w-16 px-2 py-1 text-xs border border-purple-300 dark:border-purple-700 rounded bg-white dark:bg-gray-800"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={repeatSelectedMedicines}
+                                                        className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                                                    >
+                                                        OK
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setShowRepeatInput(false); setRepeatCount('') }}
+                                                        className="px-2 py-1 text-xs bg-gray-400 text-white rounded hover:bg-gray-500"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                             {medicines.length === 0 ? (
                                 <div className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs text-center">
                                     <p className="text-muted">No medicines added to treatment yet. Select medicines and click "Add All to Treatment".</p>
@@ -611,9 +783,26 @@ function NewTreatmentPage() {
                                         const product = products.find(p => String(p.id) === String(medicine.productId))
                                         return (
                                             <div key={medicineIndex} className="relative group transition-all duration-300 border border-emerald-200/40 dark:border-emerald-700/40 bg-gradient-to-br from-white via-emerald-50/20 to-transparent dark:from-gray-900/80 dark:via-emerald-950/10 dark:to-gray-900/80 rounded-2xl hover:border-emerald-400/60 dark:hover:border-emerald-600/60 hover:shadow-xl hover:shadow-emerald-500/10">
+                                                {/* Selection Checkbox */}
+                                                <div className="absolute top-4 left-4 z-10">
+                                                    <label className="relative group/checkbox cursor-pointer flex-shrink-0">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedMedicineIndices.has(medicineIndex)}
+                                                            onChange={() => toggleMedicineSelection(medicineIndex)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="peer sr-only"
+                                                        />
+                                                        <div className="w-5 h-5 border-2 border-emerald-400 dark:border-emerald-600 rounded-md bg-white dark:bg-gray-700 peer-checked:bg-gradient-to-br peer-checked:from-emerald-500 peer-checked:to-green-600 peer-checked:border-emerald-500 transition-all duration-200 flex items-center justify-center shadow-sm peer-checked:shadow-lg peer-checked:shadow-emerald-500/50 group-hover/checkbox:border-emerald-500 group-hover/checkbox:scale-110">
+                                                            <svg className="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        </div>
+                                                    </label>
+                                                </div>
                                                 {/* Futuristic glow effect on hover */}
                                                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-400/0 via-green-400/0 to-emerald-500/0 group-hover:from-emerald-400/5 group-hover:via-green-400/5 group-hover:to-emerald-500/5 transition-all duration-500 pointer-events-none"></div>
-                                                <div className="relative p-4">
+                                                <div className="relative pl-12 p-4">
                                                     {/* Row 1: Medicine Name (Left) + SPY Grid (Right) */}
                                                     <div className="flex flex-col lg:flex-row gap-4 mb-3">
                                                         {/* LEFT: Medicine Info */}
@@ -1038,19 +1227,58 @@ function NewTreatmentPage() {
                                                                 <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Presentation</label>
                                                                 <CustomSelect value={medicine.presentation || ''} onChange={(val) => updateMedicine(medicineIndex, 'presentation', val.toUpperCase())} options={presentation} placeholder="Pres" allowCustom={true} className="text-xs h-8" />
                                                             </div>
-                                                            <div className="flex-1 min-w-[112px]">
-                                                                <label className="block text-[10px] font-semibold text-gray-600 dark:text-gray-400 mb-0.5">Site</label>
-                                                                <CustomSelect value={medicine.administration || ''} onChange={(val) => updateMedicine(medicineIndex, 'administration', val.toUpperCase())} options={administration} placeholder="Admin" allowCustom={true} className="text-xs h-8" />
-                                                            </div>
                                                         </div>
 
-                                                        {/* Remove Button */}
-                                                        <div className="flex justify-end pt-3 border-t border-emerald-200/30 dark:border-emerald-700/30 mt-3">
+                                                        {/* Action Buttons */}
+                                                        <div className="flex justify-end gap-2 pt-3 border-t border-emerald-200/30 dark:border-emerald-700/30 mt-3">
+                                                            {showRepeatInputForRow[medicineIndex] ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="1"
+                                                                        value={repeatCountForRow[medicineIndex] || ''}
+                                                                        onChange={(e) => setRepeatCountForRow(prev => ({ ...prev, [medicineIndex]: e.target.value }))}
+                                                                        placeholder="Times"
+                                                                        className="w-16 px-2 py-1 text-xs border border-purple-300 dark:border-purple-700 rounded bg-white dark:bg-gray-800"
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => repeatSingleRow(medicineIndex)}
+                                                                        className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                                                                    >
+                                                                        OK
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => { 
+                                                                            setShowRepeatInputForRow(prev => ({ ...prev, [medicineIndex]: false }))
+                                                                            setRepeatCountForRow(prev => ({ ...prev, [medicineIndex]: '' }))
+                                                                        }}
+                                                                        className="px-2 py-1 text-xs bg-gray-400 text-white rounded hover:bg-gray-500"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowRepeatInputForRow(prev => ({ ...prev, [medicineIndex]: true }))}
+                                                                    className="px-3 py-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-white hover:bg-purple-500 dark:hover:bg-purple-600 border border-purple-300 dark:border-purple-700 rounded-lg transition-all duration-200 hover:shadow-md"
+                                                                >
+                                                                    <svg className="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                                    </svg>
+                                                                    Repeat
+                                                                </button>
+                                                            )}
                                                             <button
                                                                 type="button"
                                                                 onClick={() => removeMedicine(medicineIndex)}
-                                                                className="px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-600 border border-red-300 dark:border-red-700 rounded-lg transition-all duration-200 hover:shadow-md"
+                                                                className="px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-600 border border-red-300 dark:border-red-700 rounded-lg transition-all duration-200 hover:shadow-md"
                                                             >
+                                                                <svg className="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                </svg>
                                                                 Remove
                                                             </button>
                                                         </div>
